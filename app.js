@@ -29,6 +29,7 @@ const supabaseClient = (window.supabase && typeof window.supabase.createClient =
     : null;
 let currentUser = null;
 let cloudLastUpdated = null;
+let pendingCloudSave = false;
 
 // --- TOAST ---
 function showToast(message){
@@ -45,6 +46,8 @@ window.save = function(options){
     const opts = options || {};
     const silent = !!opts.silent;
     const skipBackup = !!opts.skipBackup;
+    const skipCloud = !!opts.skipCloud;
+    const triggerCloud = opts.triggerCloud !== false;
 
     if(!skipBackup){
         const existing = localStorage.getItem(SAVE_KEY);
@@ -66,6 +69,7 @@ window.save = function(options){
     } else {
         render();
     }
+    if(triggerCloud && !skipCloud) queueCloudSave();
     if(!opts.skipToast) showToast('Sauvegardé');
 };
 
@@ -421,7 +425,7 @@ function applyLoadedState(data) {
     gameState.activeQuests = gameState.activeQuests || [];
     gameState.rewards = gameState.rewards || [];
     gameState.inventory = gameState.inventory || [];
-    window.save({silent:true, skipBackup:true, skipToast:true});
+    window.save({silent:true, skipBackup:true, skipToast:true, skipCloud:true});
     render();
 }
 
@@ -535,12 +539,24 @@ async function bootstrapSupabaseAuth(){
     const { data } = await supabaseClient.auth.getUser();
     currentUser = data?.user || null;
     await fetchCloudMeta();
+    if(currentUser) await window.cloudLoad({silent:true});
     updateCloudUI();
     supabaseClient.auth.onAuthStateChange(async (_event, session) => {
         currentUser = session?.user || null;
         await fetchCloudMeta();
+        if(currentUser) await window.cloudLoad({silent:true});
         updateCloudUI();
     });
+}
+
+function queueCloudSave(){
+    if(!supabaseClient || !currentUser) return;
+    if(pendingCloudSave) return;
+    pendingCloudSave = true;
+    setTimeout(async ()=>{
+        pendingCloudSave = false;
+        await window.cloudSave({silent:true});
+    }, 400);
 }
 
 async function fetchCloudMeta(){
@@ -556,7 +572,7 @@ async function fetchCloudMeta(){
 }
 
 window.cloudLogin = async () => {
-    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    if(!supabaseClient){ if(!silent) alert("Supabase non charg?."); return; }
     const email = (document.getElementById('cloud-email')?.value || '').trim();
     const password = (document.getElementById('cloud-password')?.value || '').trim();
     if(!email || !password){ alert("Saisis email et mot de passe."); return; }
@@ -577,7 +593,7 @@ window.cloudLogout = async () => {
 };
 
 window.cloudSignUp = async () => {
-    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    if(!supabaseClient){ if(!silent) alert("Supabase non charg?."); return; }
     const email = (document.getElementById('cloud-email')?.value || '').trim();
     const password = (document.getElementById('cloud-password')?.value || '').trim();
     if(!email || !password){ alert("Saisis email et mot de passe."); return; }
@@ -590,7 +606,7 @@ window.cloudSignUp = async () => {
 };
 
 window.cloudReset = async () => {
-    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    if(!supabaseClient){ if(!silent) alert("Supabase non charg?."); return; }
     const email = (document.getElementById('cloud-email')?.value || '').trim();
     if(!email){ alert("Saisis ton email."); return; }
     updateCloudUI("Envoi du reset...");
@@ -602,10 +618,12 @@ window.cloudReset = async () => {
     updateCloudUI("Email reset envoyé.");
 };
 
-window.cloudSave = async () => {
-    if(!supabaseClient){ alert("Supabase non chargé."); return; }
-    if(!currentUser){ alert("Connecte-toi d'abord."); return; }
-    updateCloudUI("Sauvegarde en cours...");
+window.cloudSave = async (opts) => {
+    const options = opts || {};
+    const silent = !!options.silent;
+    if(!supabaseClient){ if(!silent) alert("Supabase non charg?."); return; }
+    if(!currentUser){ if(!silent) alert("Connecte-toi d'abord."); return; }
+    if(!silent) updateCloudUI("Sauvegarde en cours...");
     const { error } = await supabaseClient
         .from('saves')
         .upsert({
@@ -613,23 +631,25 @@ window.cloudSave = async () => {
             data: gameState,
             updated_at: new Date().toISOString()
         });
-    if(error){ alert("Erreur sauvegarde cloud : " + error.message); updateCloudUI(); return; }
+    if(error){ if(!silent) alert("Erreur sauvegarde cloud : " + error.message); updateCloudUI(); return; }
     cloudLastUpdated = new Date().toISOString();
-    showToast('Sauvegarde cloud OK');
+    if(!silent) showToast('Sauvegarde cloud OK');
     updateCloudUI();
 };
 
-window.cloudLoad = async () => {
-    if(!supabaseClient){ alert("Supabase non chargé."); return; }
-    if(!currentUser){ alert("Connecte-toi d'abord."); return; }
-    updateCloudUI("Chargement cloud...");
+window.cloudLoad = async (opts) => {
+    const options = opts || {};
+    const silent = !!options.silent;
+    if(!supabaseClient){ if(!silent) alert("Supabase non charg?."); return; }
+    if(!currentUser){ if(!silent) alert("Connecte-toi d'abord."); return; }
+    if(!silent) updateCloudUI("Chargement cloud...");
     const { data, error } = await supabaseClient
         .from('saves')
         .select('data, updated_at')
         .eq('user_id', currentUser.id)
         .maybeSingle();
-    if(error && error.code !== 'PGRST116'){ alert("Erreur cloud : " + error.message); updateCloudUI(); return; }
-    if(!data){ alert("Aucune sauvegarde cloud trouvée."); updateCloudUI(); return; }
+    if(error && error.code !== 'PGRST116'){ if(!silent) alert("Erreur cloud : " + error.message); updateCloudUI(); return; }
+    if(!data){ if(!silent) alert("Aucune sauvegarde cloud trouv?e."); updateCloudUI(); return; }
     cloudLastUpdated = data.updated_at;
     applyLoadedState(data.data);
     showToast('Chargé depuis le cloud');
@@ -1163,6 +1183,6 @@ window.onload = () => {
     updateCloudUI();
     bootstrapSupabaseAuth();
     refreshManualSlots();
-    setInterval(() => window.save({silent:true, skipToast:true}), 30000);
+    setInterval(() => window.save({silent:true, skipToast:true, skipBackup:true, triggerCloud:true}), 60000);
     render();
 };
