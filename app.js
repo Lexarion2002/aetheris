@@ -427,13 +427,34 @@ function applyLoadedState(data) {
 
 // --- BACKUPS ---
 window.exportBackup = () => {
-    const blob = new Blob([JSON.stringify(gameState)], {type: "application/json"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'aetheris_backup.json';
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    const doDownload = (data, label) => {
+        const blob = new Blob([JSON.stringify(data)], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = label || 'aetheris_backup.json';
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    };
+
+    const tryCloud = async () => {
+        if(!supabaseClient || !currentUser) return false;
+        const { data, error } = await supabaseClient
+            .from('saves')
+            .select('data')
+            .eq('user_id', currentUser.id)
+            .maybeSingle();
+        if(error || !data) return false;
+        doDownload(data.data, 'aetheris_backup_cloud.json');
+        showToast('Exporté depuis le cloud');
+        return true;
+    };
+
+    tryCloud().then(ok => {
+        if(ok) return;
+        doDownload(gameState, 'aetheris_backup_local.json');
+        showToast('Exporté (local)');
+    });
 };
 
 window.importBackup = (file) => {
@@ -452,14 +473,7 @@ window.importBackup = (file) => {
 };
 
 window.restorePreviousBackup = () => {
-    for(const key of BACKUP_KEYS){
-        const data = localStorage.getItem(key);
-        if(data){
-            try { applyLoadedState(JSON.parse(data)); showToast('Backup restauré'); return; }
-            catch(e){ continue; }
-        }
-    }
-    alert("Aucun backup disponible.");
+    alert("Fonction de restauration automatique retirée. Utilise Importer pour charger un fichier.");
 };
 
 // --- CLOUD (SUPABASE) ---
@@ -623,62 +637,15 @@ window.cloudLoad = async () => {
 };
 
 function refreshManualSlots(){
-    const sel = document.getElementById('slot-select');
-    if(!sel) return;
-    const keys = Object.keys(localStorage).filter(k => k.startsWith('aetheris_slot_')).sort();
-    // Forcer le slot auto en tête s'il existe
-    const hasAuto = localStorage.getItem('aetheris_slot_auto');
-    if(hasAuto && !keys.includes('aetheris_slot_auto')){
-        keys.unshift('aetheris_slot_auto');
-    }
-    sel.innerHTML = "";
-    if(!keys.length){
-        const opt = document.createElement('option');
-        opt.value = "";
-        opt.innerText = "Aucune sauvegarde";
-        sel.appendChild(opt);
-        return;
-    }
-    keys.forEach(k => {
-        const opt = document.createElement('option');
-        opt.value = k;
-        let labelName = k === 'aetheris_slot_auto' ? 'Sauvegarde auto' : k.replace('aetheris_slot_','');
-        try {
-            const parsed = JSON.parse(localStorage.getItem(k) || "{}");
-            const ts = parsed?.lastSavedAt;
-            if(ts){
-                const d = new Date(ts);
-                const stamp = d.toLocaleString('fr-FR', { day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit' });
-                labelName += ` — ${stamp}`;
-            }
-        } catch(e){}
-        opt.innerText = labelName;
-        sel.appendChild(opt);
-    });
+    // Slots retir�s de l'UI.
 }
 
 window.saveSlot = () => {
-    const input = document.getElementById('manual-save-name');
-    const name = (input?.value || '').trim();
-    if(!name){ alert("Choisis un nom de sauvegarde (slot)."); return; }
-    const key = `aetheris_slot_${name}`;
-    localStorage.setItem(key, JSON.stringify(gameState));
-    showToast(`Sauvegarde manuelle créée (${name})`);
-    refreshManualSlots();
+    alert("Slots retir�s. Utilise Exporter/Importer ou Sauver/Charger cloud.");
 };
 
 window.loadSlot = () => {
-    const sel = document.getElementById('slot-select');
-    const name = sel?.value;
-    if(!name){ alert("Aucune sauvegarde sélectionnée."); return; }
-    const data = localStorage.getItem(name);
-    if(!data){ alert("Sauvegarde introuvable."); return; }
-    try{
-        applyLoadedState(JSON.parse(data));
-        showToast(`Chargé depuis ${name.replace('aetheris_slot_','')}`);
-    }catch(e){
-        alert("Sauvegarde invalide.");
-    }
+    alert("Slots retir�s. Utilise Exporter/Importer ou Sauver/Charger cloud.");
 };
 
 // --- ACTIONS GLOBALES ---

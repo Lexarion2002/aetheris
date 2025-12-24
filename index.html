@@ -71,21 +71,7 @@
                         <button id="export-backup" class="btn-primary" style="width:100%; margin-bottom:8px;">Exporter</button>
                         <button id="import-backup" class="btn-util" style="width:100%;">Importer</button>
                         <input type="file" id="import-backup-file" accept="application/json" style="display:none">
-                        <div class="creator-row mini" style="margin-top:8px;">
-                            <button id="copy-backup" class="btn-util">Copier</button>
-                            <button id="paste-backup" class="btn-util">Coller</button>
-                            <button id="restore-backup" class="btn-util">Restaurer backup</button>
-                        </div>
-                        <div class="creator-column" style="margin-top:8px;">
-                            <input type="text" id="manual-save-name" placeholder="Nom de sauvegarde (ex: slot1)">
-                            <div class="creator-row mini">
-                                <button id="save-slot" class="btn-primary">Sauvegarder</button>
-                                <select id="slot-select"></select>
-                                <button id="load-slot" class="btn-util">Charger</button>
-                            </div>
-                        </div>
-                        <div id="backup-status" class="last-save">Backup: 0/3</div>
-                        <div id="last-save-display" class="last-save">Derniere sauvegarde : --</div>
+                        <div class="last-save" id="backup-status">Backup local: --</div>
                     </div>
                 </section>
             </aside>
