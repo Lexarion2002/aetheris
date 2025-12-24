@@ -588,8 +588,11 @@ window.cloudLogout = async () => {
     await supabaseClient.auth.signOut();
     currentUser = null;
     cloudLastUpdated = null;
-    updateCloudUI("Déconnecté");
-    showToast('Déconnecté');
+    gameState = baseState();
+    window.save({silent:true, skipToast:true, skipCloud:true});
+    render();
+    updateCloudUI("Deconnecte");
+    showToast('Deconnecte (donnees locales reinitialisees)');
 };
 
 window.cloudSignUp = async () => {
