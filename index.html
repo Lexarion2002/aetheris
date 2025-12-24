@@ -12,6 +12,26 @@
         <button id="toggle-sidebar" class="btn-util" style="position:fixed; left:16px; top:16px; z-index:900;">≡</button>
         <div class="dashboard-grid">
             <aside class="glass-card sidebar-compact">
+                <section class="glass-card" style="margin-top:0;">
+                    <h3 class="section-title">CONNEXION</h3>
+                    <div class="cloud-box">
+                        <input type="email" id="cloud-email" placeholder="Email">
+                        <input type="password" id="cloud-password" placeholder="Mot de passe (min 6)">
+                        <div class="creator-row mini">
+                            <button id="cloud-signup" class="btn-primary">Inscription</button>
+                            <button id="cloud-login" class="btn-util">Connexion</button>
+                        </div>
+                        <div class="creator-row mini">
+                            <button id="cloud-reset" class="btn-util">Reset mot de passe</button>
+                            <button id="cloud-logout" class="btn-util">Deconnexion</button>
+                        </div>
+                        <div class="creator-row mini">
+                            <button id="cloud-save" class="btn-primary" style="flex:1;">Sauver cloud</button>
+                            <button id="cloud-load" class="btn-util" style="flex:1;">Charger cloud</button>
+                        </div>
+                        <div id="cloud-status" class="last-save">Non connecte</div>
+                    </div>
+                </section>
                 <div class="player-identity">
                     <div id="player-title" class="player-title">NOVICE</div>
                     <div class="player-subtitle">NIVEAU <span id="level-value">1</span></div>
@@ -35,7 +55,7 @@
                         <span id="gold-value" class="stat-value">0</span>
                     </div>
                     <div class="stat-unit">
-                        <span class="stat-label">SÉRIE</span>
+                        <span class="stat-label">S?%RIE</span>
                         <span id="streak-value" class="stat-value">0</span>
                     </div>
                 </div>
@@ -44,27 +64,6 @@
                 <div id="active-stats-tags" class="tags-container"></div>
                 <button onclick="window.addNewStat()" class="btn-primary" style="width:100%; margin-top:10px;">+ ATTRIBUT</button>
                 
-                <section class="glass-card" style="margin-top:12px;">
-                    <h3 class="section-title">CLOUD</h3>
-                    <div class="cloud-box">
-                        <input type="email" id="cloud-email" placeholder="Email">
-                        <input type="password" id="cloud-password" placeholder="Mot de passe (min 6)">
-                        <div class="creator-row mini">
-                            <button id="cloud-signup" class="btn-primary">Inscription</button>
-                            <button id="cloud-login" class="btn-util">Connexion</button>
-                        </div>
-                        <div class="creator-row mini">
-                            <button id="cloud-reset" class="btn-util">Reset mot de passe</button>
-                            <button id="cloud-logout" class="btn-util">Déconnexion</button>
-                        </div>
-                        <div class="creator-row mini">
-                            <button id="cloud-save" class="btn-primary" style="flex:1;">Sauver cloud</button>
-                            <button id="cloud-load" class="btn-util" style="flex:1;">Charger cloud</button>
-                        </div>
-                        <div id="cloud-status" class="last-save">Non connecté</div>
-                    </div>
-                </section>
-
                 <section class="glass-card" style="margin-top:12px;">
                     <h3 class="section-title">BACKUP</h3>
                     <div class="backup-actions">
