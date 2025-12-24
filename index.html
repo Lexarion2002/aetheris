@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Aetheris Obsidian v23.1</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="container">
+        <button id="toggle-sidebar" class="btn-util" style="position:fixed; left:16px; top:16px; z-index:900;">≡</button>
+        <div class="dashboard-grid">
+            <aside class="glass-card sidebar-compact">
+                <div class="player-identity">
+                    <div id="player-title" class="player-title">NOVICE</div>
+                    <div class="player-subtitle">NIVEAU <span id="level-value">1</span></div>
+                </div>
+                
+                <div class="avatar-container" onclick="document.getElementById('avatar-upload').click()">
+                    <img id="avatar-img" src="https://via.placeholder.com/100?text=+" alt="Avatar">
+                    <input type="file" id="avatar-upload" style="display: none;" accept="image/*">
+                </div>
+
+                <div class="xp-mini-container">
+                    <div class="progress-bg-mini">
+                        <div id="xp-fill" class="progress-fill-mini"></div>
+                    </div>
+                    <div id="xp-display-text" class="xp-mini-text">0 / 100 XP</div>
+                </div>
+
+                <div class="stats-row-center">
+                    <div class="stat-unit">
+                        <span class="stat-label">OR</span>
+                        <span id="gold-value" class="stat-value">0</span>
+                    </div>
+                    <div class="stat-unit">
+                        <span class="stat-label">SÉRIE</span>
+                        <span id="streak-value" class="stat-value">0</span>
+                    </div>
+                </div>
+
+                <div class="chart-container"><canvas id="radarChart"></canvas></div>
+                <div id="active-stats-tags" class="tags-container"></div>
+                <button onclick="window.addNewStat()" class="btn-primary" style="width:100%; margin-top:10px;">+ ATTRIBUT</button>
+            </aside>
+
+            <main>
+                <section class="glass-card">
+                    <h3 class="section-title">COMMANDEMENT STRATÉGIQUE</h3>
+                    <div class="creator-row">
+                        <input type="text" id="obj-input" placeholder="Objectif stratégique...">
+                        <button onclick="window.requestNewObjective()" class="btn-primary">FIXER</button>
+                    </div>
+                    <div id="hierarchy-container"></div>
+                </section>
+                <section class="glass-card">
+                    <h3 class="section-title">FRONT ACTIF</h3>
+                    <div class="active-filters">
+                        <select id="active-filter">
+                            <option value="all">Toutes</option>
+                            <option value="active">En cours</option>
+                            <option value="overdue">En retard</option>
+                            <option value="done">Terminées</option>
+                        </select>
+                        <select id="active-sort">
+                            <option value="none">Tri</option>
+                            <option value="due">Échéance</option>
+                            <option value="priority">Priorité</option>
+                        </select>
+                    </div>
+                    <div id="active-quests-list"></div>
+                </section>
+                <section class="glass-card">
+                    <h3 class="section-title">ANALYTICS</h3>
+                    <div class="analytics-grid">
+                        <div class="stat-badge">
+                            <div class="stat-label">Vitesse moyenne</div>
+                            <div id="speed-metric" class="stat-number">--</div>
+                        </div>
+                        <div class="stat-badge">
+                            <div class="stat-label">Temps estimé restant</div>
+                            <div id="eta-metric" class="stat-number">--</div>
+                        </div>
+                        <div class="stat-badge">
+                            <div class="stat-label">Répartition XP</div>
+                            <div id="xp-distribution" class="stat-number">--</div>
+                        </div>
+                    </div>
+                    <div class="timeline">
+                        <div class="timeline-title">Timeline actions terminées</div>
+                        <div id="timeline-list"></div>
+                    </div>
+                </section>
+            </main>
+
+            <aside>
+                <section class="glass-card">
+                    <h3 class="section-title">RITUELS</h3>
+                    <div id="habit-list"></div>
+                    <div class="creator-column">
+                        <input type="text" id="habit-input" placeholder="Habitude...">
+                        <select id="habit-type">
+                            <option value="good">POSITIVE</option>
+                            <option value="bad">NÉGATIVE</option>
+                        </select>
+                        <button onclick="window.addHabit()" class="btn-primary">AJOUTER</button>
+                    </div>
+                </section>
+                <section class="glass-card">
+                    <h3 class="section-title">BOUTIQUE</h3>
+                    <div id="reward-list"></div>
+                    <div class="creator-row mini">
+                        <input type="text" id="reward-name" placeholder="Item...">
+                        <input type="number" id="reward-cost" placeholder="💰">
+                        <button id="add-reward-btn" class="btn-gold">+</button>
+                    </div>
+                </section>
+                <section class="glass-card">
+                    <h3 class="section-title">INVENTAIRE</h3>
+                    <div id="inventory-list" class="inventory-list"></div>
+                </section>
+                <section class="glass-card">
+                    <h3 class="section-title">BACKUP</h3>
+                    <div class="backup-actions">
+                        <button id="export-backup" class="btn-primary" style="width:100%; margin-bottom:8px;">Exporter</button>
+                        <button id="import-backup" class="btn-util" style="width:100%;">Importer</button>
+                        <input type="file" id="import-backup-file" accept="application/json" style="display:none">
+                        <div class="creator-row mini" style="margin-top:8px;">
+                            <button id="copy-backup" class="btn-util">Copier</button>
+                            <button id="paste-backup" class="btn-util">Coller</button>
+                            <button id="restore-backup" class="btn-util">Restaurer backup</button>
+                        </div>
+                        <div class="creator-column" style="margin-top:8px;">
+                            <input type="text" id="manual-save-name" placeholder="Nom de sauvegarde (ex: slot1)">
+                            <div class="creator-row mini">
+                                <button id="save-slot" class="btn-primary">Sauvegarder</button>
+                                <select id="slot-select"></select>
+                                <button id="load-slot" class="btn-util">Charger</button>
+                            </div>
+                        </div>
+                        <div id="backup-status" class="last-save">Backup: 0/3</div>
+                        <div id="last-save-display" class="last-save">Derniere sauvegarde : --</div>
+                    </div>
+                </section>
+                <button id="reset-system-trigger" class="btn-reset">RESET SYSTEM</button>
+            </aside>
+        </div>
+    </div>
+
+    <div id="custom-modal" class="modal-overlay" style="display: none;">
+        <div class="glass-card modal-content">
+            <h3 id="modal-title"></h3>
+            <p id="modal-desc"></p>
+            <div class="modal-body">
+                <input type="text" id="modal-input-text" placeholder="Saisir...">
+                <div id="modal-extra-fields"></div>
+            </div>
+            <div class="modal-actions">
+                <button id="modal-confirm" class="btn-primary">VALIDER</button>
+                <button id="modal-cancel" class="btn-util">RETOUR</button>
+            </div>
+        </div>
+    </div>
+    <div id="toast" class="toast"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
+
+
