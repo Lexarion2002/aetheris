@@ -21,6 +21,15 @@ const baseState = () => ({
 
 let gameState = Object.assign(baseState(), JSON.parse(localStorage.getItem(SAVE_KEY) || "{}"));
 
+// --- SUPABASE ---
+const SUPABASE_URL = 'https://fcrgbvimgiesbpwcvtst.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_GzMRB95ihAyQ8j_23h3Y-Q_1ol8BQ13';
+const supabaseClient = (window.supabase && typeof window.supabase.createClient === 'function')
+    ? window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY)
+    : null;
+let currentUser = null;
+let cloudLastUpdated = null;
+
 // --- TOAST ---
 function showToast(message){
     const toast = document.getElementById('toast');
@@ -451,6 +460,166 @@ window.restorePreviousBackup = () => {
         }
     }
     alert("Aucun backup disponible.");
+};
+
+// --- CLOUD (SUPABASE) ---
+function formatCloudDate(ts){
+    if(!ts) return null;
+    try {
+        return new Date(ts).toLocaleString('fr-FR', { hour12:false });
+    } catch(e){
+        return ts;
+    }
+}
+
+function updateCloudUI(statusOverride){
+    const statusEl = document.getElementById('cloud-status');
+    const saveBtn = document.getElementById('cloud-save');
+    const loadBtn = document.getElementById('cloud-load');
+    const loginBtn = document.getElementById('cloud-login');
+    const signupBtn = document.getElementById('cloud-signup');
+    const resetBtn = document.getElementById('cloud-reset');
+    const logoutBtn = document.getElementById('cloud-logout');
+    const emailInput = document.getElementById('cloud-email');
+    const passInput = document.getElementById('cloud-password');
+    const hasClient = !!supabaseClient;
+    const logged = !!currentUser;
+    const stamp = formatCloudDate(cloudLastUpdated);
+
+    if(statusEl){
+        if(statusOverride){
+            statusEl.innerText = statusOverride;
+        } else if(!hasClient){
+            statusEl.innerText = "Supabase indisponible";
+        } else if(logged){
+            statusEl.innerText = `Connecté : ${currentUser.email || currentUser.id}${stamp ? ' | Sauvegarde : ' + stamp : ''}`;
+        } else {
+            statusEl.innerText = "Non connecté";
+        }
+    }
+    if(saveBtn) saveBtn.disabled = !hasClient || !logged;
+    if(loadBtn) loadBtn.disabled = !hasClient || !logged;
+    if(logoutBtn) logoutBtn.disabled = !hasClient || !logged;
+    if(loginBtn) loginBtn.disabled = !hasClient;
+    if(signupBtn) signupBtn.disabled = !hasClient;
+    if(resetBtn) resetBtn.disabled = !hasClient;
+
+    // Masquer les champs et boutons d'inscription/connexion quand l'utilisateur est connecté
+    const authControls = [emailInput, passInput, signupBtn, loginBtn, resetBtn];
+    authControls.forEach(el => {
+        if(!el) return;
+        el.style.display = logged ? 'none' : '';
+    });
+    if(logoutBtn) logoutBtn.style.display = logged ? '' : 'none';
+}
+
+async function bootstrapSupabaseAuth(){
+    if(!supabaseClient){
+        updateCloudUI("Supabase indisponible");
+        return;
+    }
+    const { data } = await supabaseClient.auth.getUser();
+    currentUser = data?.user || null;
+    await fetchCloudMeta();
+    updateCloudUI();
+    supabaseClient.auth.onAuthStateChange(async (_event, session) => {
+        currentUser = session?.user || null;
+        await fetchCloudMeta();
+        updateCloudUI();
+    });
+}
+
+async function fetchCloudMeta(){
+    if(!supabaseClient || !currentUser) return;
+    const { data, error } = await supabaseClient
+        .from('saves')
+        .select('updated_at')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+    if(!error && data){
+        cloudLastUpdated = data.updated_at;
+    }
+}
+
+window.cloudLogin = async () => {
+    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    const email = (document.getElementById('cloud-email')?.value || '').trim();
+    const password = (document.getElementById('cloud-password')?.value || '').trim();
+    if(!email || !password){ alert("Saisis email et mot de passe."); return; }
+    updateCloudUI("Connexion en cours...");
+    const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+    if(error){ alert("Erreur connexion : " + error.message); updateCloudUI(); return; }
+    showToast('Connecté');
+    updateCloudUI();
+};
+
+window.cloudLogout = async () => {
+    if(!supabaseClient) return;
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    cloudLastUpdated = null;
+    updateCloudUI("Déconnecté");
+    showToast('Déconnecté');
+};
+
+window.cloudSignUp = async () => {
+    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    const email = (document.getElementById('cloud-email')?.value || '').trim();
+    const password = (document.getElementById('cloud-password')?.value || '').trim();
+    if(!email || !password){ alert("Saisis email et mot de passe."); return; }
+    if(password.length < 6){ alert("Mot de passe : 6 caractères minimum."); return; }
+    updateCloudUI("Création du compte...");
+    const { error } = await supabaseClient.auth.signUp({ email, password });
+    if(error){ alert("Erreur inscription : " + error.message); updateCloudUI(); return; }
+    showToast('Inscription faite. Vérifie ton email si la confirmation est requise.');
+    updateCloudUI();
+};
+
+window.cloudReset = async () => {
+    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    const email = (document.getElementById('cloud-email')?.value || '').trim();
+    if(!email){ alert("Saisis ton email."); return; }
+    updateCloudUI("Envoi du reset...");
+    const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.href
+    });
+    if(error){ alert("Erreur reset : " + error.message); updateCloudUI(); return; }
+    showToast('Email de réinitialisation envoyé.');
+    updateCloudUI("Email reset envoyé.");
+};
+
+window.cloudSave = async () => {
+    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    if(!currentUser){ alert("Connecte-toi d'abord."); return; }
+    updateCloudUI("Sauvegarde en cours...");
+    const { error } = await supabaseClient
+        .from('saves')
+        .upsert({
+            user_id: currentUser.id,
+            data: gameState,
+            updated_at: new Date().toISOString()
+        });
+    if(error){ alert("Erreur sauvegarde cloud : " + error.message); updateCloudUI(); return; }
+    cloudLastUpdated = new Date().toISOString();
+    showToast('Sauvegarde cloud OK');
+    updateCloudUI();
+};
+
+window.cloudLoad = async () => {
+    if(!supabaseClient){ alert("Supabase non chargé."); return; }
+    if(!currentUser){ alert("Connecte-toi d'abord."); return; }
+    updateCloudUI("Chargement cloud...");
+    const { data, error } = await supabaseClient
+        .from('saves')
+        .select('data, updated_at')
+        .eq('user_id', currentUser.id)
+        .maybeSingle();
+    if(error && error.code !== 'PGRST116'){ alert("Erreur cloud : " + error.message); updateCloudUI(); return; }
+    if(!data){ alert("Aucune sauvegarde cloud trouvée."); updateCloudUI(); return; }
+    cloudLastUpdated = data.updated_at;
+    applyLoadedState(data.data);
+    showToast('Chargé depuis le cloud');
+    updateCloudUI();
 };
 
 function refreshManualSlots(){
@@ -992,6 +1161,12 @@ window.onload = () => {
     const resetBtn = document.getElementById('reset-system-trigger');
     const addRewardBtn = document.getElementById('add-reward-btn');
     const toggleSidebarBtn = document.getElementById('toggle-sidebar');
+    const cloudLoginBtn = document.getElementById('cloud-login');
+    const cloudSignupBtn = document.getElementById('cloud-signup');
+    const cloudResetBtn = document.getElementById('cloud-reset');
+    const cloudLogoutBtn = document.getElementById('cloud-logout');
+    const cloudSaveBtn = document.getElementById('cloud-save');
+    const cloudLoadBtn = document.getElementById('cloud-load');
 
     if(exportBtn) exportBtn.onclick = () => window.exportBackup();
     if(importBtn) importBtn.onclick = () => importFile?.click();
@@ -1006,12 +1181,20 @@ window.onload = () => {
     if(toggleSidebarBtn) toggleSidebarBtn.onclick = () => {
         document.body.classList.toggle('sidebar-collapsed');
     };
+    if(cloudLoginBtn) cloudLoginBtn.onclick = () => window.cloudLogin();
+    if(cloudSignupBtn) cloudSignupBtn.onclick = () => window.cloudSignUp();
+    if(cloudResetBtn) cloudResetBtn.onclick = () => window.cloudReset();
+    if(cloudLogoutBtn) cloudLogoutBtn.onclick = () => window.cloudLogout();
+    if(cloudSaveBtn) cloudSaveBtn.onclick = () => window.cloudSave();
+    if(cloudLoadBtn) cloudLoadBtn.onclick = () => window.cloudLoad();
 
     const filterSel = document.getElementById('active-filter');
     const sortSel = document.getElementById('active-sort');
     if(filterSel) filterSel.onchange = (e) => window.setActiveFilter(e.target.value);
     if(sortSel) sortSel.onchange = (e) => window.setActiveSort(e.target.value);
 
+    updateCloudUI();
+    bootstrapSupabaseAuth();
     refreshManualSlots();
     setInterval(() => window.save({silent:true, skipToast:true}), 30000);
     render();

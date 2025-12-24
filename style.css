@@ -163,6 +163,11 @@ select option { background: #0d1117; color: #fff; }
 .objective-body.open { max-height: 1200px; opacity:1; }
 .last-save { font-size: 0.6rem; color: #8b949e; margin-top: 6px; text-align: right; }
 
+.cloud-box { display:flex; flex-direction:column; gap:8px; }
+.cloud-box input { width:100%; padding:8px; border-radius:6px; border:1px solid var(--border); background:#0d1117; color:#c9d1d9; }
+.cloud-box input:focus { outline:1px solid var(--blue); }
+button:disabled { opacity:0.55; cursor:not-allowed; }
+
 /* TOAST */
 .toast {
     position: fixed; bottom: 18px; right: 18px;

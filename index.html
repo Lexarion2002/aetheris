@@ -5,6 +5,7 @@
     <title>Aetheris Obsidian v23.1</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
     <div class="container">
@@ -42,6 +43,51 @@
                 <div class="chart-container"><canvas id="radarChart"></canvas></div>
                 <div id="active-stats-tags" class="tags-container"></div>
                 <button onclick="window.addNewStat()" class="btn-primary" style="width:100%; margin-top:10px;">+ ATTRIBUT</button>
+                
+                <section class="glass-card" style="margin-top:12px;">
+                    <h3 class="section-title">CLOUD</h3>
+                    <div class="cloud-box">
+                        <input type="email" id="cloud-email" placeholder="Email">
+                        <input type="password" id="cloud-password" placeholder="Mot de passe (min 6)">
+                        <div class="creator-row mini">
+                            <button id="cloud-signup" class="btn-primary">Inscription</button>
+                            <button id="cloud-login" class="btn-util">Connexion</button>
+                        </div>
+                        <div class="creator-row mini">
+                            <button id="cloud-reset" class="btn-util">Reset mot de passe</button>
+                            <button id="cloud-logout" class="btn-util">Déconnexion</button>
+                        </div>
+                        <div class="creator-row mini">
+                            <button id="cloud-save" class="btn-primary" style="flex:1;">Sauver cloud</button>
+                            <button id="cloud-load" class="btn-util" style="flex:1;">Charger cloud</button>
+                        </div>
+                        <div id="cloud-status" class="last-save">Non connecté</div>
+                    </div>
+                </section>
+
+                <section class="glass-card" style="margin-top:12px;">
+                    <h3 class="section-title">BACKUP</h3>
+                    <div class="backup-actions">
+                        <button id="export-backup" class="btn-primary" style="width:100%; margin-bottom:8px;">Exporter</button>
+                        <button id="import-backup" class="btn-util" style="width:100%;">Importer</button>
+                        <input type="file" id="import-backup-file" accept="application/json" style="display:none">
+                        <div class="creator-row mini" style="margin-top:8px;">
+                            <button id="copy-backup" class="btn-util">Copier</button>
+                            <button id="paste-backup" class="btn-util">Coller</button>
+                            <button id="restore-backup" class="btn-util">Restaurer backup</button>
+                        </div>
+                        <div class="creator-column" style="margin-top:8px;">
+                            <input type="text" id="manual-save-name" placeholder="Nom de sauvegarde (ex: slot1)">
+                            <div class="creator-row mini">
+                                <button id="save-slot" class="btn-primary">Sauvegarder</button>
+                                <select id="slot-select"></select>
+                                <button id="load-slot" class="btn-util">Charger</button>
+                            </div>
+                        </div>
+                        <div id="backup-status" class="last-save">Backup: 0/3</div>
+                        <div id="last-save-display" class="last-save">Derniere sauvegarde : --</div>
+                    </div>
+                </section>
             </aside>
 
             <main>
@@ -118,29 +164,6 @@
                 <section class="glass-card">
                     <h3 class="section-title">INVENTAIRE</h3>
                     <div id="inventory-list" class="inventory-list"></div>
-                </section>
-                <section class="glass-card">
-                    <h3 class="section-title">BACKUP</h3>
-                    <div class="backup-actions">
-                        <button id="export-backup" class="btn-primary" style="width:100%; margin-bottom:8px;">Exporter</button>
-                        <button id="import-backup" class="btn-util" style="width:100%;">Importer</button>
-                        <input type="file" id="import-backup-file" accept="application/json" style="display:none">
-                        <div class="creator-row mini" style="margin-top:8px;">
-                            <button id="copy-backup" class="btn-util">Copier</button>
-                            <button id="paste-backup" class="btn-util">Coller</button>
-                            <button id="restore-backup" class="btn-util">Restaurer backup</button>
-                        </div>
-                        <div class="creator-column" style="margin-top:8px;">
-                            <input type="text" id="manual-save-name" placeholder="Nom de sauvegarde (ex: slot1)">
-                            <div class="creator-row mini">
-                                <button id="save-slot" class="btn-primary">Sauvegarder</button>
-                                <select id="slot-select"></select>
-                                <button id="load-slot" class="btn-util">Charger</button>
-                            </div>
-                        </div>
-                        <div id="backup-status" class="last-save">Backup: 0/3</div>
-                        <div id="last-save-display" class="last-save">Derniere sauvegarde : --</div>
-                    </div>
                 </section>
                 <button id="reset-system-trigger" class="btn-reset">RESET SYSTEM</button>
             </aside>
