@@ -12,9 +12,9 @@
         <button id="toggle-sidebar" class="btn-util" style="position:fixed; left:16px; top:16px; z-index:900;">≡</button>
         <div class="dashboard-grid">
             <aside class="glass-card sidebar-compact">
-                <section class="glass-card" style="margin-top:0;">
+                <section class="glass-card collapsible" style="margin-top:0;">
                     <h3 class="section-title">CONNEXION</h3>
-                    <div class="cloud-box">
+                    <div class="cloud-box cloud-compact">
                         <input type="email" id="cloud-email" placeholder="Email">
                         <input type="password" id="cloud-password" placeholder="Mot de passe (min 6)">
                         <div class="creator-row mini">
@@ -64,7 +64,7 @@
                 <div id="active-stats-tags" class="tags-container"></div>
                 <button onclick="window.addNewStat()" class="btn-primary" style="width:100%; margin-top:10px;">+ ATTRIBUT</button>
                 
-                <section class="glass-card" style="margin-top:12px;">
+                <section class="glass-card collapsible" style="margin-top:12px;">
                     <h3 class="section-title">BACKUP</h3>
                     <div class="backup-actions">
                         <button id="export-backup" class="btn-primary" style="width:100%; margin-bottom:8px;">Exporter</button>

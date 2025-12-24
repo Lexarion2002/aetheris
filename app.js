@@ -1169,7 +1169,8 @@ window.onload = () => {
     if(resetBtn) resetBtn.onclick = () => window.resetSystem();
     if(addRewardBtn) addRewardBtn.onclick = () => window.addReward();
     if(toggleSidebarBtn) toggleSidebarBtn.onclick = () => {
-        document.body.classList.toggle('sidebar-collapsed');
+        document.body.classList.remove('sidebar-collapsed');
+        document.body.classList.toggle('sidebar-collapsible-only');
     };
     if(cloudLoginBtn) cloudLoginBtn.onclick = () => window.cloudLogin();
     if(cloudSignupBtn) cloudSignupBtn.onclick = () => window.cloudSignUp();
