@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
+import { firestoreStorage } from './firebase'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -158,6 +159,9 @@ export const useMusicStore = create<MusicState>()(
           artistesSuivis: s.artistesSuivis.map((a) => (a.id === id ? { ...a, alerte } : a)),
         })),
     }),
-    { name: 'aetheris-music-v1' },
+    { 
+      name: 'aetheris-music-v1',
+      storage: createJSONStorage(() => firestoreStorage),
+    },
   ),
 )
