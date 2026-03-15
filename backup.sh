@@ -36,7 +36,23 @@ cd "$BACKUP_DEST" || exit 1
 echo "🔐 Génération du checksum SHA-256..."
 shasum -a 256 "$ARCHIVE_NAME" > "${ARCHIVE_NAME}.sha256"
 
-echo "✅ Backup terminé avec succès !"
+echo -e "\n✅ Backup Local OK"
 echo "📍 Archive : $ARCHIVE_PATH"
 echo "📜 Checksum :"
 cat "${ARCHIVE_NAME}.sha256"
+
+# ------------------------------------------
+# Synchronisation Cloud (Git Commit & Push)
+# ------------------------------------------
+cd "$PROJECT_DIR" || exit 1
+
+echo -e "\n☁️  Préparation de la synchronisation Cloud..."
+git add .
+# Le "|| true" permet au script de continuer même s'il n'y a aucune modification à commit
+git commit -m "Auto-backup: $TIMESTAMP" > /dev/null 2>&1 || true
+
+if git push origin main 2>/dev/null; then
+    echo "✅ Cloud Sync OK"
+else
+    echo "⚠️  Attention : Le 'git push' a échoué (pas d'internet ou dépôt distant inaccessible)."
+fi
