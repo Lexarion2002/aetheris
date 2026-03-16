@@ -233,8 +233,8 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
               Note : <span className={`font-bold ${noteColor(note)}`}>{note}/10</span>
             </label>
             <input
-              type="range" min={1} max={10} value={note}
-              onChange={(e) => setNote(parseInt(e.target.value))}
+              type="range" min={1} max={10} step={0.5} value={note}
+              onChange={(e) => setNote(parseFloat(e.target.value))}
               className="w-full accent-teal-500"
             />
             <div className="flex justify-between text-[10px] text-zinc-700 mt-0.5">
@@ -729,7 +729,7 @@ function BibliothequeSection({
                     <div className="absolute inset-0 flex items-center justify-center text-3xl text-zinc-700">♪</div>
                   )}
                 </div>
-                <div className={`absolute top-1.5 right-1.5 text-[11px] font-bold px-1.5 py-0.5 rounded border ${noteBg(album.note)}`}>
+              <div className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
                   {album.note}
                 </div>
                 

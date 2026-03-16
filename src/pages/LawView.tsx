@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, Cell } from 'rechar
 import { useLawStore } from '../store/lawStore'
 import { useStore } from '../store'
 import { usePomodoroStore } from '../store/pomodoroStore'
+import { TaskFormModal } from '../components/TaskFormModal'
 import type { GlobalStatus } from '../store/lawStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -114,6 +115,7 @@ export function LawView() {
 
   const [editNotion, setEditNotion] = useState(false)
   const [notionVal,  setNotionVal]  = useState(notionUrl)
+  const [taskModal,  setTaskModal]  = useState(false)
 
   // ── Find the Droit domain ──────────────────────────────────────────────────
 
@@ -238,9 +240,17 @@ export function LawView() {
 
       {/* ── 2. Focus rapide ───────────────────────────────────────────────── */}
       <section className="space-y-4">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
-          Tâches critiques Droit
-        </h2>
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-semibold uppercase tracking-[0.2em] text-zinc-500">
+            Tâches critiques Droit
+          </h2>
+          <button
+            onClick={() => setTaskModal(true)}
+            className="text-xs px-2.5 py-1.5 rounded-lg border border-zinc-800 text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+          >
+            + Nouvelle tâche
+          </button>
+        </div>
 
         {nextTasks.length === 0 ? (
           <p className="text-sm italic text-zinc-600">
@@ -386,6 +396,13 @@ export function LawView() {
         )}
       </section>
 
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {taskModal && droitDomain && (
+        <TaskFormModal
+          domainId={droitDomain.id}
+          onClose={() => setTaskModal(false)}
+        />
+      )}
     </div>
   )
 }
