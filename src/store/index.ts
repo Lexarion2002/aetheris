@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
-import { firestoreStorage } from './firebase'
 import type { Domain, Task, SubTask, Objective, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
@@ -131,7 +130,7 @@ const trackProgress = (history: ProgressEntry[] | undefined, value: number): Pro
 
 export const useStore = create<AetherisState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       seeded:    true,
       onboarded: false,
       theme:     'dark'  as AppTheme,
@@ -476,8 +475,8 @@ export const useStore = create<AetherisState>()(
       setUserContext: (ctx) => set({ userContext: ctx }),
     }),
     {
-      name: 'aetheris-v2',
-      storage: createJSONStorage(() => firestoreStorage),
+      name: 'aetheris-store',
+      storage: createJSONStorage(() => localStorage),
     },
   ),
 )

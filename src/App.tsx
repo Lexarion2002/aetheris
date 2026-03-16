@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { LandingPage } from './pages/LandingPage'
 import { OnboardingPage } from './pages/OnboardingPage'
+import { firestoreStorage } from './store/firebase'
 import { useStore } from './store'
 
 // ─── Lazy page imports ────────────────────────────────────────────────────────
@@ -64,6 +65,15 @@ export default function App() {
       addDomain({ name: 'Musique', color: 'red', icon: '🎵', description: 'Écoute, critique musicale et collection' })
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // ── Background Sync (Local -> Cloud) ─────────────────────────────────────────
+  useEffect(() => {
+    const unsub = useStore.subscribe((state) => {
+      // Sauvegarde silencieuse en arrière-plan à chaque modification
+      firestoreStorage.setItem('aetheris-store', JSON.stringify({ state, version: 0 }))
+    })
+    return unsub
   }, [])
 
   return (

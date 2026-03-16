@@ -882,11 +882,11 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-7">
             {cats.map((cat) => (
               <button key={cat.id} type="button" onClick={() => setCategory(cat.id)}
-                className={['flex flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all',
+                className={['flex w-full overflow-hidden flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all',
                   validCat === cat.id ? 'border-teal-500/40 bg-teal-500/10 text-teal-300' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700',
                 ].join(' ')}>
-                <span className="text-xl leading-none">{cat.icon}</span>
-                <span className="text-[9px] leading-tight">{cat.name}</span>
+                <span className="text-xl leading-none shrink-0">{cat.icon}</span>
+                <span className="text-[10px] truncate w-full text-center leading-tight">{cat.name}</span>
               </button>
             ))}
           </div>
@@ -1081,17 +1081,23 @@ interface CsvRow {
   selected:    boolean
 }
 
-function parseCsvDate(raw: string): string | null {
-  raw = raw.trim()
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
-  const m = raw.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/)
-  if (m) return `${m[3]}-${m[2].padStart(2, '0')}-${m[1].padStart(2, '0')}`
+const formatDate = (raw: string): string | null => {
+  const clean = raw.trim()
+  // Le Store utilise du texte au format ISO (YYYY-MM-DD) pour garantir un tri chronologique correct
+  if (/^\d{4}-\d{2}-\d{2}$/.test(clean)) {
+    return clean
+  }
+  // Transforme les formats DD/MM/YYYY ou DD-MM-YYYY en YYYY-MM-DD
+  const match = clean.match(/^(\d{1,2})[/\-](\d{1,2})[/\-](\d{4})$/)
+  if (match) {
+    return `${match[3]}-${match[2].padStart(2, '0')}-${match[1].padStart(2, '0')}`
+  }
   return null
 }
 
 function parseCsvAmount(raw: string): number | null {
   if (!raw?.trim()) return null
-  let s = raw.trim().replace(/[€$£\u00a0]/g, '').trim()
+  let s = raw.trim().replace(/[€$£\u00a0\s]/g, '').trim()
   if (s.includes(',') && !s.includes('.')) s = s.replace(',', '.')
   else if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.')
   const n = parseFloat(s)
@@ -1146,9 +1152,9 @@ function parseCsvText(text: string, categories: FinanceCategory[], existing: Tra
   const split  = (l: string) => l.split(delim).map((c) => c.replace(/^["']|["']$/g, '').trim())
   const headers = split(lines[0]).map(normStr)
   const idx = {
-    date:   headers.findIndex((h) => h === 'date' || h.startsWith('date')),
-    desc:   headers.findIndex((h) => ['libelle', 'description', 'label', 'intitule', 'operation', 'details'].some((k) => h.includes(k))),
-    amount: headers.findIndex((h) => ['montant', 'amount'].some((k) => h === k)),
+    date:   headers.findIndex((h) => h === 'date' || h.startsWith('date') || h.includes('booking date')),
+    desc:   headers.findIndex((h) => ['libelle', 'description', 'label', 'intitule', 'operation', 'details', 'partner name'].some((k) => h.includes(k))),
+    amount: headers.findIndex((h) => ['montant', 'amount'].some((k) => h.includes(k))),
     debit:  headers.findIndex((h) => h.includes('debit')),
     credit: headers.findIndex((h) => h.includes('credit')),
   }
@@ -1156,7 +1162,7 @@ function parseCsvText(text: string, categories: FinanceCategory[], existing: Tra
   const existSet = new Set(existing.map((t) => `${t.date}|${t.amount}|${(t.note ?? '').toLowerCase()}`))
   return lines.slice(1).flatMap((line, i) => {
     const cols = split(line)
-    const date = parseCsvDate(cols[idx.date] ?? '')
+    const date = formatDate(cols[idx.date] ?? '')
     if (!date) return []
     const description = idx.desc >= 0 ? (cols[idx.desc] ?? '') : ''
     let amount: number | null = null
@@ -1336,6 +1342,7 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
             <p>Date;Description;Montant</p>
             <p>Date;Libellé;Débit;Crédit</p>
             <p>Date,Description,Amount</p>
+            <p>Booking Date,Partner Name,Amount (EUR)</p>
             <p className="text-zinc-800">Séparateurs : ; , | tab · Encodage : UTF-8</p>
           </div>
         </div>
@@ -1395,7 +1402,7 @@ async function parsePdfFile(file: File, categories: FinanceCategory[]): Promise<
 
     // Date at start (accept DD/MM/YYYY or DD/MM/YY — normalise dots/dashes too)
     const rawDate = parts[0].replace(/\./g, '/')
-    const date = parseCsvDate(rawDate)
+    const date = formatDate(rawDate)
     if (!date) continue
 
     // Amount: last token matching number pattern
@@ -1418,7 +1425,7 @@ async function parsePdfFile(file: File, categories: FinanceCategory[]): Promise<
     // If description is very short, try next line as continuation
     if (description.length < 8 && i + 1 < lineGroups.length) {
       const nextParts = lineGroups[i + 1].sort((a, b) => a.x - b.x).map((it) => it.str.trim()).filter(Boolean)
-      const nextIsDate = nextParts[0] && parseCsvDate(nextParts[0].replace(/\./g, '/')) !== null
+      const nextIsDate = nextParts[0] && formatDate(nextParts[0].replace(/\./g, '/')) !== null
       if (!nextIsDate) description = (description + ' ' + nextParts.join(' ')).trim()
     }
 
