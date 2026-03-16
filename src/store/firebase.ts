@@ -24,8 +24,7 @@ const app = initializeApp(firebaseConfig)
 // Permet l'utilisation 100% hors-ligne avec synchronisation auto au retour d'internet
 const db = initializeFirestore(app, {
   localCache: persistentLocalCache(),
-  experimentalForceLongPolling: true,
-  useFetchStreams: false
+  experimentalForceLongPolling: true
 })
 
 console.log('[Firebase] 📡 Lancement du test de connexion onSnapshot...')
@@ -51,7 +50,7 @@ export const firestoreStorage: StateStorage = {
       
       if (snap.exists()) {
         console.log(`[Firebase] 🟢 Lecture réussie pour le store : ${name}`)
-        return snap.data().value
+        return snap.data()?.value ?? null
       }
 
       const localData = window.localStorage.getItem(name)
@@ -75,5 +74,8 @@ export const firestoreStorage: StateStorage = {
       console.error(`[Firebase] 🔴 Erreur d'écriture pour ${name} :`, error)
     }
   },
-  removeItem: async () => {}
+  removeItem: async (name) => {
+    // Optionally remove from Firestore in the future
+    console.log(`[Firebase] removeItem called for store: ${name} (not implemented)`)
+  }
 }

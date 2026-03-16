@@ -9,28 +9,22 @@ export type AlbumTag =
   | 'ambient' | 'jazz' | 'rap' | 'rock' | 'electro' | 'classical' | 'soul'
   | 'rnb' | 'folk' | 'metal' | 'pop' | 'world' | 'experimental' | 'indie'
 
-export interface AlbumCritique {
+export interface AlbumEntry {
   id:                  string
   titre:               string
   artiste:             string
-  dateOriginaleSortie: string   // ISO "YYYY-MM-DD" or empty
-  pochette:            string   // base64 data URL or external URL or empty
-  note:                number   // 1-10
-  tags:                AlbumTag[]  // up to 3
-  critique:            string
-  tracksFavorites:     string[]
-  contexte:            string
-  dateCritique:        string   // ISO date added
-}
-
-export interface AlbumAttente {
-  id:                   string
-  titre:                string
-  artiste:              string
-  source:               string
-  pourquoi:             string
-  dateAjout:            string   // ISO
-  dateAttendueSortie?:  string   // ISO, optional
+  pochette:            string
+  dateAjout:           string
+  note:                number | null
+  critique?:           string
+  dateCritique?:       string
+  source?:             string
+  pourquoi?:           string
+  dateAttendueSortie?: string
+  dateOriginaleSortie?:string
+  tags?:               AlbumTag[]
+  tracksFavorites?:    string[]
+  contexte?:           string
 }
 
 export interface ArtisteFollowed {
@@ -55,20 +49,16 @@ export interface AlbumEnCours {
 
 interface MusicState {
   albumEnCours:   AlbumEnCours | null
-  bibliotheque:   AlbumCritique[]
-  fileAttente:    AlbumAttente[]
+  albums:         AlbumEntry[]
   artistesSuivis: ArtisteFollowed[]
 
   setAlbumEnCours:       (album: Omit<AlbumEnCours, 'startedAt'>) => void
   clearAlbumEnCours:     () => void
   setPremiereImpression: (text: string) => void
 
-  addCritique:    (critique: Omit<AlbumCritique, 'id' | 'dateCritique'>) => void
-  updateCritique: (id: string, updates: Partial<Omit<AlbumCritique, 'id'>>) => void
-  deleteCritique: (id: string) => void
-
-  addAlbumFile:      (album: Omit<AlbumAttente, 'id' | 'dateAjout'>) => void
-  removeFromFile:    (id: string) => void
+  addAlbum:       (album: Omit<AlbumEntry, 'id' | 'dateAjout' | 'note'> & { note?: number | null }) => void
+  updateAlbum:    (id: string, updates: Partial<Omit<AlbumEntry, 'id'>>) => void
+  deleteAlbum:    (id: string) => void
   startListening:    (id: string) => void   // move from file to en cours
 
   followArtiste:        (artiste: Omit<ArtisteFollowed, 'id'>) => void
@@ -83,8 +73,7 @@ export const useMusicStore = create<MusicState>()(
   persist(
     (set, get) => ({
       albumEnCours:   null,
-      bibliotheque:   [],
-      fileAttente:    [],
+      albums:         [],
       artistesSuivis: [],
 
       setAlbumEnCours: (album) =>
@@ -97,48 +86,36 @@ export const useMusicStore = create<MusicState>()(
           s.albumEnCours ? { albumEnCours: { ...s.albumEnCours, premiereImpression: text } } : {}
         ),
 
-      addCritique: (critique) => {
-        const entry: AlbumCritique = {
-          id: nanoid(),
-          dateCritique: new Date().toISOString().split('T')[0],
-          ...critique,
-        }
-        set((s) => ({ bibliotheque: [entry, ...s.bibliotheque] }))
-      },
-
-      updateCritique: (id, updates) =>
-        set((s) => ({
-          bibliotheque: s.bibliotheque.map((a) => (a.id === id ? { ...a, ...updates } : a)),
-        })),
-
-      deleteCritique: (id) =>
-        set((s) => ({ bibliotheque: s.bibliotheque.filter((a) => a.id !== id) })),
-
-      addAlbumFile: (album) => {
-        const entry: AlbumAttente = {
+      addAlbum: (album) => {
+        const entry: AlbumEntry = {
           id: nanoid(),
           dateAjout: new Date().toISOString().split('T')[0],
+          note: album.note ?? null,
           ...album,
         }
-        set((s) => ({ fileAttente: [entry, ...s.fileAttente] }))
+        set((s) => ({ albums: [entry, ...s.albums] }))
       },
 
-      removeFromFile: (id) =>
-        set((s) => ({ fileAttente: s.fileAttente.filter((a) => a.id !== id) })),
+      updateAlbum: (id, updates) =>
+        set((s) => ({
+          albums: s.albums.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+        })),
+
+      deleteAlbum: (id) =>
+        set((s) => ({ albums: s.albums.filter((a) => a.id !== id) })),
 
       startListening: (id) => {
-        const album = get().fileAttente.find((a) => a.id === id)
+        const album = get().albums.find((a) => a.id === id)
         if (!album) return
-        set((s) => ({
-          fileAttente: s.fileAttente.filter((a) => a.id !== id),
+        set({
           albumEnCours: {
             titre:              album.titre,
             artiste:            album.artiste,
-            pochette:           '',
+            pochette:           album.pochette || '',
             premiereImpression: '',
             startedAt:          new Date().toISOString(),
           },
-        }))
+        })
       },
 
       followArtiste: (artiste) =>
