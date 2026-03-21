@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useWritingStore } from '../store/writingStore'
-import type { WritingArc, WritingCharacter, WritingCitation, WritingFragment } from '../store/writingStore'
+import type { WritingArc, WritingCharacter, WritingCitation } from '../store/writingStore'
 
 // ─── Section anchor nav ───────────────────────────────────────────────────────
 

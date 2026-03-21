@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware'
 
 export type GlobalStatus = 'recherches' | 'redaction' | 'repetition' | 'finalisation'
 
-interface LawState {
+export interface LawState {
   grandOralDate: string | null   // YYYY-MM-DD
   rapportDate:   string | null   // YYYY-MM-DD
   globalStatus:  GlobalStatus

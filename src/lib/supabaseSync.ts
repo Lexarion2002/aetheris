@@ -160,7 +160,7 @@ export async function syncRowsToSupabase(payload: SyncPayload): Promise<void> {
       amount:      tx.amount,
       category_id: tx.category ?? null,
       date:        tx.date,
-      notes:       tx.notes ?? null,
+      notes:       tx.note ?? null,
       created_at:  tx.createdAt,
     })),
 

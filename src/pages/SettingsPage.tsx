@@ -106,12 +106,15 @@ export function SettingsPage() {
   const handleExport = () => {
     const s = useStore.getState()
     const data: AetherisData = {
-      domains:      s.domains,
-      tasks:        s.tasks,
-      objectives:   s.objectives,
-      expenses:     s.expenses,
-      timeSessions: s.timeSessions,
-      budgets:      s.budgets,
+      domains:         s.domains,
+      tasks:           s.tasks,
+      objectives:      s.objectives,
+      expenses:        s.expenses,
+      timeSessions:    s.timeSessions,
+      budgets:         s.budgets,
+      transactions:    s.transactions,
+      categoryBudgets: s.categoryBudgets,
+      savingsGoals:    s.savingsGoals,
     }
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
     const url  = URL.createObjectURL(blob)
@@ -134,12 +137,15 @@ export function SettingsPage() {
         const raw = JSON.parse(ev.target?.result as string) as Partial<AetherisData>
         if (!raw.domains || !raw.tasks) throw new Error('Format invalide')
         importData({
-          domains:      raw.domains      ?? [],
-          tasks:        raw.tasks        ?? [],
-          objectives:   raw.objectives   ?? [],
-          expenses:     raw.expenses     ?? [],
-          timeSessions: raw.timeSessions ?? [],
-          budgets:      raw.budgets      ?? [],
+          domains:         raw.domains         ?? [],
+          tasks:           raw.tasks           ?? [],
+          objectives:      raw.objectives      ?? [],
+          expenses:        raw.expenses        ?? [],
+          timeSessions:    raw.timeSessions     ?? [],
+          budgets:         raw.budgets         ?? [],
+          transactions:    raw.transactions    ?? [],
+          categoryBudgets: raw.categoryBudgets ?? [],
+          savingsGoals:    raw.savingsGoals    ?? [],
         })
         setImportStatus('success')
         setImportMsg(`✓ ${raw.tasks.length} tâches, ${raw.objectives?.length ?? 0} objectifs importés.`)
@@ -430,7 +436,7 @@ export function SettingsPage() {
           { label: 'Pause courte',          desc: 'Pause après chaque session',            key: 'shortBreakDuration',      min: 1,  max: 30  },
           { label: 'Pause longue',          desc: 'Pause après 4 sessions complétées',     key: 'longBreakDuration',       min: 5,  max: 60  },
           { label: 'Sessions avant pause longue', desc: 'Nombre de sessions par cycle',   key: 'sessionsBeforeLongBreak', min: 2,  max: 8   },
-        ].map(({ label, desc, key, min, max }, i, arr) => (
+        ].map(({ label, desc, key, min, max }, i) => (
           <div key={key}>
             {i > 0 && <hr className="border-zinc-800 my-3" />}
             <div className="flex items-center justify-between py-1 gap-4">

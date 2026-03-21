@@ -48,7 +48,7 @@ export interface WritingCitation {
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-interface WritingState {
+export interface WritingState {
   lastSentence:    string
   moodKeywords:    string[]
   chapterCurrent:  number

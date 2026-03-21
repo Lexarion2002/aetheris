@@ -52,7 +52,7 @@ export interface AlbumEnCours {
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-interface MusicState {
+export interface MusicState {
   _hasHydrated:   boolean
   setHasHydrated: (state: boolean) => void
 

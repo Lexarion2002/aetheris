@@ -87,7 +87,7 @@ const DEFAULT_OUTILS: OutilPraticien[] = [
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
-interface CareerState {
+export interface CareerState {
   cabinetInfo:     CabinetInfo
   statusSemaine:   StatusSemaine
   missions:        Mission[]

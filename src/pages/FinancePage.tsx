@@ -126,13 +126,13 @@ export function FinancePage() {
   const expensePie = useMemo(() => {
     const map = new Map<string, number>()
     monthTx.filter((t) => t.type === 'expense').forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount))
-    return Array.from(map, ([key, value]) => ({ key, value, ...catMeta(key) })).sort((a, b) => b.value - a.value)
+    return Array.from(map, ([catId, value]) => ({ value, ...catMeta(catId) })).sort((a, b) => b.value - a.value)
   }, [monthTx])
 
   const incomePie = useMemo(() => {
     const map = new Map<string, number>()
     monthTx.filter((t) => t.type === 'income').forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount))
-    return Array.from(map, ([key, value]) => ({ key, value, ...catMeta(key) })).sort((a, b) => b.value - a.value)
+    return Array.from(map, ([catId, value]) => ({ value, ...catMeta(catId) })).sort((a, b) => b.value - a.value)
   }, [monthTx])
 
   // ── Budget lookups ────────────────────────────────────────────────────────────

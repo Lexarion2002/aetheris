@@ -234,12 +234,15 @@ describe('importData + resetAll', () => {
     addTask({ domainId: 'health', title: 'Old', status: 'todo', priority: 'low', timeEstimate: null, dueDate: null })
 
     importData({
-      domains:      [{ id: 'health', name: 'Santé', color: 'green', icon: '🏃', description: '' }],
-      tasks:        [],
-      objectives:   [],
-      expenses:     [],
-      timeSessions: [],
-      budgets:      [{ domainId: 'health', amount: 100 }],
+      domains:         [{ id: 'health', name: 'Santé', color: 'green', icon: '🏃', description: '' }],
+      tasks:           [],
+      objectives:      [],
+      expenses:        [],
+      timeSessions:    [],
+      budgets:         [{ domainId: 'health', amount: 100 }],
+      transactions:    [],
+      categoryBudgets: [],
+      savingsGoals:    [],
     })
 
     expect(useStore.getState().tasks).toHaveLength(0)

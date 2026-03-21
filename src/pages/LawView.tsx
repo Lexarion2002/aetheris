@@ -340,7 +340,7 @@ export function LawView() {
                   cursor={false}
                   contentStyle={{ background: '#18181b', border: '1px solid #27272a', borderRadius: 8, fontSize: 11 }}
                   labelStyle={{ color: '#a1a1aa' }}
-                  formatter={(v: number) => [fmtDuration(v), 'Focus']}
+                  formatter={(v) => [fmtDuration(v as number), 'Focus']}
                 />
                 <Bar dataKey="minutes" radius={[3, 3, 0, 0]}>
                   {weeklyData.map((entry, i) => (

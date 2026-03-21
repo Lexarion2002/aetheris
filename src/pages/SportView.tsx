@@ -120,7 +120,7 @@ export function SportView() {
 
         {/* Stades */}
         <div className="space-y-2">
-          {store.courseStades.map((stade, i) => (
+          {store.courseStades.map((stade) => (
             <div key={stade.id} className="flex items-center justify-between gap-3 group">
               <label className="flex items-center gap-3 cursor-pointer flex-1">
                 <input

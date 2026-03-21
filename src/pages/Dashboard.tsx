@@ -2,10 +2,14 @@ import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
+import type { LawState } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
+import type { CareerState } from '../store/careerStore'
 import { useWritingStore } from '../store/writingStore'
+import type { WritingState } from '../store/writingStore'
 import { usePomodoroStore } from '../store/pomodoroStore'
 import { useMusicStore } from '../store/musicStore'
+import type { MusicState } from '../store/musicStore'
 import { getDomainColors } from '../utils/domainColors'
 import { AddDomainModal } from '../components/AddDomainModal'
 import { useState } from 'react'
@@ -79,7 +83,6 @@ function computeTodayActions(
   missions: Array<{ id: string; sujet: string; deadline: string | null; stade: string }>,
   law: { grandOralDate: string | null; rapportDate: string | null },
 ): TodayAction[] {
-  const today = todayStr()
   const actions: TodayAction[] = []
 
   // All active tasks due this week
@@ -385,11 +388,11 @@ export function Dashboard() {
 interface DomainCockpitProps {
   domain:         Domain
   tasks:          Task[]
-  law:            ReturnType<typeof useLawStore>
-  career:         ReturnType<typeof useCareerStore>
-  writing:        ReturnType<typeof useWritingStore>
+  law:            LawState
+  career:         CareerState
+  writing:        WritingState
   lastWritingDays: number | null
-  activeArc:      ReturnType<typeof useWritingStore>['arcs'][number] | undefined
+  activeArc:      WritingState['arcs'][number] | undefined
 }
 
 function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, activeArc }: DomainCockpitProps) {
@@ -631,7 +634,7 @@ function FinanceCockpit({
 
 // ─── MusicCockpit ─────────────────────────────────────────────────────────────
 
-function MusicCockpit({ music }: { music: ReturnType<typeof useMusicStore> }) {
+function MusicCockpit({ music }: { music: MusicState }) {
   const navigate = useNavigate()
   const colors   = getDomainColors('red')
 
