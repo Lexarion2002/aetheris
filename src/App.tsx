@@ -1,13 +1,17 @@
-import { lazy, Suspense, useEffect } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { LandingPage } from './pages/LandingPage'
 import { OnboardingPage } from './pages/OnboardingPage'
+import { AuthModal } from './components/AuthModal'
 import { firestoreStorage } from './store/firebase'
-import { watchOnlineStatus, syncRowsToSupabase } from './lib/supabaseSync'
+import { watchOnlineStatus, syncRowsToSupabase, setCurrentUserId } from './lib/supabaseSync'
+import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
+import { isSupabaseReady } from './lib/supabase'
 import { useShoppingStore } from './store/shoppingStore'
 import { useStore } from './store'
 import { useMusicStore } from './store/musicStore'
+import type { User } from '@supabase/supabase-js'
 
 // ─── Lazy page imports ────────────────────────────────────────────────────────
 
@@ -45,10 +49,33 @@ function PageLoader() {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const onboarded        = useStore((s) => s.onboarded)
-  const theme            = useStore((s) => s.theme)
-  const deleteDomain     = useStore((s) => s.deleteDomain)
-  const domains          = useStore((s) => s.domains)
+  const onboarded    = useStore((s) => s.onboarded)
+  const theme        = useStore((s) => s.theme)
+  const deleteDomain = useStore((s) => s.deleteDomain)
+  const domains      = useStore((s) => s.domains)
+
+  // ── Auth state ───────────────────────────────────────────────────────────
+  const [authUser,    setAuthUser]    = useState<User | null | undefined>(undefined) // undefined = chargement
+  const supabaseOn = isSupabaseReady()
+
+  useEffect(() => {
+    if (!supabaseOn) {
+      setAuthUser(null)
+      return
+    }
+    // Vérifie la session existante
+    getCurrentUser().then((user) => {
+      setAuthUser(user)
+      setCurrentUserId(user?.id ?? null)
+    })
+    // Écoute les changements
+    const unsub = onAuthStateChange((user) => {
+      setAuthUser(user)
+      setCurrentUserId(user?.id ?? null)
+    })
+    return unsub
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     document.body.classList.toggle('theme-light', theme === 'light')
@@ -79,15 +106,12 @@ export default function App() {
 
   // Nettoyage des anciennes clés localStorage (migration unique)
   useEffect(() => {
-    const LEGACY_KEYS = [
-      'aetheris-v2', 'aetheris-store',
-    ]
+    const LEGACY_KEYS = ['aetheris-v2', 'aetheris-store']
     LEGACY_KEYS.forEach((k) => localStorage.removeItem(k))
-    console.log('✓ localStorage vidé (anciennes clés supprimées)')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-// One-time migration: remove legacy standalone "Finance" domain (now a standalone page)
+  // One-time migration: remove legacy standalone "Finance" domain
   useEffect(() => {
     domains
       .filter((d) => ['finance', 'finances'].includes(d.name.trim().toLowerCase()))
@@ -95,14 +119,12 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Background Sync Music (Local -> Cloud) ────────────────────────────────────
+  // ── Background Sync Music (Local -> Cloud) ─────────────────────────────────
   useEffect(() => {
     let unsubscribeMusic: (() => void) | undefined
-
     const syncTimer = setTimeout(() => {
       const isMusicHydrated = useMusicStore.persist.hasHydrated()
       const { bibliotheque } = useMusicStore.getState()
-
       if (isMusicHydrated && bibliotheque.length > 0) {
         unsubscribeMusic = useMusicStore.subscribe(async (state, prevState) => {
           if (prevState.bibliotheque.length > 1 && state.bibliotheque.length === 0) return
@@ -111,17 +133,33 @@ export default function App() {
             await firestoreStorage.setItem('aetheris-music-v1', data)
           } catch (error) {
             console.error('[Sync] Erreur de sauvegarde Musique:', error)
-            alert("Erreur de synchronisation Musique : La sauvegarde a échoué. Vérifiez que la taille de vos pochettes n'est pas trop importante.")
+            alert("Erreur de synchronisation Musique : La sauvegarde a échoué.")
           }
         })
       }
     }, 500)
-
-    return () => {
-      clearTimeout(syncTimer)
-      if (unsubscribeMusic) unsubscribeMusic()
-    }
+    return () => { clearTimeout(syncTimer); if (unsubscribeMusic) unsubscribeMusic() }
   }, [])
+
+  // ── Auth guard ────────────────────────────────────────────────────────────
+  // Pendant la vérification auth → spinner
+  if (authUser === undefined) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-zinc-950">
+        <div className="flex gap-2">
+          {[0,1,2].map((i) => (
+            <span key={i} className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-bounce"
+              style={{ animationDelay: `${i * 120}ms` }} />
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // Supabase activé mais pas connecté → AuthModal
+  if (supabaseOn && !authUser) {
+    return <AuthModal onSuccess={() => getCurrentUser().then((u) => { setAuthUser(u); setCurrentUserId(u?.id ?? null) })} />
+  }
 
   return (
     <BrowserRouter>
@@ -132,42 +170,18 @@ export default function App() {
 
         {/* ── App (requires onboarding) ─────────────────────────────────────── */}
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
-          <Route path="dashboard" element={
-            <Suspense fallback={<PageLoader />}><Dashboard /></Suspense>
-          } />
-          <Route path="domain/:id" element={
-            <Suspense fallback={<PageLoader />}><DomainView /></Suspense>
-          } />
-          <Route path="focus" element={
-            <Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>
-          } />
-          <Route path="objectives" element={
-            <Suspense fallback={<PageLoader />}><ObjectivesPage /></Suspense>
-          } />
-          <Route path="finances" element={
-            <Suspense fallback={<PageLoader />}><FinancePage /></Suspense>
-          } />
-          <Route path="analytics" element={
-            <Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>
-          } />
-          <Route path="week" element={
-            <Suspense fallback={<PageLoader />}><WeekView /></Suspense>
-          } />
-          <Route path="settings" element={
-            <Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>
-          } />
-          <Route path="categories" element={
-            <Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>
-          } />
-          <Route path="musique" element={
-            <Suspense fallback={<PageLoader />}><MusicPage /></Suspense>
-          } />
-          <Route path="cuisine" element={
-            <Suspense fallback={<PageLoader />}><CuisinePage /></Suspense>
-          } />
-          <Route path="achats" element={
-            <Suspense fallback={<PageLoader />}><ShoppingPage /></Suspense>
-          } />
+          <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="domain/:id" element={<Suspense fallback={<PageLoader />}><DomainView /></Suspense>} />
+          <Route path="focus" element={<Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>} />
+          <Route path="objectives" element={<Suspense fallback={<PageLoader />}><ObjectivesPage /></Suspense>} />
+          <Route path="finances" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
+          <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
+          <Route path="week" element={<Suspense fallback={<PageLoader />}><WeekView /></Suspense>} />
+          <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
+          <Route path="categories" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
+          <Route path="musique" element={<Suspense fallback={<PageLoader />}><MusicPage /></Suspense>} />
+          <Route path="cuisine" element={<Suspense fallback={<PageLoader />}><CuisinePage /></Suspense>} />
+          <Route path="achats" element={<Suspense fallback={<PageLoader />}><ShoppingPage /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

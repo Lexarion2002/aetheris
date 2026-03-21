@@ -1,6 +1,8 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { getDomainColors } from '../utils/domainColors'
+import { signOut } from '../lib/supabaseAuth'
+import { isSupabaseReady } from '../lib/supabase'
 
 const ROUTE_META: Record<string, { title: string; subtitle: string }> = {
   '/dashboard':  { title: 'Dashboard',   subtitle: "Vue d'ensemble de tous vos domaines" },
@@ -77,6 +79,19 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
         <span className="hidden sm:inline">Rechercher</span>
         <kbd className="hidden sm:inline-flex h-4 items-center rounded border border-zinc-700 px-1 text-[9px] text-zinc-600">⌘K</kbd>
       </button>
+
+      {/* Logout button (Supabase only) */}
+      {isSupabaseReady() && (
+        <button
+          onClick={() => signOut()}
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          title="Se déconnecter"
+        >
+          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+          </svg>
+        </button>
+      )}
     </header>
   )
 }

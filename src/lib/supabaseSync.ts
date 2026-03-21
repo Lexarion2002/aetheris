@@ -3,6 +3,21 @@ import type { StateStorage } from 'zustand/middleware'
 import type { Domain, Task, Transaction } from '../types'
 import type { ShoppingItem, BoughtItem } from '../types'
 
+// ─── User scope ───────────────────────────────────────────────────────────────
+// Le user_id courant est injecté par App.tsx dès que l'auth change.
+// Les clés de stockage deviennent `${userId}:${storeName}` pour isoler les données.
+
+let _currentUserId: string | null = null
+
+export function setCurrentUserId(id: string | null): void {
+  _currentUserId = id
+  console.log('[Supabase] 👤 User ID:', id ?? 'non connecté')
+}
+
+function scopedKey(name: string): string {
+  return _currentUserId ? `${_currentUserId}:${name}` : name
+}
+
 // ─── supabaseStorage — Zustand persist adapter (clé/valeur) ──────────────────
 
 export const supabaseStorage: StateStorage = {
@@ -12,31 +27,32 @@ export const supabaseStorage: StateStorage = {
       return localStorage.getItem(name)
     }
 
-    console.log(`[Supabase] 📥 getItem("${name}")`)
+    const key = scopedKey(name)
+    console.log(`[Supabase] 📥 getItem("${key}")`)
     try {
       const { data, error } = await supabase
         .from('stores')
         .select('value')
-        .eq('key', name)
+        .eq('key', key)
         .single()
 
       if (error) {
         if (error.code === 'PGRST116') {
-          console.log(`[Supabase] "${name}" absent du cloud — lecture localStorage`)
+          console.log(`[Supabase] "${key}" absent du cloud — lecture localStorage`)
         } else {
-          console.error(`[Supabase] ❌ getItem(${name}) :`, error.code, error.message)
+          console.error(`[Supabase] ❌ getItem(${key}) :`, error.code, error.message)
         }
         // Migration : si données locales, les pousser vers Supabase
         const local = localStorage.getItem(name)
         if (local) {
-          console.log(`[Supabase] 🔄 Migration localStorage → cloud pour "${name}"`)
+          console.log(`[Supabase] 🔄 Migration localStorage → cloud pour "${key}"`)
           await supabaseStorage.setItem(name, local)
         }
         return local
       }
 
       if (data?.value) {
-        console.log(`[Supabase] ✅ getItem("${name}") — données récupérées du cloud`)
+        console.log(`[Supabase] ✅ getItem("${key}") — données récupérées du cloud`)
         localStorage.setItem(name, data.value)
         return data.value
       }
@@ -56,28 +72,29 @@ export const supabaseStorage: StateStorage = {
       return
     }
 
-    console.log(`[Supabase] 📤 setItem("${name}") — ${Math.round(value.length / 1024)}kb`)
+    const key = scopedKey(name)
+    console.log(`[Supabase] 📤 setItem("${key}") — ${Math.round(value.length / 1024)}kb`)
     try {
       const { error } = await supabase
         .from('stores')
         .upsert(
-          { key: name, value, updated_at: new Date().toISOString() },
+          { key, value, updated_at: new Date().toISOString() },
           { onConflict: 'key' },
         )
       if (error) {
-        console.error(`[Supabase] ❌ setItem(${name}) :`, error.code, error.message)
+        console.error(`[Supabase] ❌ setItem(${key}) :`, error.code, error.message)
       } else {
-        console.log(`[Supabase] ✅ setItem("${name}") — cloud OK`)
+        console.log(`[Supabase] ✅ setItem("${key}") — cloud OK`)
       }
     } catch (err) {
-      console.error(`[Supabase] ❌ setItem(${name}) exception :`, err)
+      console.error(`[Supabase] ❌ setItem(${key}) exception :`, err)
     }
   },
 
   removeItem: async (name: string): Promise<void> => {
     localStorage.removeItem(name)
     if (!supabase) return
-    await supabase.from('stores').delete().eq('key', name)
+    await supabase.from('stores').delete().eq('key', scopedKey(name))
   },
 }
 
