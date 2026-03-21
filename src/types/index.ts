@@ -144,3 +144,33 @@ export interface TimeSession {
   focus: number                // 0–100, niveau de concentration
   createdAt: string
 }
+
+// ─── Shopping ─────────────────────────────────────────────────────────────────
+
+export type ShoppingPriority = 'Envie' | 'Besoin' | 'Urgent'
+export type ShoppingVerdict  = 'Satisfait' | 'Mitigé' | 'Déçu'
+
+export interface ShoppingCategory {
+  id:    string
+  name:  string
+  color: string   // hex
+}
+
+export interface ShoppingItem {
+  id:         string
+  name:       string
+  brand?:     string
+  price:      number
+  imageUrl?:  string   // base64 or URL
+  link?:      string
+  notes?:     string
+  categoryId?: string
+  priority:   ShoppingPriority
+  createdAt:  string
+}
+
+export interface BoughtItem extends ShoppingItem {
+  boughtDate: string
+  pricePaid:  number
+  verdict:    ShoppingVerdict
+}

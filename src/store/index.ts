@@ -2,6 +2,11 @@ import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
+import { supabaseStorage } from '../lib/supabaseSync'
+import { firestoreStorage as _firestoreStorage } from './firebase'
+
+// Utilise Supabase si configuré, sinon Firestore en fallback
+const activeStorage = supabaseStorage ?? _firestoreStorage
 import type { Domain, Task, SubTask, Objective, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
@@ -130,7 +135,7 @@ const trackProgress = (history: ProgressEntry[] | undefined, value: number): Pro
 
 export const useStore = create<AetherisState>()(
   persist(
-    (set, get) => ({
+    (set) => ({
       seeded:    true,
       onboarded: false,
       theme:     'dark'  as AppTheme,
@@ -209,9 +214,13 @@ export const useStore = create<AetherisState>()(
       // ── Domain ──────────────────────────────────────────────────────────────
 
       addDomain: (domain) =>
-        set((s) => ({
-          domains: [...s.domains, { id: nanoid(), ...domain }],
-        })),
+        set((s) => {
+          const exists = s.domains.some(
+            (d) => d.name.trim().toLowerCase() === domain.name.trim().toLowerCase()
+          )
+          if (exists) return s
+          return { domains: [...s.domains, { id: nanoid(), ...domain }] }
+        }),
 
       updateDomain: (id, updates) =>
         set((s) => ({
@@ -475,8 +484,8 @@ export const useStore = create<AetherisState>()(
       setUserContext: (ctx) => set({ userContext: ctx }),
     }),
     {
-      name: 'aetheris-store',
-      storage: createJSONStorage(() => localStorage),
+      name: 'aetheris-app',
+      storage: createJSONStorage(() => activeStorage),
     },
   ),
 )

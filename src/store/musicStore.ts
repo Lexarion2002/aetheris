@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { nanoid } from '../utils/nanoid'
-import { firestoreStorage } from './firebase'
+import { firestoreStorage, db } from './firebase'
+import { collection, getDocs } from 'firebase/firestore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -9,22 +9,27 @@ export type AlbumTag =
   | 'ambient' | 'jazz' | 'rap' | 'rock' | 'electro' | 'classical' | 'soul'
   | 'rnb' | 'folk' | 'metal' | 'pop' | 'world' | 'experimental' | 'indie'
 
-export interface AlbumEntry {
+export interface AlbumCritique {
   id:                  string
   titre:               string
   artiste:             string
+  dateOriginaleSortie: string
   pochette:            string
+  note:                number
+  tags:                AlbumTag[]
+  critique:            string
+  tracksFavorites:     string[]
+  contexte:            string
+  dateCritique:        string
+}
+
+export interface AlbumAttente {
+  id:                  string
+  titre:               string
+  artiste:             string
+  source:              string
+  pourquoi:            string
   dateAjout:           string
-  note:                number | null
-  critique?:           string
-  dateCritique?:       string
-  source?:             string
-  pourquoi?:           string
-  dateAttendueSortie?: string
-  dateOriginaleSortie?:string
-  tags?:               AlbumTag[]
-  tracksFavorites?:    string[]
-  contexte?:           string
 }
 
 export interface ArtisteFollowed {
@@ -48,17 +53,26 @@ export interface AlbumEnCours {
 // ─── State ────────────────────────────────────────────────────────────────────
 
 interface MusicState {
+  _hasHydrated:   boolean
+  setHasHydrated: (state: boolean) => void
+
+  fetchLibrary:   () => Promise<void>
+
   albumEnCours:   AlbumEnCours | null
-  albums:         AlbumEntry[]
+  bibliotheque:   AlbumCritique[]
+  fileAttente:    AlbumAttente[]
   artistesSuivis: ArtisteFollowed[]
 
   setAlbumEnCours:       (album: Omit<AlbumEnCours, 'startedAt'>) => void
   clearAlbumEnCours:     () => void
   setPremiereImpression: (text: string) => void
 
-  addAlbum:       (album: Omit<AlbumEntry, 'id' | 'dateAjout' | 'note'> & { note?: number | null }) => void
-  updateAlbum:    (id: string, updates: Partial<Omit<AlbumEntry, 'id'>>) => void
-  deleteAlbum:    (id: string) => void
+  addCritique:    (critique: Omit<AlbumCritique, 'id' | 'dateCritique'> & { id?: string }) => void
+  updateCritique: (id: string, data: Partial<Omit<AlbumCritique, 'id'>>) => void
+  deleteCritique: (id: string) => void
+
+  addAlbumFile:   (album: Omit<AlbumAttente, 'id' | 'dateAjout'>) => void
+  removeFromFile: (id: string) => void
   startListening:    (id: string) => void   // move from file to en cours
 
   followArtiste:        (artiste: Omit<ArtisteFollowed, 'id'>) => void
@@ -72,8 +86,33 @@ interface MusicState {
 export const useMusicStore = create<MusicState>()(
   persist(
     (set, get) => ({
+      _hasHydrated:   false,
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
+
+      fetchLibrary: async () => {
+        try {
+          const snapshot = await getDocs(collection(db, 'aetheris_stores'))
+          
+          snapshot.forEach((document) => {
+            if (document.id === 'aetheris-music-v1') {
+              const rawData = document.data()?.value || document.data()
+              const parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData
+              
+              if (parsed.state) {
+                set(parsed.state)
+              } else {
+                set({ bibliotheque: parsed })
+              }
+            }
+          })
+        } catch (error) {
+          console.error('[MusicStore] Erreur fetchLibrary:', error)
+        }
+      },
+
       albumEnCours:   null,
-      albums:         [],
+      bibliotheque:   [],
+      fileAttente:    [],
       artistesSuivis: [],
 
       setAlbumEnCours: (album) =>
@@ -86,41 +125,74 @@ export const useMusicStore = create<MusicState>()(
           s.albumEnCours ? { albumEnCours: { ...s.albumEnCours, premiereImpression: text } } : {}
         ),
 
-      addAlbum: (album) => {
-        const entry: AlbumEntry = {
-          id: nanoid(),
-          dateAjout: new Date().toISOString().split('T')[0],
-          note: album.note ?? null,
-          ...album,
-        }
-        set((s) => ({ albums: [entry, ...s.albums] }))
+      addCritique: (critique) => {
+        set((s) => {
+          const id = critique.id || crypto.randomUUID()
+          // Sécurité absolue : si l'ID existe déjà, on le met à jour au lieu de le dupliquer
+          if (s.bibliotheque.some((a) => a.id === id)) {
+            return { bibliotheque: s.bibliotheque.map((a) => (a.id === id ? { ...a, ...critique } : a)) }
+          }
+          const entry: AlbumCritique = {
+            id,
+            dateCritique: new Date().toISOString().split('T')[0],
+            ...(critique as Omit<AlbumCritique, 'id' | 'dateCritique'>),
+          }
+          return { bibliotheque: [entry, ...s.bibliotheque] }
+        })
       },
 
-      updateAlbum: (id, updates) =>
+      updateCritique: (id, data) =>
         set((s) => ({
-          albums: s.albums.map((a) => (a.id === id ? { ...a, ...updates } : a)),
+          bibliotheque: s.bibliotheque.map((a) => (a.id === id ? { ...a, ...data } : a)),
         })),
 
-      deleteAlbum: (id) =>
-        set((s) => ({ albums: s.albums.filter((a) => a.id !== id) })),
+      deleteCritique: (id) => {
+        if (!id) return
+        set((s) => {
+          const exists = s.bibliotheque.some((a) => a.id === id)
+          if (!exists) return s // Stoppe la mise à jour si l'ID est introuvable
+          
+          const filtered = s.bibliotheque.filter((a) => a.id !== id)
+          
+          // Protection anti-vide : si on passe de plusieurs albums à zéro, c'est une anomalie
+          if (filtered.length === 0 && s.bibliotheque.length > 1) {
+            return s
+          }
+          
+          return { bibliotheque: filtered }
+        })
+      },
+
+      addAlbumFile: (album) => {
+        const entry: AlbumAttente = {
+          id: crypto.randomUUID(),
+          dateAjout: new Date().toISOString().split('T')[0],
+          ...album,
+        }
+        set((s) => ({ fileAttente: [entry, ...s.fileAttente] }))
+      },
+
+      removeFromFile: (id) =>
+        set((s) => ({ fileAttente: s.fileAttente.filter((a) => a.id !== id) })),
 
       startListening: (id) => {
-        const album = get().albums.find((a) => a.id === id)
+        const album = get().fileAttente.find((a) => a.id === id)
         if (!album) return
-        set({
+        set((s) => ({
+          fileAttente: s.fileAttente.filter((a) => a.id !== id),
           albumEnCours: {
             titre:              album.titre,
             artiste:            album.artiste,
-            pochette:           album.pochette || '',
+            pochette:           '',
             premiereImpression: '',
             startedAt:          new Date().toISOString(),
           },
-        })
+        }))
       },
 
       followArtiste: (artiste) =>
         set((s) => ({
-          artistesSuivis: [...s.artistesSuivis, { id: nanoid(), ...artiste }],
+          artistesSuivis: [...s.artistesSuivis, { id: crypto.randomUUID(), ...artiste }],
         })),
 
       updateArtiste: (id, updates) =>
@@ -139,6 +211,10 @@ export const useMusicStore = create<MusicState>()(
     { 
       name: 'aetheris-music-v1',
       storage: createJSONStorage(() => firestoreStorage),
+      onRehydrateStorage: () => (state) => {
+        console.log('[MusicStore] 🔄 Hydratation terminée avec :', state?.bibliotheque)
+        state?.setHasHydrated(true)
+      },
     },
   ),
 )

@@ -151,8 +151,9 @@ function TaskCard({ task, onEdit, sessions, subTasks }: {
   const pomElsewhere = pomActive && pomTaskId !== task.id  // Pomodoro on another task
 
   // Title of the task currently in Pomodoro (if it's a different task)
+  // Selector uses only pomTaskId (store value) — returns a primitive, stable across renders
   const pomElsewhereTitle = useStore((s) =>
-    pomElsewhere ? (s.tasks.find((t) => t.id === pomTaskId)?.title ?? null) : null
+    pomTaskId ? (s.tasks.find((t) => t.id === pomTaskId)?.title ?? null) : null
   )
 
   // If Pomodoro becomes active, auto-stop the local mini-timer

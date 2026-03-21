@@ -4,7 +4,10 @@ import { Layout } from './components/Layout'
 import { LandingPage } from './pages/LandingPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { firestoreStorage } from './store/firebase'
+import { watchOnlineStatus, syncRowsToSupabase } from './lib/supabaseSync'
+import { useShoppingStore } from './store/shoppingStore'
 import { useStore } from './store'
+import { useMusicStore } from './store/musicStore'
 
 // ─── Lazy page imports ────────────────────────────────────────────────────────
 
@@ -18,6 +21,8 @@ const WeekView       = lazy(() => import('./pages/WeekView').then((m) => ({ defa
 const SettingsPage   = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage').then((m) => ({ default: m.CategoriesPage })))
 const MusicPage      = lazy(() => import('./pages/MusicPage').then((m) => ({ default: m.MusicPage })))
+const CuisinePage    = lazy(() => import('./pages/CuisinePage').then((m) => ({ default: m.CuisinePage })))
+const ShoppingPage   = lazy(() => import('./pages/ShoppingPage').then((m) => ({ default: m.ShoppingPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -40,17 +45,49 @@ function PageLoader() {
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
-  const onboarded    = useStore((s) => s.onboarded)
-  const theme        = useStore((s) => s.theme)
-  const deleteDomain = useStore((s) => s.deleteDomain)
-  const addDomain    = useStore((s) => s.addDomain)
-  const domains      = useStore((s) => s.domains)
+  const onboarded        = useStore((s) => s.onboarded)
+  const theme            = useStore((s) => s.theme)
+  const deleteDomain     = useStore((s) => s.deleteDomain)
+  const domains          = useStore((s) => s.domains)
 
   useEffect(() => {
     document.body.classList.toggle('theme-light', theme === 'light')
   }, [theme])
 
-  // One-time migration: remove legacy standalone "Finance" domain (now a standalone page)
+  // ── Sync au retour d'Internet ─────────────────────────────────────────────
+  useEffect(() => watchOnlineStatus(), [])
+
+  // ── Sync row-per-row vers Supabase (debounce 2s) ──────────────────────────
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout>
+    const unsub = useStore.subscribe((state) => {
+      clearTimeout(timer)
+      timer = setTimeout(() => {
+        const { wishlist, bought } = useShoppingStore.getState()
+        syncRowsToSupabase({
+          domains:      state.domains,
+          tasks:        state.tasks,
+          transactions: state.transactions,
+          wishlist,
+          bought,
+        })
+      }, 2000)
+    })
+    return () => { clearTimeout(timer); unsub() }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  // Nettoyage des anciennes clés localStorage (migration unique)
+  useEffect(() => {
+    const LEGACY_KEYS = [
+      'aetheris-v2', 'aetheris-store',
+    ]
+    LEGACY_KEYS.forEach((k) => localStorage.removeItem(k))
+    console.log('✓ localStorage vidé (anciennes clés supprimées)')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+// One-time migration: remove legacy standalone "Finance" domain (now a standalone page)
   useEffect(() => {
     domains
       .filter((d) => ['finance', 'finances'].includes(d.name.trim().toLowerCase()))
@@ -58,22 +95,32 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // One-time migration: ensure "Musique" domain exists
+  // ── Background Sync Music (Local -> Cloud) ────────────────────────────────────
   useEffect(() => {
-    const exists = domains.some((d) => d.name.trim().toLowerCase() === 'musique')
-    if (!exists) {
-      addDomain({ name: 'Musique', color: 'red', icon: '🎵', description: 'Écoute, critique musicale et collection' })
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    let unsubscribeMusic: (() => void) | undefined
 
-  // ── Background Sync (Local -> Cloud) ─────────────────────────────────────────
-  useEffect(() => {
-    const unsub = useStore.subscribe((state) => {
-      // Sauvegarde silencieuse en arrière-plan à chaque modification
-      firestoreStorage.setItem('aetheris-store', JSON.stringify({ state, version: 0 }))
-    })
-    return unsub
+    const syncTimer = setTimeout(() => {
+      const isMusicHydrated = useMusicStore.persist.hasHydrated()
+      const { bibliotheque } = useMusicStore.getState()
+
+      if (isMusicHydrated && bibliotheque.length > 0) {
+        unsubscribeMusic = useMusicStore.subscribe(async (state, prevState) => {
+          if (prevState.bibliotheque.length > 1 && state.bibliotheque.length === 0) return
+          try {
+            const data = JSON.stringify({ state, version: 0 })
+            await firestoreStorage.setItem('aetheris-music-v1', data)
+          } catch (error) {
+            console.error('[Sync] Erreur de sauvegarde Musique:', error)
+            alert("Erreur de synchronisation Musique : La sauvegarde a échoué. Vérifiez que la taille de vos pochettes n'est pas trop importante.")
+          }
+        })
+      }
+    }, 500)
+
+    return () => {
+      clearTimeout(syncTimer)
+      if (unsubscribeMusic) unsubscribeMusic()
+    }
   }, [])
 
   return (
@@ -114,6 +161,12 @@ export default function App() {
           } />
           <Route path="musique" element={
             <Suspense fallback={<PageLoader />}><MusicPage /></Suspense>
+          } />
+          <Route path="cuisine" element={
+            <Suspense fallback={<PageLoader />}><CuisinePage /></Suspense>
+          } />
+          <Route path="achats" element={
+            <Suspense fallback={<PageLoader />}><ShoppingPage /></Suspense>
           } />
         </Route>
       </Routes>

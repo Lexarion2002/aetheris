@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useMusicStore } from '../store/musicStore'
 import type { AlbumCritique, AlbumAttente, ArtisteFollowed, AlbumTag } from '../store/musicStore'
 
@@ -11,18 +11,17 @@ const ALL_TAGS: AlbumTag[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
+// Générateur d'ID sécurisé (fallback si crypto.randomUUID n'est pas dispo)
+function generateId() {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
+  return Math.random().toString(36).substring(2, 15)
+}
+
 function noteColor(note: number) {
   if (note >= 9) return 'text-amber-400'
   if (note >= 7) return 'text-teal-400'
   if (note >= 5) return 'text-zinc-300'
   return 'text-zinc-500'
-}
-
-function noteBg(note: number) {
-  if (note >= 9) return 'bg-amber-500/15 text-amber-400 border-amber-500/25'
-  if (note >= 7) return 'bg-teal-500/15 text-teal-400 border-teal-500/25'
-  if (note >= 5) return 'bg-zinc-700/40 text-zinc-300 border-zinc-700'
-  return 'bg-zinc-800/40 text-zinc-500 border-zinc-800'
 }
 
 function TagPill({ tag }: { tag: string }) {
@@ -69,15 +68,19 @@ function PochetteImg({ src, alt, size = 48 }: { src: string; alt: string; size?:
 // ─── Critique Modal ────────────────────────────────────────────────────────────
 
 interface CritiqueModalProps {
-  initial?: AlbumCritique | null
+  initial?: Partial<AlbumCritique & AlbumAttente> | null
   onClose: () => void
 }
 
 function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
   const addCritique       = useMusicStore((s) => s.addCritique)
   const updateCritique    = useMusicStore((s) => s.updateCritique)
+  const deleteCritique    = useMusicStore((s) => s.deleteCritique)
+  const fileAttente       = useMusicStore((s) => s.fileAttente)
+  const removeFromFile    = useMusicStore((s) => s.removeFromFile)
   const albumEnCours      = useMusicStore((s) => s.albumEnCours)
   const clearAlbumEnCours = useMusicStore((s) => s.clearAlbumEnCours)
+  const bibliotheque      = useMusicStore((s) => s.bibliotheque)
 
   const [titre,      setTitre]      = useState(initial?.titre      ?? albumEnCours?.titre   ?? '')
   const [artiste,    setArtiste]    = useState(initial?.artiste    ?? albumEnCours?.artiste ?? '')
@@ -94,7 +97,27 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
   function handleImageFile(file: File) {
     if (!file.type.startsWith('image/')) return
     const reader = new FileReader()
-    reader.onload = (e) => setPochette((e.target?.result as string) ?? '')
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX_SIZE = 300
+        let { width, height } = img
+        if (width > height && width > MAX_SIZE) {
+          height *= MAX_SIZE / width
+          width = MAX_SIZE
+        } else if (height > MAX_SIZE) {
+          width *= MAX_SIZE / height
+          height = MAX_SIZE
+        }
+        canvas.width = width
+        canvas.height = height
+        const ctx = canvas.getContext('2d')
+        ctx?.drawImage(img, 0, 0, width, height)
+        setPochette(canvas.toDataURL('image/jpeg', 0.8))
+      }
+      img.src = (e.target?.result as string) ?? ''
+    }
     reader.readAsDataURL(file)
   }
 
@@ -105,6 +128,8 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
       return [...prev, tag]
     })
   }
+
+  const isExistingCritique = !!(initial?.id && bibliotheque.some((a) => a.id === initial.id))
 
   function handleSubmit() {
     if (!titre.trim() || !artiste.trim()) return
@@ -119,10 +144,14 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
       tracksFavorites:     tracks.split('\n').map((t) => t.trim()).filter(Boolean),
       contexte:            contexte.trim(),
     }
-    if (initial) {
-      updateCritique(initial.id, data)
+    
+    if (isExistingCritique) {
+      updateCritique(initial.id!, data)
     } else {
-      addCritique(data)
+      addCritique({ id: initial?.id || generateId(), ...data })
+      if (initial?.id && fileAttente.some((a) => a.id === initial.id)) {
+        removeFromFile(initial.id!)
+      }
       if (albumEnCours) clearAlbumEnCours()
     }
     onClose()
@@ -300,8 +329,21 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
               disabled={!titre.trim() || !artiste.trim()}
               className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              {initial ? 'Enregistrer' : 'Ajouter à la bibliothèque'}
+          {!!initial ? 'Enregistrer' : 'Ajouter à la bibliothèque'}
             </button>
+  {!!initial && (
+          <button
+            onClick={() => {
+              if (window.confirm('Supprimer cette critique ?')) {
+                deleteCritique(initial.id!)
+                onClose()
+              }
+            }}
+            className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm transition-colors"
+          >
+            Supprimer
+          </button>
+        )}
             <button onClick={onClose} className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors">
               Annuler
             </button>
@@ -411,7 +453,7 @@ function ArtisteModal({ initial, onClose }: ArtisteModalProps) {
       attentes:             attentes.trim(),
       alerte,
     }
-    if (initial) updateArtiste(initial.id, data)
+    if (initial) updateArtiste(initial.id!, data)
     else followArtiste(data)
     onClose()
   }
@@ -496,7 +538,6 @@ function AlbumEnCoursCard({ onCritique }: { onCritique: () => void }) {
   const [titre,    setTitre]   = useState('')
   const [artiste,  setArtiste] = useState('')
   const [pochette, setPochette] = useState('')
-  const [impression, setImpression] = useState('')
 
   if (!albumEnCours) {
     return (
@@ -603,7 +644,7 @@ function BibliothequeSection({
   onEdit: (album: AlbumCritique) => void
   onNew: () => void
 }) {
-  const bibliotheque = useMusicStore((s) => s.bibliotheque)
+  const bibliotheque   = useMusicStore((s) => s.bibliotheque)
   const deleteCritique = useMusicStore((s) => s.deleteCritique)
   const [sort,       setSort]       = useState<SortMode>('sortie_desc')
   const [view,       setView]       = useState<ViewMode>('grid')
@@ -711,9 +752,9 @@ function BibliothequeSection({
         </div>
       ) : view === 'grid' ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {sorted.map((album) => (
+          {sorted.map((album, idx) => (
             <div
-              key={album.id}
+              key={album.id || `grid-${idx}`}
               className="group bg-zinc-900 border border-zinc-800/60 rounded-xl overflow-hidden hover:border-zinc-700/60 transition-colors cursor-pointer"
               onClick={() => onEdit(album)}
             >
@@ -737,7 +778,7 @@ function BibliothequeSection({
                   onClick={(e) => {
                     e.stopPropagation()
                     if (window.confirm('Supprimer cet album de la bibliothèque ?')) {
-                      deleteCritique(album.id)
+                      deleteCritique(album.id!)
                     }
                   }}
                   title="Supprimer l'album"
@@ -763,11 +804,13 @@ function BibliothequeSection({
         </div>
       ) : (
         <div className="space-y-1">
-          {sorted.map((album) => (
-            <div
-              key={album.id}
-              className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800/40 hover:border-zinc-700/50 transition-colors group"
-            >
+          {sorted.map((album, idx) => {
+            const itemId = album.id || `list-${idx}`
+            return (
+              <div
+                key={itemId}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800/40 hover:border-zinc-700/50 transition-colors group"
+              >
               <PochetteImg src={album.pochette} alt={album.titre} size={36} />
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
@@ -785,23 +828,51 @@ function BibliothequeSection({
                 <NoteStars note={album.note} />
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    onClick={(e) => { e.stopPropagation(); onEdit(album) }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onEdit(album)
+                    }}
                     className="p-1 rounded text-zinc-600 hover:text-zinc-400 transition-colors text-xs"
                   >
                     ✏
                   </button>
-                  {confirmDel === album.id ? (
+                  {confirmDel === itemId ? (
                     <>
-                      <button onClick={(e) => { e.stopPropagation(); deleteCritique(album.id); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Suppr</button>
-                      <button onClick={(e) => { e.stopPropagation(); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 hover:bg-zinc-700">✕</button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          deleteCritique(album.id!)
+                          setConfirmDel(null)
+                        }}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                      >
+                        Suppr
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          setConfirmDel(null)
+                        }}
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 hover:bg-zinc-700"
+                      >
+                        ✕
+                      </button>
                     </>
                   ) : (
-                    <button onClick={(e) => { e.stopPropagation(); setConfirmDel(album.id) }} className="p-1 rounded text-zinc-700 hover:text-red-500 transition-colors text-xs">🗑</button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setConfirmDel(itemId)
+                      }}
+                      className="p-1 rounded text-zinc-700 hover:text-red-500 transition-colors text-xs"
+                    >
+                      🗑
+                    </button>
                   )}
                 </div>
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>
@@ -834,9 +905,9 @@ function PantheonSection({ onEdit }: { onEdit: (album: AlbumCritique) => void })
         <p className="text-xs text-zinc-600 py-4 text-center">Aucun album noté 9 ou 10 encore.</p>
       ) : (
         <div className="flex flex-wrap gap-3">
-          {pantheon.map((album) => (
+          {pantheon.map((album, idx) => (
             <div
-              key={album.id}
+              key={album.id || `panth-${idx}`}
               className="relative group cursor-pointer"
               style={{ width: 80 }}
               onClick={() => onEdit(album)}
@@ -862,10 +933,10 @@ function PantheonSection({ onEdit }: { onEdit: (album: AlbumCritique) => void })
 
 // ─── File d'attente ────────────────────────────────────────────────────────────
 
-function FileAttenteSection({ onNew }: { onNew: () => void }) {
-  const fileAttente   = useMusicStore((s) => s.fileAttente)
-  const removeFromFile = useMusicStore((s) => s.removeFromFile)
+function FileAttenteSection({ onNew, onEdit }: { onNew: () => void; onEdit: (a: AlbumAttente) => void }) {
+  const fileAttente    = useMusicStore((s) => s.fileAttente)
   const startListening = useMusicStore((s) => s.startListening)
+  const removeFromFile = useMusicStore((s) => s.removeFromFile)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
 
   return (
@@ -886,8 +957,10 @@ function FileAttenteSection({ onNew }: { onNew: () => void }) {
         <p className="text-xs text-zinc-600 py-3 text-center">Aucun album en attente.</p>
       ) : (
         <div className="space-y-1.5">
-          {fileAttente.map((album) => (
-            <div key={album.id} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800/40 group">
+          {fileAttente.map((album, idx) => {
+            const itemId = album.id || `attente-${idx}`
+            return (
+              <div key={itemId} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800/40 group">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-zinc-200 truncate">{album.titre}</span>
@@ -903,23 +976,24 @@ function FileAttenteSection({ onNew }: { onNew: () => void }) {
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
+            <button onClick={() => onEdit(album)} className="p-1 rounded text-zinc-600 hover:text-zinc-400 transition-colors text-xs opacity-0 group-hover:opacity-100">✏</button>
                 <button
-                  onClick={() => startListening(album.id)}
+                    onClick={() => startListening(album.id!)}
                   className="text-[11px] px-2 py-1 rounded-lg bg-teal-600/15 hover:bg-teal-600/25 text-teal-400 transition-colors"
                 >
                   ▶ Écouter
                 </button>
-                {confirmDel === album.id ? (
+                {confirmDel === itemId ? (
                   <>
-                    <button onClick={() => { removeFromFile(album.id); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Suppr</button>
+                      <button onClick={() => { removeFromFile(album.id!); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Suppr</button>
                     <button onClick={() => setConfirmDel(null)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">✕</button>
                   </>
                 ) : (
-                  <button onClick={() => setConfirmDel(album.id)} className="p-1 rounded text-zinc-700 hover:text-red-500 transition-colors text-xs opacity-0 group-hover:opacity-100">🗑</button>
+                  <button onClick={() => setConfirmDel(itemId)} className="p-1 rounded text-zinc-700 hover:text-red-500 transition-colors text-xs opacity-0 group-hover:opacity-100">🗑</button>
                 )}
               </div>
             </div>
-          ))}
+          )})}
         </div>
       )}
     </div>
@@ -974,9 +1048,9 @@ function ArtistesSection({
   onEdit: (a: ArtisteFollowed) => void
   onNew: () => void
 }) {
-  const artistesSuivis = useMusicStore((s) => s.artistesSuivis)
-  const unfollowArtiste = useMusicStore((s) => s.unfollowArtiste)
+  const artistesSuivis   = useMusicStore((s) => s.artistesSuivis)
   const setArtisteAlerte = useMusicStore((s) => s.setArtisteAlerte)
+  const unfollowArtiste  = useMusicStore((s) => s.unfollowArtiste)
   const [confirmDel, setConfirmDel] = useState<string | null>(null)
 
   return (
@@ -997,12 +1071,13 @@ function ArtistesSection({
         <p className="text-xs text-zinc-600 py-3 text-center">Aucun artiste suivi.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {artistesSuivis.map((artiste) => {
+          {artistesSuivis.map((artiste, idx) => {
+            const itemId = artiste.id || `art-${idx}`
             const pct = artiste.discographieTotal > 0
               ? Math.round((artiste.discographieEcoutee / artiste.discographieTotal) * 100)
               : 0
             return (
-              <div key={artiste.id} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-800/40 group hover:border-zinc-700/50 transition-colors">
+              <div key={itemId} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-800/40 group hover:border-zinc-700/50 transition-colors">
                 <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700/40">
                   {artiste.photo ? (
                     <img src={artiste.photo} alt={artiste.nom} className="w-full h-full object-cover" />
@@ -1033,14 +1108,14 @@ function ArtistesSection({
                 </div>
                 <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button onClick={() => onEdit(artiste)} className="p-1 rounded text-zinc-600 hover:text-zinc-400 text-xs">✏</button>
-                  <button onClick={() => setArtisteAlerte(artiste.id, !artiste.alerte)} className="p-1 rounded text-zinc-600 hover:text-teal-400 text-xs">🔔</button>
-                  {confirmDel === artiste.id ? (
+                  <button onClick={() => setArtisteAlerte(artiste.id!, !artiste.alerte)} className="p-1 rounded text-zinc-600 hover:text-teal-400 text-xs">🔔</button>
+                  {confirmDel === itemId ? (
                     <>
-                      <button onClick={() => { unfollowArtiste(artiste.id); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">Suppr</button>
+                      <button onClick={() => { unfollowArtiste(artiste.id!); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">Suppr</button>
                       <button onClick={() => setConfirmDel(null)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">✕</button>
                     </>
                   ) : (
-                    <button onClick={() => setConfirmDel(artiste.id)} className="p-1 rounded text-zinc-700 hover:text-red-500 text-xs">🗑</button>
+                    <button onClick={() => setConfirmDel(itemId)} className="p-1 rounded text-zinc-700 hover:text-red-500 text-xs">🗑</button>
                   )}
                 </div>
               </div>
@@ -1055,9 +1130,36 @@ function ArtistesSection({
 // ─── MusicPage ────────────────────────────────────────────────────────────────
 
 export function MusicPage() {
-  const [critiqueModal, setCritiqueModal] = useState<{ open: boolean; album?: AlbumCritique | null }>({ open: false })
+  const [critiqueModal, setCritiqueModal] = useState<{ open: boolean; album?: Partial<AlbumCritique & AlbumAttente> | null }>({ open: false })
   const [fileModal,     setFileModal]     = useState(false)
   const [artisteModal,  setArtisteModal]  = useState<{ open: boolean; artiste?: ArtisteFollowed | null }>({ open: false })
+
+  const _hasHydrated = useMusicStore((s) => s._hasHydrated)
+  const bibliotheque = useMusicStore((s) => s.bibliotheque)
+  
+  // ─── AUTO-RÉPARATION DES DONNÉES CORROMPUES ───
+  useEffect(() => {
+    if (_hasHydrated) {
+      useMusicStore.setState((state) => {
+        let changed = false
+        const newBiblio = state.bibliotheque.map((a) => {
+          if (!a.id) { changed = true; return { ...a, id: generateId() } }
+          return a
+        })
+        const newAttente = state.fileAttente.map((a) => {
+          if (!a.id) { changed = true; return { ...a, id: generateId() } }
+          return a
+        })
+        const newArtistes = state.artistesSuivis.map((a) => {
+          if (!a.id) { changed = true; return { ...a, id: generateId() } }
+          return a
+        })
+        return changed ? { bibliotheque: newBiblio, fileAttente: newAttente, artistesSuivis: newArtistes } : state
+      })
+    }
+  }, [_hasHydrated])
+
+  console.log('[MusicPage] 🎵 Hydratation :', _hasHydrated, '| Albums chargés depuis le store:', bibliotheque)
 
   return (
     <div className="min-h-full bg-zinc-950 p-4 sm:p-6 lg:p-8">
@@ -1097,7 +1199,10 @@ export function MusicPage() {
 
         {/* ── File d'attente ───────────────────────────────────────────────── */}
         <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-          <FileAttenteSection onNew={() => setFileModal(true)} />
+          <FileAttenteSection
+            onNew={() => setFileModal(true)}
+            onEdit={(album) => setCritiqueModal({ open: true, album })}
+          />
         </div>
 
         {/* ── Stats ────────────────────────────────────────────────────────── */}

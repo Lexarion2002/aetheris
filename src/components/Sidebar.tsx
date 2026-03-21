@@ -173,6 +173,36 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           <span className="text-sm w-4 text-center shrink-0">💶</span>
           <span className="truncate">Finances</span>
         </NavLink>
+        {/* Achats — page standalone */}
+        <NavLink to="/achats" onClick={onNavigate}
+          className={({ isActive }) =>
+            [
+              'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              isActive
+                ? 'bg-sky-500/15 text-sky-400 font-medium'
+                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+            ].join(' ')
+          }
+        >
+          <span className="text-sm w-4 text-center shrink-0">🛍️</span>
+          <span className="truncate">Achats</span>
+        </NavLink>
+        {/* Cuisine — page standalone */}
+        <NavLink to="/cuisine" onClick={onNavigate}
+          className={({ isActive }) =>
+            [
+              'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              isActive
+                ? 'bg-orange-500/15 text-orange-400 font-medium'
+                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+            ].join(' ')
+          }
+        >
+          <span className="text-sm w-4 text-center shrink-0">🍳</span>
+          <span className="truncate">Cuisine</span>
+        </NavLink>
       </div>
 
       {/* ── Spacer ─────────────────────────────────────────────────────────────── */}

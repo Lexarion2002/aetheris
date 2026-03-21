@@ -9,7 +9,7 @@ export function OnboardingPage() {
   const addDomain             = useStore((s) => s.addDomain)
   const completeOnboarding    = useStore((s) => s.completeOnboarding)
 
-  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [selected, setSelected] = useState<Set<string>>(new Set(DEFAULT_DOMAINS.map((d) => d.id)))
 
   const toggle = (id: string) =>
     setSelected((prev) => {

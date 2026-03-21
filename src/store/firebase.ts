@@ -1,5 +1,5 @@
-import { initializeApp } from 'firebase/app'
-import { initializeFirestore, persistentLocalCache, doc, setDoc, getDoc, onSnapshot, collection } from 'firebase/firestore'
+import { initializeApp, getApp, getApps } from 'firebase/app'
+import { getFirestore, initializeFirestore, persistentLocalCache, doc, setDoc, getDoc, onSnapshot, collection } from 'firebase/firestore'
 import type { StateStorage } from 'zustand/middleware'
 
 // Remplace ceci par la config générée par Firebase à l'étape 1
@@ -18,19 +18,21 @@ console.log('[Firebase] 🔧 Configuration de démarrage :', {
   apiKey: firebaseConfig.apiKey ? `${firebaseConfig.apiKey.substring(0, 8)}...` : undefined
 })
 
-const app = initializeApp(firebaseConfig)
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig)
 
 // Initialise Firestore avec un cache local persistant (IndexedDB)
 // Permet l'utilisation 100% hors-ligne avec synchronisation auto au retour d'internet
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache(),
-  experimentalForceLongPolling: true
-})
+export const db = getApps().length > 0 
+  ? getFirestore(app) 
+  : initializeFirestore(app, {
+      localCache: persistentLocalCache(),
+      experimentalForceLongPolling: true
+    })
 
 console.log('[Firebase] 📡 Lancement du test de connexion onSnapshot...')
 try {
   onSnapshot(
-    collection(db, 'test'),
+    collection(db, 'aetheris_stores'),
     (snapshot) => {
       console.log('[Firebase] 🟢 Test onSnapshot réussi ! Documents trouvés :', snapshot.size)
     },

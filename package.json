@@ -12,6 +12,7 @@
     "test:run": "vitest run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.99.3",
     "firebase": "^12.10.0",
     "pdfjs-dist": "^5.5.207",
     "react": "^19.2.0",
