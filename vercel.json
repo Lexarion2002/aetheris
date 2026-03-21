@@ -3,7 +3,11 @@
   "devCommand": "npm run dev",
   "outputDirectory": "dist",
   "env": {
-    "VITE_SUPABASE_URL": "@VITE_SUPABASE_URL",
-    "VITE_SUPABASE_ANON_KEY": "@VITE_SUPABASE_ANON_KEY"
+    "VITE_SUPABASE_URL": {
+      "description": "Supabase Project URL"
+    },
+    "VITE_SUPABASE_ANON_KEY": {
+      "description": "Supabase Anon Key"
+    }
   }
 }
