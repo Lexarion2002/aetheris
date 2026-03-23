@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
+import { supabaseStorage } from '../lib/supabaseSync'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -203,6 +204,6 @@ export const useWritingStore = create<WritingState>()(
       deleteCitation: (id) =>
         set((s) => ({ citations: s.citations.filter((c) => c.id !== id) })),
     }),
-    { name: 'aetheris-writing-v1' },
+    { name: 'aetheris-writing-v1', storage: createJSONStorage(() => supabaseStorage) },
   ),
 )

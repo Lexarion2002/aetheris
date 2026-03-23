@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
+import { supabaseStorage } from '../lib/supabaseSync'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -244,6 +245,6 @@ export const useCareerStore = create<CareerState>()(
       deleteContact: (id) =>
         set((s) => ({ contacts: s.contacts.filter((c) => c.id !== id) })),
     }),
-    { name: 'aetheris-career-v1' },
+    { name: 'aetheris-career-v1', storage: createJSONStorage(() => supabaseStorage) },
   ),
 )

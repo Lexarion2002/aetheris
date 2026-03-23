@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Recette, Ingredient } from '../types/cuisine'
+import { supabaseStorage } from '../lib/supabaseSync'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -115,7 +116,7 @@ export const useCuisineStore = create<CuisineState>()(
     }),
     {
       name:    'aetheris-cuisine-v1',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => supabaseStorage),
     },
   ),
 )

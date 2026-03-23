@@ -1,6 +1,7 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
+import { supabaseStorage } from '../lib/supabaseSync'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -171,6 +172,6 @@ export const useSportStore = create<SportState>()(
       deleteObjectif: (id) =>
         set((s) => ({ objectifs: s.objectifs.filter((o) => o.id !== id) })),
     }),
-    { name: 'aetheris-sport-v1' },
+    { name: 'aetheris-sport-v1', storage: createJSONStorage(() => supabaseStorage) },
   ),
 )

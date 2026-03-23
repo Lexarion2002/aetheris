@@ -1,5 +1,6 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { supabaseStorage } from '../lib/supabaseSync'
 
 export type GlobalStatus = 'recherches' | 'redaction' | 'repetition' | 'finalisation'
 
@@ -28,6 +29,6 @@ export const useLawStore = create<LawState>()(
       setGlobalStatus:  (status) => set({ globalStatus: status }),
       setNotionUrl:     (url)    => set({ notionUrl: url }),
     }),
-    { name: 'aetheris-law-v1' },
+    { name: 'aetheris-law-v1', storage: createJSONStorage(() => supabaseStorage) },
   ),
 )

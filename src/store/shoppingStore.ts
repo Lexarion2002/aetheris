@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { ShoppingItem, BoughtItem, ShoppingCategory, ShoppingVerdict } from '../types'
+import { supabaseStorage } from '../lib/supabaseSync'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -87,7 +88,7 @@ export const useShoppingStore = create<ShoppingState>()(
     }),
     {
       name:    'aetheris-shopping-v1',
-      storage: createJSONStorage(() => localStorage),
+      storage: createJSONStorage(() => supabaseStorage),
     },
   ),
 )
