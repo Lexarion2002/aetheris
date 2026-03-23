@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
-import { firestoreStorage, db } from './firebase'
+import { supabaseStorage } from '../lib/supabaseSync'
+import { db } from './firebase'
 import { collection, getDocs } from 'firebase/firestore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -210,7 +211,7 @@ export const useMusicStore = create<MusicState>()(
     }),
     { 
       name: 'aetheris-music-v1',
-      storage: createJSONStorage(() => firestoreStorage),
+      storage: createJSONStorage(() => supabaseStorage),
       onRehydrateStorage: () => (state) => {
         console.log('[MusicStore] 🔄 Hydratation terminée avec :', state?.bibliotheque)
         state?.setHasHydrated(true)
