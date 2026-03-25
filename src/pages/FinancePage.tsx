@@ -1148,19 +1148,32 @@ function guessCsvCategory(description: string, type: 'income' | 'expense', categ
 function parseCsvText(text: string, categories: FinanceCategory[], existing: Transaction[]): CsvRow[] {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
   if (lines.length < 2) return []
-  const delim = detectCsvDelimiter(lines[0])
-  const split  = (l: string) => l.split(delim).map((c) => c.replace(/^["']|["']$/g, '').trim())
-  const headers = split(lines[0]).map(normStr)
-  const idx = {
-    date:   headers.findIndex((h) => h === 'date' || h.startsWith('date') || h.includes('booking date')),
-    desc:   headers.findIndex((h) => ['libelle', 'description', 'label', 'intitule', 'operation', 'details', 'partner name'].some((k) => h.includes(k))),
-    amount: headers.findIndex((h) => ['montant', 'amount'].some((k) => h.includes(k))),
-    debit:  headers.findIndex((h) => h.includes('debit')),
-    credit: headers.findIndex((h) => h.includes('credit')),
+  // Scan the first 10 lines to find the header row (some bank exports have metadata before headers)
+  let headerLineIdx = 0
+  let delim = ','
+  let idx = { date: -1, desc: -1, amount: -1, debit: -1, credit: -1 }
+  for (let li = 0; li < Math.min(10, lines.length); li++) {
+    const d = detectCsvDelimiter(lines[li])
+    const split = (l: string) => l.split(d).map((c) => c.replace(/^["']|["']$/g, '').trim())
+    const h = split(lines[li]).map(normStr)
+    const dateIdx = h.findIndex((hh) => hh === 'date' || hh.startsWith('date') || hh.includes('booking date'))
+    if (dateIdx !== -1) {
+      headerLineIdx = li
+      delim = d
+      idx = {
+        date:   dateIdx,
+        desc:   h.findIndex((hh) => ['libelle', 'description', 'label', 'intitule', 'operation', 'details', 'partner name'].some((k) => hh.includes(k))),
+        amount: h.findIndex((hh) => ['montant', 'amount'].some((k) => hh.includes(k))),
+        debit:  h.findIndex((hh) => hh.includes('debit')),
+        credit: h.findIndex((hh) => hh.includes('credit')),
+      }
+      break
+    }
   }
   if (idx.date === -1) return []
+  const split  = (l: string) => l.split(delim).map((c) => c.replace(/^["']|["']$/g, '').trim())
   const existSet = new Set(existing.map((t) => `${t.date}|${t.amount}|${(t.note ?? '').toLowerCase()}`))
-  return lines.slice(1).flatMap((line, i) => {
+  return lines.slice(headerLineIdx + 1).flatMap((line, i) => {
     const cols = split(line)
     const date = formatDate(cols[idx.date] ?? '')
     if (!date) return []
