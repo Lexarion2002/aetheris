@@ -1147,15 +1147,15 @@ function guessCsvCategory(description: string, type: 'income' | 'expense', categ
 
 function parseCsvText(text: string, categories: FinanceCategory[], existing: Transaction[]): CsvRow[] {
   const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
-  if (lines.length < 2) return []
+  if (lines.length < 1) return []
   // Scan the first 10 lines to find the header row (some bank exports have metadata before headers)
-  let headerLineIdx = 0
+  let headerLineIdx = -1
   let delim = ','
   let idx = { date: -1, desc: -1, amount: -1, debit: -1, credit: -1 }
   for (let li = 0; li < Math.min(10, lines.length); li++) {
     const d = detectCsvDelimiter(lines[li])
-    const split = (l: string) => l.split(d).map((c) => c.replace(/^["']|["']$/g, '').trim())
-    const h = split(lines[li]).map(normStr)
+    const splitFn = (l: string) => l.split(d).map((c) => c.replace(/^["']|["']$/g, '').trim())
+    const h = splitFn(lines[li]).map(normStr)
     const dateIdx = h.findIndex((hh) => hh === 'date' || hh.startsWith('date') || hh.includes('booking date'))
     if (dateIdx !== -1) {
       headerLineIdx = li
@@ -1170,7 +1170,17 @@ function parseCsvText(text: string, categories: FinanceCategory[], existing: Tra
       break
     }
   }
-  if (idx.date === -1) return []
+  // No header found — try headerless mode: detect delimiter from first line and assume col 0=date, 1=desc, 2=amount
+  if (headerLineIdx === -1) {
+    delim = detectCsvDelimiter(lines[0])
+    const firstCols = lines[0].split(delim).map((c) => c.replace(/^["']|["']$/g, '').trim())
+    if (firstCols.length >= 2 && formatDate(firstCols[0]) !== null) {
+      headerLineIdx = -1  // data starts at line 0
+      idx = { date: 0, desc: firstCols.length >= 2 ? 1 : -1, amount: firstCols.length >= 3 ? 2 : -1, debit: -1, credit: -1 }
+    } else {
+      return []
+    }
+  }
   const split  = (l: string) => l.split(delim).map((c) => c.replace(/^["']|["']$/g, '').trim())
   const existSet = new Set(existing.map((t) => `${t.date}|${t.amount}|${(t.note ?? '').toLowerCase()}`))
   return lines.slice(headerLineIdx + 1).flatMap((line, i) => {
