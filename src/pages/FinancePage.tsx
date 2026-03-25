@@ -1214,8 +1214,11 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
     const reader = new FileReader()
     reader.onload = (e) => {
       const text = e.target?.result as string
+      const firstLines = text.replace(/^\uFEFF/, '').split(/\r?\n/).slice(0, 5).join(' | ')
+      console.log('[CSV] Premières lignes:', firstLines)
       const parsed = parseCsvText(text, financeCategories, transactions)
-      if (parsed.length === 0) setError('Aucune transaction détectée. Vérifiez le format du fichier.')
+      console.log('[CSV] Transactions parsées:', parsed.length, parsed[0])
+      if (parsed.length === 0) setError(`Aucune transaction détectée. Vérifiez le format du fichier.\n[Debug] Lignes: ${firstLines}`)
       else { setError(null); setRows(parsed) }
     }
     reader.readAsText(file, 'UTF-8')
