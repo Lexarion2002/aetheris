@@ -1146,7 +1146,7 @@ function guessCsvCategory(description: string, type: 'income' | 'expense', categ
 }
 
 function parseCsvText(text: string, categories: FinanceCategory[], existing: Transaction[]): CsvRow[] {
-  const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean)
+  const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\r|\n/).map((l) => l.trim()).filter(Boolean)
   if (lines.length < 1) return []
   // Scan the first 10 lines to find the header row (some bank exports have metadata before headers)
   let headerLineIdx = -1
