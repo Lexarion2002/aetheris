@@ -83,7 +83,10 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
   const bibliotheque      = useMusicStore((s) => s.bibliotheque)
 
   const [titre,      setTitre]      = useState(initial?.titre      ?? albumEnCours?.titre   ?? '')
-  const [artiste,    setArtiste]    = useState(initial?.artiste    ?? albumEnCours?.artiste ?? '')
+  const [artistes,      setArtistes]      = useState<string[]>(
+    (initial?.artiste ?? albumEnCours?.artiste ?? '').split(',').map((s) => s.trim()).filter(Boolean)
+  )
+  const [artisteInput, setArtisteInput] = useState('')
   const [dateSortie, setDateSortie] = useState(initial?.dateOriginaleSortie ?? '')
   const [pochette,   setPochette]   = useState(initial?.pochette   ?? albumEnCours?.pochette ?? '')
   const [note,       setNote]       = useState<number>(initial?.note ?? 7)
@@ -131,11 +134,17 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
 
   const isExistingCritique = !!(initial?.id && bibliotheque.some((a) => a.id === initial.id))
 
+  function addArtiste(val: string) {
+    const name = val.trim()
+    if (name && !artistes.includes(name)) setArtistes((p) => [...p, name])
+    setArtisteInput('')
+  }
+
   function handleSubmit() {
-    if (!titre.trim() || !artiste.trim()) return
+    if (!titre.trim() || artistes.length === 0) return
     const data = {
       titre:               titre.trim(),
-      artiste:             artiste.trim(),
+      artiste:             artistes.join(', '),
       dateOriginaleSortie: dateSortie,
       pochette,
       note,
@@ -180,11 +189,22 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
             </div>
             <div>
               <label className="text-[11px] text-zinc-500 mb-1 block">Artiste *</label>
-              <input
-                value={artiste} onChange={(e) => setArtiste(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-                placeholder="Artiste"
-              />
+              <div className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-2 py-1.5 flex flex-wrap gap-1 focus-within:border-teal-500/50">
+                {artistes.map((a) => (
+                  <span key={a} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-700 text-xs text-zinc-200">
+                    {a}
+                    <button type="button" onClick={() => setArtistes((p) => p.filter((x) => x !== a))} className="text-zinc-500 hover:text-zinc-300">×</button>
+                  </span>
+                ))}
+                <input
+                  value={artisteInput}
+                  onChange={(e) => setArtisteInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addArtiste(artisteInput) } }}
+                  onBlur={() => { if (artisteInput.trim()) addArtiste(artisteInput) }}
+                  className="flex-1 min-w-[80px] bg-transparent text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
+                  placeholder={artistes.length === 0 ? 'Artiste, Entrée' : '+'}
+                />
+              </div>
             </div>
           </div>
 
@@ -326,7 +346,7 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleSubmit}
-              disabled={!titre.trim() || !artiste.trim()}
+              disabled={!titre.trim() || artistes.length === 0}
               className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
           {!!initial ? 'Enregistrer' : 'Ajouter à la bibliothèque'}
