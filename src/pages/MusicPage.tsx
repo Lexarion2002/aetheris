@@ -957,7 +957,18 @@ function FileAttenteSection({ onNew, onEdit }: { onNew: () => void; onEdit: (a: 
   const fileAttente    = useMusicStore((s) => s.fileAttente)
   const startListening = useMusicStore((s) => s.startListening)
   const removeFromFile = useMusicStore((s) => s.removeFromFile)
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
+  const [confirmDel,  setConfirmDel]  = useState<string | null>(null)
+  const [highlighted, setHighlighted] = useState<string | null>(null)
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  function randomSelect() {
+    if (fileAttente.length === 0) return
+    const album = fileAttente[Math.floor(Math.random() * fileAttente.length)]
+    const id = album.id!
+    setHighlighted(id)
+    setTimeout(() => setHighlighted(null), 2000)
+    itemRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   return (
     <div>
@@ -966,12 +977,22 @@ function FileAttenteSection({ onNew, onEdit }: { onNew: () => void; onEdit: (a: 
           File d'attente
           <span className="ml-2 text-xs text-zinc-600 font-normal">{fileAttente.length}</span>
         </h2>
-        <button
-          onClick={onNew}
-          className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
-        >
-          + Ajouter
-        </button>
+        <div className="flex items-center gap-2">
+          {fileAttente.length > 1 && (
+            <button
+              onClick={randomSelect}
+              className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
+            >
+              🎲
+            </button>
+          )}
+          <button
+            onClick={onNew}
+            className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
+          >
+            + Ajouter
+          </button>
+        </div>
       </div>
       {fileAttente.length === 0 ? (
         <p className="text-xs text-zinc-600 py-3 text-center">Aucun album en attente.</p>
@@ -980,7 +1001,11 @@ function FileAttenteSection({ onNew, onEdit }: { onNew: () => void; onEdit: (a: 
           {fileAttente.map((album, idx) => {
             const itemId = album.id || `attente-${idx}`
             return (
-              <div key={itemId} className="flex items-center gap-3 px-3 py-2 rounded-xl bg-zinc-900 border border-zinc-800/40 group">
+              <div
+                key={itemId}
+                ref={(el) => { itemRefs.current[itemId] = el }}
+                className={`flex items-center gap-3 px-3 py-2 rounded-xl border group transition-colors duration-300 ${highlighted === itemId ? 'bg-teal-500/15 border-teal-500/40' : 'bg-zinc-900 border-zinc-800/40'}`}
+              >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-medium text-zinc-200 truncate">{album.titre}</span>
