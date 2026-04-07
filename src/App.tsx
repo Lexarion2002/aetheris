@@ -63,23 +63,20 @@ export default function App() {
       setAuthUser(null)
       return
     }
-    function rehydrateAll() {
-      useStore.persist.rehydrate()
-      useMusicStore.persist.rehydrate()
-      useFilmSerieStore.persist.rehydrate()
-    }
-
-    // Vérifie la session existante
+    // Vérifie la session existante — rehydrate une seule fois au chargement
     getCurrentUser().then((user) => {
       setAuthUser(user)
       setCurrentUserId(user?.id ?? null)
-      if (user) rehydrateAll()
+      if (user) {
+        useStore.persist.rehydrate()
+        useMusicStore.persist.rehydrate()
+        useFilmSerieStore.persist.rehydrate()
+      }
     })
-    // Écoute les changements
+    // Écoute les changements d'auth — NE PAS rehydrater (évite d'écraser le state en cours)
     const unsub = onAuthStateChange((user) => {
       setAuthUser(user)
       setCurrentUserId(user?.id ?? null)
-      if (user) rehydrateAll()
     })
     return unsub
   // eslint-disable-next-line react-hooks/exhaustive-deps
