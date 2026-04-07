@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useFilmSerieStore } from '../store/filmSerieStore'
 import type { FilmSerie, FilmTag, FilmSerieType, FilmSerieStatus } from '../store/filmSerieStore'
 
@@ -60,6 +60,63 @@ function PosterImg({ src, title }: { src?: string; title: string }) {
 }
 
 // ─── Add Modal ────────────────────────────────────────────────────────────────
+
+// ─── PosterUpload ─────────────────────────────────────────────────────────────
+
+function PosterUpload({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
+
+  function handleFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX_H = 450
+        let { width, height } = img
+        if (height > MAX_H) { width = Math.round(width * MAX_H / height); height = MAX_H }
+        canvas.width = width; canvas.height = height
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height)
+        onChange(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs text-zinc-500 font-medium">Affiche</label>
+      <div
+        className={`relative flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed transition-colors cursor-pointer ${dragOver ? 'border-violet-500/60 bg-violet-500/10' : 'border-zinc-700/60 bg-zinc-800/50 hover:border-zinc-600'}`}
+        style={{ minHeight: value ? 0 : 100 }}
+        onClick={() => fileRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+      >
+        {value ? (
+          <div className="relative w-full">
+            <img src={value} alt="affiche" className="w-full max-h-52 object-contain rounded-lg" />
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); onChange('') }}
+              className="absolute top-1 right-1 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-400 rounded-full w-6 h-6 flex items-center justify-center text-xs"
+            >×</button>
+          </div>
+        ) : (
+          <>
+            <span className="text-2xl text-zinc-600">🎬</span>
+            <span className="text-xs text-zinc-500">Glisse une image ou clique</span>
+          </>
+        )}
+      </div>
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
+    </div>
+  )
+}
 
 interface ModalAddItemProps {
   onClose: () => void
@@ -168,23 +225,7 @@ function ModalAddItem({ onClose }: ModalAddItemProps) {
           />
         </div>
 
-        {/* Image URL */}
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-zinc-500 font-medium">Image / Affiche (URL)</label>
-          <input
-            className="bg-zinc-800 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
-            placeholder="https://..."
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-          />
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt="preview"
-              className="w-24 h-36 object-cover rounded-lg border border-zinc-700/50 self-center"
-            />
-          )}
-        </div>
+        <PosterUpload value={imageUrl} onChange={setImageUrl} />
 
         {/* Tags */}
         <div className="flex flex-col gap-2">
@@ -518,22 +559,7 @@ function ModalEditItem({ item, onClose }: ModalEditItemProps) {
           />
         </div>
 
-        {/* Image URL */}
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-zinc-500 font-medium">Image / Affiche (URL)</label>
-          <input
-            className="bg-zinc-800 border border-zinc-700/50 rounded-lg px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-violet-500/50 focus:ring-1 focus:ring-violet-500/30"
-            value={imageUrl}
-            onChange={(e) => setImageUrl(e.target.value)}
-          />
-          {imageUrl && (
-            <img
-              src={imageUrl}
-              alt="preview"
-              className="w-24 h-36 object-cover rounded-lg border border-zinc-700/50 self-center"
-            />
-          )}
-        </div>
+        <PosterUpload value={imageUrl} onChange={setImageUrl} />
 
         {/* Tags */}
         <div className="flex flex-col gap-2">
