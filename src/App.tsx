@@ -4,7 +4,6 @@ import { Layout } from './components/Layout'
 import { LandingPage } from './pages/LandingPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { AuthModal } from './components/AuthModal'
-import { firestoreStorage } from './store/firebase'
 import { watchOnlineStatus, setCurrentUserId } from './lib/supabaseSync'
 import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
 import { isSupabaseReady } from './lib/supabase'
@@ -109,27 +108,6 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // ── Background Sync Music (Local -> Cloud) ─────────────────────────────────
-  useEffect(() => {
-    let unsubscribeMusic: (() => void) | undefined
-    const syncTimer = setTimeout(() => {
-      const isMusicHydrated = useMusicStore.persist.hasHydrated()
-      const { bibliotheque } = useMusicStore.getState()
-      if (isMusicHydrated && bibliotheque.length > 0) {
-        unsubscribeMusic = useMusicStore.subscribe(async (state, prevState) => {
-          if (prevState.bibliotheque.length > 1 && state.bibliotheque.length === 0) return
-          try {
-            const data = JSON.stringify({ state, version: 0 })
-            await firestoreStorage.setItem('aetheris-music-v1', data)
-          } catch (error) {
-            console.error('[Sync] Erreur de sauvegarde Musique:', error)
-            alert("Erreur de synchronisation Musique : La sauvegarde a échoué.")
-          }
-        })
-      }
-    }, 500)
-    return () => { clearTimeout(syncTimer); if (unsubscribeMusic) unsubscribeMusic() }
-  }, [])
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   // Pendant la vérification auth → spinner

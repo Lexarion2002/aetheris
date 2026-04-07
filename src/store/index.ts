@@ -3,10 +3,8 @@ import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
 import { supabaseStorage } from '../lib/supabaseSync'
-import { firestoreStorage as _firestoreStorage } from './firebase'
 
-// Utilise Supabase si configuré, sinon Firestore en fallback
-const activeStorage = supabaseStorage ?? _firestoreStorage
+const activeStorage = supabaseStorage
 import type { Domain, Task, SubTask, Objective, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────

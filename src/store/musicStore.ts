@@ -1,8 +1,6 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { supabaseStorage } from '../lib/supabaseSync'
-import { db } from './firebase'
-import { collection, getDocs } from 'firebase/firestore'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -57,7 +55,6 @@ export interface MusicState {
   _hasHydrated:   boolean
   setHasHydrated: (state: boolean) => void
 
-  fetchLibrary:   () => Promise<void>
 
   albumEnCours:   AlbumEnCours | null
   bibliotheque:   AlbumCritique[]
@@ -90,26 +87,6 @@ export const useMusicStore = create<MusicState>()(
       _hasHydrated:   false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
-      fetchLibrary: async () => {
-        try {
-          const snapshot = await getDocs(collection(db, 'aetheris_stores'))
-          
-          snapshot.forEach((document) => {
-            if (document.id === 'aetheris-music-v1') {
-              const rawData = document.data()?.value || document.data()
-              const parsed = typeof rawData === 'string' ? JSON.parse(rawData) : rawData
-              
-              if (parsed.state) {
-                set(parsed.state)
-              } else {
-                set({ bibliotheque: parsed })
-              }
-            }
-          })
-        } catch (error) {
-          console.error('[MusicStore] Erreur fetchLibrary:', error)
-        }
-      },
 
       albumEnCours:   null,
       bibliotheque:   [],
