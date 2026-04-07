@@ -5,10 +5,9 @@ import { LandingPage } from './pages/LandingPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { AuthModal } from './components/AuthModal'
 import { firestoreStorage } from './store/firebase'
-import { watchOnlineStatus, syncRowsToSupabase, setCurrentUserId } from './lib/supabaseSync'
+import { watchOnlineStatus, setCurrentUserId } from './lib/supabaseSync'
 import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
 import { isSupabaseReady } from './lib/supabase'
-import { useShoppingStore } from './store/shoppingStore'
 import { useStore } from './store'
 import { useMusicStore } from './store/musicStore'
 import type { User } from '@supabase/supabase-js'
@@ -85,25 +84,6 @@ export default function App() {
   // ── Sync au retour d'Internet ─────────────────────────────────────────────
   useEffect(() => watchOnlineStatus(), [])
 
-  // ── Sync row-per-row vers Supabase (debounce 2s) ──────────────────────────
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    const unsub = useStore.subscribe((state) => {
-      clearTimeout(timer)
-      timer = setTimeout(() => {
-        const { wishlist, bought } = useShoppingStore.getState()
-        syncRowsToSupabase({
-          domains:      state.domains,
-          tasks:        state.tasks,
-          transactions: state.transactions,
-          wishlist,
-          bought,
-        })
-      }, 2000)
-    })
-    return () => { clearTimeout(timer); unsub() }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
 
   // Nettoyage des anciennes clés localStorage (migration unique)
   useEffect(() => {
