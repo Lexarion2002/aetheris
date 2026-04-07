@@ -10,6 +10,7 @@ import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
 import { isSupabaseReady } from './lib/supabase'
 import { useStore } from './store'
 import { useMusicStore } from './store/musicStore'
+import { useFilmSerieStore } from './store/filmSerieStore'
 import type { User } from '@supabase/supabase-js'
 
 // ─── Lazy page imports ────────────────────────────────────────────────────────
@@ -63,15 +64,23 @@ export default function App() {
       setAuthUser(null)
       return
     }
+    function rehydrateAll() {
+      useStore.persist.rehydrate()
+      useMusicStore.persist.rehydrate()
+      useFilmSerieStore.persist.rehydrate()
+    }
+
     // Vérifie la session existante
     getCurrentUser().then((user) => {
       setAuthUser(user)
       setCurrentUserId(user?.id ?? null)
+      if (user) rehydrateAll()
     })
     // Écoute les changements
     const unsub = onAuthStateChange((user) => {
       setAuthUser(user)
       setCurrentUserId(user?.id ?? null)
+      if (user) rehydrateAll()
     })
     return unsub
   // eslint-disable-next-line react-hooks/exhaustive-deps
