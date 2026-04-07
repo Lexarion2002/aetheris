@@ -26,7 +26,8 @@ const SettingsPage   = lazy(() => import('./pages/SettingsPage').then((m) => ({ 
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage').then((m) => ({ default: m.CategoriesPage })))
 const MusicPage      = lazy(() => import('./pages/MusicPage').then((m) => ({ default: m.MusicPage })))
 const CuisinePage    = lazy(() => import('./pages/CuisinePage').then((m) => ({ default: m.CuisinePage })))
-const ShoppingPage   = lazy(() => import('./pages/ShoppingPage').then((m) => ({ default: m.ShoppingPage })))
+const ShoppingPage      = lazy(() => import('./pages/ShoppingPage').then((m) => ({ default: m.ShoppingPage })))
+const FilmsSeriesPage   = lazy(() => import('./pages/FilmsSeriesPage').then((m) => ({ default: m.FilmsSeriesPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -182,6 +183,7 @@ export default function App() {
           <Route path="musique" element={<Suspense fallback={<PageLoader />}><MusicPage /></Suspense>} />
           <Route path="cuisine" element={<Suspense fallback={<PageLoader />}><CuisinePage /></Suspense>} />
           <Route path="achats" element={<Suspense fallback={<PageLoader />}><ShoppingPage /></Suspense>} />
+          <Route path="films" element={<Suspense fallback={<PageLoader />}><FilmsSeriesPage /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

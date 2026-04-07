@@ -203,6 +203,21 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           <span className="text-sm w-4 text-center shrink-0">🍳</span>
           <span className="truncate">Cuisine</span>
         </NavLink>
+        {/* Films & Séries — page standalone */}
+        <NavLink to="/films" onClick={onNavigate}
+          className={({ isActive }) =>
+            [
+              'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              isActive
+                ? 'bg-violet-500/15 text-violet-400 font-medium'
+                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+            ].join(' ')
+          }
+        >
+          <span className="text-sm w-4 text-center shrink-0">🎬</span>
+          <span className="truncate">Films & Séries</span>
+        </NavLink>
       </div>
 
       {/* ── Spacer ─────────────────────────────────────────────────────────────── */}
