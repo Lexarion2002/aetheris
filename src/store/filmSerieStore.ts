@@ -4,11 +4,6 @@ import { supabaseStorage } from '../lib/supabaseSync'
 
 export type FilmSerieType   = 'film' | 'serie'
 export type FilmSerieStatus = 'à voir' | 'en cours' | 'vu'
-export type FilmTag =
-  | 'action' | 'comédie' | 'drame' | 'horreur' | 'sci-fi'
-  | 'thriller' | 'animation' | 'documentaire' | 'romance'
-  | 'fantastique' | 'biopic' | 'crime'
-
 export interface FilmSerie {
   id:             string
   title:          string
@@ -18,7 +13,7 @@ export interface FilmSerie {
   imageUrl?:      string
   rating?:        number
   review?:        string
-  tags:           FilmTag[]
+  tags:           string[]
   favoriteScenes: string[]
   watchDate?:     string
   status:         FilmSerieStatus

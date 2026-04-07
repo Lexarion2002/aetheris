@@ -1,10 +1,10 @@
 import { useState, useRef } from 'react'
 import { useFilmSerieStore } from '../store/filmSerieStore'
-import type { FilmSerie, FilmTag, FilmSerieType, FilmSerieStatus } from '../store/filmSerieStore'
+import type { FilmSerie, FilmSerieType, FilmSerieStatus } from '../store/filmSerieStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const ALL_TAGS: FilmTag[] = [
+const SUGGESTED_TAGS = [
   'action', 'comédie', 'drame', 'horreur', 'sci-fi',
   'thriller', 'animation', 'documentaire', 'romance',
   'fantastique', 'biopic', 'crime',
@@ -130,14 +130,16 @@ function ModalAddItem({ onClose }: ModalAddItemProps) {
   const [director,    setDirector]    = useState('')
   const [releaseYear, setReleaseYear] = useState('')
   const [imageUrl,    setImageUrl]    = useState('')
-  const [tags,        setTags]        = useState<FilmTag[]>([])
-  const [status,      setStatus]      = useState<FilmSerieStatus>('à voir')
+  const [tags,      setTags]      = useState<string[]>([])
+  const [tagInput,  setTagInput]  = useState('')
+  const [status,    setStatus]    = useState<FilmSerieStatus>('à voir')
 
-  function toggleTag(tag: FilmTag) {
-    setTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    )
+  function addTag(val: string) {
+    const t = val.trim().toLowerCase()
+    if (t && !tags.includes(t)) setTags((p) => [...p, t])
+    setTagInput('')
   }
+  function removeTag(t: string) { setTags((p) => p.filter((x) => x !== t)) }
 
   function handleSubmit() {
     if (!title.trim()) return
@@ -230,17 +232,27 @@ function ModalAddItem({ onClose }: ModalAddItemProps) {
         {/* Tags */}
         <div className="flex flex-col gap-2">
           <label className="text-xs text-zinc-500 font-medium">Tags</label>
-          <div className="flex flex-wrap gap-1.5">
-            {ALL_TAGS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  tags.includes(tag)
-                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/40'
-                    : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:text-zinc-300'
-                }`}
-              >
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            {tags.map((tag) => (
+              <span key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                {tag}
+                <button type="button" onClick={() => removeTag(tag)} className="text-violet-400 hover:text-violet-200">×</button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput) } }}
+              placeholder="Ajouter un tag..."
+              className="flex-1 bg-zinc-800 border border-zinc-700/50 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-violet-500/50 placeholder:text-zinc-600"
+            />
+            <button type="button" onClick={() => addTag(tagInput)} className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-violet-300 text-xs border border-zinc-700/50">+</button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {SUGGESTED_TAGS.filter((t) => !tags.includes(t)).map((tag) => (
+              <button key={tag} type="button" onClick={() => addTag(tag)} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:text-zinc-300 transition-colors">
                 {tag}
               </button>
             ))}
@@ -450,18 +462,20 @@ function ModalEditItem({ item, onClose }: ModalEditItemProps) {
   const [director,    setDirector]    = useState(item.director ?? '')
   const [releaseYear, setReleaseYear] = useState(item.releaseYear?.toString() ?? '')
   const [imageUrl,    setImageUrl]    = useState(item.imageUrl ?? '')
-  const [tags,        setTags]        = useState<FilmTag[]>(item.tags)
-  const [review,      setReview]      = useState(item.review ?? '')
-  const [rating,      setRating]      = useState<number>(item.rating ?? 7)
-  const [scenes,      setScenes]      = useState<string[]>(
+  const [tags,      setTags]      = useState<string[]>(item.tags)
+  const [tagInput,  setTagInput]  = useState('')
+  const [review,    setReview]    = useState(item.review ?? '')
+  const [rating,    setRating]    = useState<number>(item.rating ?? 7)
+  const [scenes,    setScenes]    = useState<string[]>(
     item.favoriteScenes.length > 0 ? item.favoriteScenes : ['']
   )
 
-  function toggleTag(tag: FilmTag) {
-    setTags((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    )
+  function addTag(val: string) {
+    const t = val.trim().toLowerCase()
+    if (t && !tags.includes(t)) setTags((p) => [...p, t])
+    setTagInput('')
   }
+  function removeTag(t: string) { setTags((p) => p.filter((x) => x !== t)) }
 
   function addScene() {
     setScenes((prev) => [...prev, ''])
@@ -564,17 +578,27 @@ function ModalEditItem({ item, onClose }: ModalEditItemProps) {
         {/* Tags */}
         <div className="flex flex-col gap-2">
           <label className="text-xs text-zinc-500 font-medium">Tags</label>
-          <div className="flex flex-wrap gap-1.5">
-            {ALL_TAGS.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => toggleTag(tag)}
-                className={`px-2.5 py-1 rounded-full text-xs font-medium transition-colors ${
-                  tags.includes(tag)
-                    ? 'bg-violet-500/20 text-violet-300 border border-violet-500/40'
-                    : 'bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:text-zinc-300'
-                }`}
-              >
+          <div className="flex flex-wrap gap-1.5 mb-1">
+            {tags.map((tag) => (
+              <span key={tag} className="flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-violet-500/20 text-violet-300 border border-violet-500/40">
+                {tag}
+                <button type="button" onClick={() => removeTag(tag)} className="text-violet-400 hover:text-violet-200">×</button>
+              </span>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <input
+              value={tagInput}
+              onChange={(e) => setTagInput(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addTag(tagInput) } }}
+              placeholder="Ajouter un tag..."
+              className="flex-1 bg-zinc-800 border border-zinc-700/50 rounded-lg px-3 py-1.5 text-xs text-zinc-200 outline-none focus:border-violet-500/50 placeholder:text-zinc-600"
+            />
+            <button type="button" onClick={() => addTag(tagInput)} className="px-3 py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:text-violet-300 text-xs border border-zinc-700/50">+</button>
+          </div>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {SUGGESTED_TAGS.filter((t) => !tags.includes(t)).map((tag) => (
+              <button key={tag} type="button" onClick={() => addTag(tag)} className="px-2 py-0.5 rounded-full text-xs bg-zinc-800 text-zinc-500 border border-zinc-700/50 hover:text-zinc-300 transition-colors">
                 {tag}
               </button>
             ))}
