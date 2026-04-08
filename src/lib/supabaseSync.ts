@@ -20,13 +20,15 @@ function scopedKey(name: string): string {
 
 export const supabaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
-    if (!supabase) {
-      console.warn(`[Supabase] getItem(${name}) — client null, fallback localStorage`)
-      return localStorage.getItem(name)
-    }
+    // localStorage est toujours synchrone et à jour → source principale
+    const local = localStorage.getItem(name)
+    if (local) return local
+
+    // localStorage vide → premier chargement sur un nouvel appareil, on lit Supabase
+    if (!supabase) return null
 
     const key = scopedKey(name)
-    console.log(`[Supabase] 📥 getItem("${key}")`)
+    console.log(`[Supabase] 📥 getItem("${key}") — localStorage vide, lecture cloud`)
     try {
       const { data, error } = await supabase
         .from('stores')
@@ -35,18 +37,10 @@ export const supabaseStorage: StateStorage = {
         .single()
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          console.log(`[Supabase] "${key}" absent du cloud — lecture localStorage`)
-        } else {
+        if (error.code !== 'PGRST116') {
           console.error(`[Supabase] ❌ getItem(${key}) :`, error.code, error.message)
         }
-        // Migration : si données locales, les pousser vers Supabase
-        const local = localStorage.getItem(name)
-        if (local) {
-          console.log(`[Supabase] 🔄 Migration localStorage → cloud pour "${key}"`)
-          await supabaseStorage.setItem(name, local)
-        }
-        return local
+        return null
       }
 
       if (data?.value) {
@@ -55,10 +49,10 @@ export const supabaseStorage: StateStorage = {
         return data.value
       }
 
-      return localStorage.getItem(name)
+      return null
     } catch (err) {
       console.error(`[Supabase] ❌ getItem(${name}) exception :`, err)
-      return localStorage.getItem(name)
+      return null
     }
   },
 
