@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { signInWithEmail, signUpWithEmail } from '../lib/supabaseAuth'
+import { signInWithEmail, signUpWithEmail, resetPassword } from '../lib/supabaseAuth'
 
 // ─── AuthModal ────────────────────────────────────────────────────────────────
 
@@ -8,12 +8,12 @@ interface AuthModalProps {
 }
 
 export function AuthModal({ onSuccess }: AuthModalProps) {
-  const [mode,     setMode]     = useState<'signin' | 'signup'>('signin')
+  const [mode,     setMode]     = useState<'signin' | 'signup' | 'reset'>('signin')
   const [email,    setEmail]    = useState('')
   const [password, setPassword] = useState('')
   const [error,    setError]    = useState<string | null>(null)
   const [loading,  setLoading]  = useState(false)
-  const [done,     setDone]     = useState(false)   // après inscription → email confirmation
+  const [done,     setDone]     = useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,8 +24,12 @@ export function AuthModal({ onSuccess }: AuthModalProps) {
       const { user, error } = await signInWithEmail(email, password)
       if (error) { setError(error); setLoading(false); return }
       if (user)  { onSuccess() }
-    } else {
+    } else if (mode === 'signup') {
       const { error } = await signUpWithEmail(email, password)
+      if (error) { setError(error); setLoading(false); return }
+      setDone(true)
+    } else {
+      const { error } = await resetPassword(email)
       if (error) { setError(error); setLoading(false); return }
       setDone(true)
     }
@@ -56,18 +60,50 @@ export function AuthModal({ onSuccess }: AuthModalProps) {
                 ✉️
               </div>
               <div>
-                <p className="text-sm font-medium text-zinc-100">Vérifiez votre email</p>
+                <p className="text-sm font-medium text-zinc-100">
+                  {mode === 'reset' ? 'Email envoyé' : 'Vérifiez votre email'}
+                </p>
                 <p className="mt-1 text-xs text-zinc-500">
-                  Un lien de confirmation a été envoyé à <span className="text-zinc-300">{email}</span>
+                  {mode === 'reset'
+                    ? <>Un lien de réinitialisation a été envoyé à <span className="text-zinc-300">{email}</span></>
+                    : <>Un lien de confirmation a été envoyé à <span className="text-zinc-300">{email}</span></>
+                  }
                 </p>
               </div>
               <button
                 onClick={() => { setDone(false); setMode('signin') }}
                 className="mt-2 text-xs text-teal-400 hover:text-teal-300 transition-colors"
               >
-                Se connecter après confirmation →
+                ← Retour à la connexion
               </button>
             </div>
+          ) : mode === 'reset' ? (
+            <>
+              <button onClick={() => { setMode('signin'); setError(null) }} className="mb-4 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+                ← Retour
+              </button>
+              <p className="mb-4 text-sm text-zinc-300">Entrez votre email pour recevoir un lien de réinitialisation.</p>
+              <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                <div>
+                  <label className="mb-1.5 block text-xs text-zinc-500">Email</label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    required
+                    autoFocus
+                    placeholder="vous@exemple.com"
+                    className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-teal-500/60 transition-colors"
+                  />
+                </div>
+                {error && (
+                  <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400 border border-red-500/20">{error}</p>
+                )}
+                <button type="submit" disabled={loading} className="mt-1 w-full rounded-lg bg-teal-500 py-2.5 text-sm font-medium text-white hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  {loading ? '...' : 'Envoyer le lien'}
+                </button>
+              </form>
+            </>
           ) : (
             <>
               {/* Tabs */}
@@ -77,9 +113,7 @@ export function AuthModal({ onSuccess }: AuthModalProps) {
                     key={m}
                     onClick={() => { setMode(m); setError(null) }}
                     className={`flex-1 rounded-md py-1.5 text-xs font-medium transition-colors ${
-                      mode === m
-                        ? 'bg-zinc-700 text-zinc-100'
-                        : 'text-zinc-500 hover:text-zinc-300'
+                      mode === m ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300'
                     }`}
                   >
                     {m === 'signin' ? 'Se connecter' : 'S\'inscrire'}
@@ -114,21 +148,18 @@ export function AuthModal({ onSuccess }: AuthModalProps) {
                 </div>
 
                 {error && (
-                  <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400 border border-red-500/20">
-                    {error}
-                  </p>
+                  <p className="rounded-lg bg-red-500/10 px-3 py-2 text-xs text-red-400 border border-red-500/20">{error}</p>
                 )}
 
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="mt-1 w-full rounded-lg bg-teal-500 py-2.5 text-sm font-medium text-white hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {loading
-                    ? '...'
-                    : mode === 'signin' ? 'Se connecter' : 'Créer un compte'
-                  }
+                <button type="submit" disabled={loading} className="mt-1 w-full rounded-lg bg-teal-500 py-2.5 text-sm font-medium text-white hover:bg-teal-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  {loading ? '...' : mode === 'signin' ? 'Se connecter' : 'Créer un compte'}
                 </button>
+
+                {mode === 'signin' && (
+                  <button type="button" onClick={() => { setMode('reset'); setError(null) }} className="text-xs text-zinc-500 hover:text-teal-400 transition-colors text-center">
+                    Mot de passe oublié ?
+                  </button>
+                )}
               </form>
             </>
           )}

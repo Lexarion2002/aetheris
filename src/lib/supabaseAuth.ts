@@ -28,6 +28,14 @@ export async function signInWithEmail(email: string, password: string): Promise<
   }
 }
 
+export async function resetPassword(email: string): Promise<{ error: string | null }> {
+  if (!supabase) return { error: 'Supabase non configuré' }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: `${window.location.origin}/reset-password`,
+  })
+  return { error: formatError(error) }
+}
+
 export async function signOut(): Promise<void> {
   if (!supabase) return
   await supabase.auth.signOut()
