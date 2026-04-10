@@ -9,11 +9,19 @@ export function ResetPasswordPage() {
   const [done,      setDone]      = useState(false)
   const [ready,     setReady]     = useState(false)
 
-  // Supabase envoie le token dans le hash (#access_token=...&type=recovery)
   useEffect(() => {
     if (!supabase) return
-    const { data } = supabase.auth.onAuthStateChange((event) => {
-      if (event === 'PASSWORD_RECOVERY') setReady(true)
+
+    // Vérifie si une session recovery est déjà active
+    supabase.auth.getSession().then(({ data }) => {
+      if (data.session) setReady(true)
+    })
+
+    // Écoute aussi l'event au cas où la session arrive après le mount
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+        setReady(true)
+      }
     })
     return () => data.subscription.unsubscribe()
   }, [])
