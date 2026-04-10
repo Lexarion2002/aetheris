@@ -8,8 +8,6 @@ import { watchOnlineStatus, setCurrentUserId } from './lib/supabaseSync'
 import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
 import { isSupabaseReady } from './lib/supabase'
 import { useStore } from './store'
-import { useMusicStore } from './store/musicStore'
-import { useFilmSerieStore } from './store/filmSerieStore'
 import type { User } from '@supabase/supabase-js'
 
 // ─── Lazy page imports ────────────────────────────────────────────────────────
@@ -63,15 +61,10 @@ export default function App() {
       setAuthUser(null)
       return
     }
-    // Vérifie la session existante — rehydrate une seule fois au chargement
+    // Vérifie la session existante
     getCurrentUser().then((user) => {
       setAuthUser(user)
       setCurrentUserId(user?.id ?? null)
-      if (user) {
-        useStore.persist.rehydrate()
-        useMusicStore.persist.rehydrate()
-        useFilmSerieStore.persist.rehydrate()
-      }
     })
     // Écoute les changements d'auth — NE PAS rehydrater (évite d'écraser le state en cours)
     const unsub = onAuthStateChange((user) => {
