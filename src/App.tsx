@@ -4,6 +4,7 @@ import { Layout } from './components/Layout'
 import { LandingPage } from './pages/LandingPage'
 import { OnboardingPage } from './pages/OnboardingPage'
 import { AuthModal } from './components/AuthModal'
+import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { watchOnlineStatus, setCurrentUserId } from './lib/supabaseSync'
 import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
 import { isSupabaseReady } from './lib/supabase'
@@ -114,8 +115,8 @@ export default function App() {
     )
   }
 
-  // Supabase activé mais pas connecté → AuthModal
-  if (supabaseOn && !authUser) {
+  // Supabase activé mais pas connecté → AuthModal (sauf reset-password)
+  if (supabaseOn && !authUser && !window.location.pathname.startsWith('/reset-password')) {
     return <AuthModal onSuccess={() => getCurrentUser().then((u) => { setAuthUser(u); setCurrentUserId(u?.id ?? null) })} />
   }
 
@@ -123,8 +124,9 @@ export default function App() {
     <BrowserRouter>
       <Routes>
         {/* ── Public pages ──────────────────────────────────────────────────── */}
-        <Route path="/"           element={<LandingPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/"               element={<LandingPage />} />
+        <Route path="/onboarding"     element={<OnboardingPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
 
         {/* ── App (requires onboarding) ─────────────────────────────────────── */}
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
