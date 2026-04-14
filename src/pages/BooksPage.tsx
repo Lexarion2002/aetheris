@@ -111,6 +111,137 @@ function TypeBadge({ type }: { type: BookType }) {
   )
 }
 
+// ─── Book Card (grille) ───────────────────────────────────────────────────────
+
+interface BookCardProps {
+  livre:  BookCritique
+  onEdit: () => void
+}
+
+function BookCard({ livre, onEdit }: BookCardProps) {
+  return (
+    <div
+      className="bg-zinc-900 border border-zinc-800/40 rounded-xl overflow-hidden flex flex-col cursor-pointer group shadow-sm hover:border-zinc-700/60 transition-all"
+      onClick={onEdit}
+    >
+      {/* Couverture */}
+      <div className="relative w-full aspect-[2/3] overflow-hidden">
+        {livre.couverture ? (
+          <img
+            src={livre.couverture}
+            alt={livre.titre}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+          />
+        ) : (
+          <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-600 text-4xl font-serif select-none">
+            ◉
+          </div>
+        )}
+        {/* Badge type */}
+        <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-medium backdrop-blur-sm border ${
+          livre.type === 'fiction'
+            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
+            : 'bg-sky-500/20 border-sky-500/30 text-sky-300'
+        }`}>
+          {livre.type === 'fiction' ? 'Fiction' : 'Non-fic.'}
+        </span>
+        {/* Badge note */}
+        <span className={`absolute top-2 right-2 text-xs font-bold tabular-nums bg-zinc-900/85 backdrop-blur-sm px-1.5 py-0.5 rounded font-serif ${noteColor(livre.note)}`}>
+          {livre.note % 1 === 0 ? livre.note : livre.note.toFixed(1)}/10
+        </span>
+        {/* Overlay critique au survol */}
+        {livre.critique && (
+          <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
+            <p className="text-[10px] text-zinc-200 font-serif italic line-clamp-5 leading-relaxed">
+              {livre.critique}
+            </p>
+          </div>
+        )}
+        {/* Badge référence roman */}
+        {livre.referenceRoman && (
+          <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[9px] bg-violet-500/20 border border-violet-500/30 text-violet-300 backdrop-blur-sm">
+            réf. roman
+          </span>
+        )}
+      </div>
+
+      {/* Corps */}
+      <div className="flex flex-col gap-1 p-2.5 flex-1">
+        <h3 className="text-xs font-semibold text-zinc-100 line-clamp-2 font-serif leading-snug">{livre.titre}</h3>
+        <p className="text-[10px] text-zinc-500 truncate">{livre.auteur}{livre.anneePublication ? ` · ${livre.anneePublication}` : ''}</p>
+        {livre.troismots.length > 0 && (
+          <p className="text-[9px] text-zinc-500 italic font-serif truncate">
+            {livre.troismots.join(' · ')}
+          </p>
+        )}
+        {livre.genres.length > 0 && (
+          <div className="flex flex-wrap gap-0.5 mt-0.5">
+            {livre.genres.slice(0, 2).map((g) => (
+              <span key={g} className="px-1 py-0.5 rounded text-[9px] bg-zinc-800 text-zinc-500 border border-zinc-700/40">{g}</span>
+            ))}
+          </div>
+        )}
+        <div className="flex-1" />
+        <p className="text-[9px] text-zinc-700 mt-1">{fmtDate(livre.dateLecture)}</p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Waitlist Card (grille) ───────────────────────────────────────────────────
+
+interface WaitlistCardProps {
+  livre:     BookAttente
+  onStart:   () => void
+  onRemove:  () => void
+}
+
+function WaitlistCard({ livre, onStart, onRemove }: WaitlistCardProps) {
+  const sourceCls: Record<BookSource, string> = {
+    recommandation:    'bg-zinc-700/50 border-zinc-600/30 text-zinc-400',
+    'prix-litteraire': 'bg-amber-500/10 border-amber-500/20 text-amber-400',
+    recherche:         'bg-zinc-700/50 border-zinc-600/30 text-zinc-400',
+    'reference-roman': 'bg-violet-500/10 border-violet-500/20 text-violet-400',
+  }
+
+  return (
+    <div className="bg-zinc-900 border border-zinc-800/40 rounded-xl overflow-hidden flex flex-col shadow-sm hover:border-zinc-700/60 transition-all">
+      {/* Couverture placeholder */}
+      <div className="relative w-full aspect-[2/3] bg-zinc-800/80 flex items-center justify-center text-zinc-700 text-4xl font-serif select-none">
+        ◉
+        {/* Source badge */}
+        <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] border ${sourceCls[livre.source]}`}>
+          {SOURCE_LABELS[livre.source]}
+        </span>
+      </div>
+
+      {/* Corps */}
+      <div className="flex flex-col gap-1 p-2.5 flex-1">
+        <h3 className="text-xs font-semibold text-zinc-100 line-clamp-2 font-serif leading-snug">{livre.titre}</h3>
+        {livre.auteur && <p className="text-[10px] text-zinc-500 truncate">{livre.auteur}</p>}
+        {livre.pourquoi && (
+          <p className="text-[10px] text-zinc-600 italic line-clamp-2">{livre.pourquoi}</p>
+        )}
+        <div className="flex-1" />
+        <div className="flex gap-1.5 mt-1.5">
+          <button
+            onClick={(e) => { e.stopPropagation(); onStart() }}
+            className="flex-1 text-[10px] py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:bg-emerald-500/15 hover:text-emerald-400 border border-zinc-700/50 transition-colors"
+          >
+            ▶ Lire
+          </button>
+          <button
+            onClick={(e) => { e.stopPropagation(); onRemove() }}
+            className="px-2.5 py-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors text-xs"
+          >
+            ×
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Image Drop Zone ──────────────────────────────────────────────────────────
 
 interface ImageDropZoneProps {
@@ -835,7 +966,6 @@ function BibliothequeSection({ onEdit }: BibliothequeSectionProps) {
   const [filterType,    setFilterType]    = useState<BookType | ''>('')
   const [filterNoteMin, setFilterNoteMin] = useState(0)
   const [search,        setSearch]        = useState('')
-  const [expanded,      setExpanded]      = useState<string | null>(null)
 
   const filtered = bibliotheque
     .filter((b) => !filterGenre || b.genres.includes(filterGenre))
@@ -925,75 +1055,14 @@ function BibliothequeSection({ onEdit }: BibliothequeSectionProps) {
         </select>
       </div>
 
-      {/* Liste */}
+      {/* Grille */}
       {filtered.length === 0 ? (
         <p className="text-xs text-zinc-600 py-2">Aucun livre ne correspond aux filtres.</p>
       ) : (
-        <div className="space-y-2">
-          {filtered.map((livre) => {
-            const isExpanded = expanded === livre.id
-            return (
-              <div key={livre.id} className="rounded-xl border border-zinc-800/60 bg-zinc-900 overflow-hidden">
-                {/* Header carte */}
-                <div
-                  className="flex items-start gap-3 p-4 cursor-pointer hover:bg-zinc-800/30 transition-colors"
-                  onClick={() => setExpanded(isExpanded ? null : livre.id)}
-                >
-                  <CouvertureImg src={livre.couverture} alt={livre.titre} size={44} />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-zinc-100 truncate font-serif leading-snug">{livre.titre}</p>
-                        <p className="text-xs text-zinc-500 mt-0.5">{livre.auteur}{livre.anneePublication ? ` · ${livre.anneePublication}` : ''}</p>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className={`text-base font-bold tabular-nums font-serif ${noteColor(livre.note)}`}>
-                          {livre.note}<span className="text-[10px] font-normal text-zinc-600">/10</span>
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mt-1.5">
-                      <TypeBadge type={livre.type} />
-                      {livre.genres.slice(0, 3).map((g) => <GenrePill key={g} genre={g} />)}
-                      {livre.troismots.slice(0, 3).map((m) => (
-                        <span key={m} className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800/80 text-zinc-400 border border-zinc-700/30 italic font-serif">
-                          {m}
-                        </span>
-                      ))}
-                      {livre.referenceRoman && (
-                        <span className="px-1.5 py-0.5 rounded text-[10px] bg-violet-500/10 border border-violet-500/20 text-violet-400">
-                          réf. roman
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Corps expandé */}
-                {isExpanded && (
-                  <div className="px-4 pb-4 border-t border-zinc-800/40 space-y-3 pt-3">
-                    {livre.critique && (
-                      <p className="text-sm text-zinc-300 leading-relaxed font-serif whitespace-pre-wrap">{livre.critique}</p>
-                    )}
-                    {livre.citationFavorite && (
-                      <blockquote className="border-l-2 border-emerald-500/40 pl-3 text-sm text-zinc-400 italic font-serif leading-relaxed">
-                        « {livre.citationFavorite} »
-                      </blockquote>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[11px] text-zinc-600">Lu le {fmtDate(livre.dateLecture)}</span>
-                      <button
-                        onClick={() => onEdit(livre)}
-                        className="text-xs text-zinc-500 hover:text-emerald-400 transition-colors"
-                      >
-                        Modifier
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            )
-          })}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+          {filtered.map((livre) => (
+            <BookCard key={livre.id} livre={livre} onEdit={() => onEdit(livre)} />
+          ))}
         </div>
       )}
     </div>
@@ -1064,49 +1133,17 @@ function FileAttenteSection({ onAddNew }: FileAttenteSectionProps) {
       {fileAttente.length === 0 ? (
         <p className="text-xs text-zinc-600 py-1">Ta pile à lire est vide.</p>
       ) : (
-        <div className="space-y-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {fileAttente.map((livre) => (
-            <div key={livre.id} className="flex items-start gap-3 p-3 rounded-lg bg-zinc-800/30 border border-zinc-800/40 hover:bg-zinc-800/50 transition-colors group">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="text-sm text-zinc-200 truncate font-serif">{livre.titre}</p>
-                    {livre.auteur && <p className="text-xs text-zinc-500">{livre.auteur}</p>}
-                  </div>
-                  <span className={`shrink-0 px-1.5 py-0.5 rounded text-[10px] border ${
-                    livre.source === 'reference-roman'
-                      ? 'bg-violet-500/10 border-violet-500/20 text-violet-400'
-                      : livre.source === 'prix-litteraire'
-                      ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-                      : 'bg-zinc-700/50 border-zinc-600/30 text-zinc-400'
-                  }`}>
-                    {SOURCE_LABELS[livre.source]}
-                  </span>
-                </div>
-                {livre.pourquoi && (
-                  <p className="text-xs text-zinc-600 mt-0.5 italic">{livre.pourquoi}</p>
-                )}
-              </div>
-              <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
-                <button
-                  onClick={() => {
-                    if (livreEnCours && !window.confirm('Tu as déjà un livre en cours. Démarrer quand même ?')) return
-                    startReading(livre.id)
-                  }}
-                  className="p-1 text-[11px] rounded text-zinc-500 hover:text-emerald-400 hover:bg-zinc-700 transition-colors"
-                  title="Commencer"
-                >
-                  ▶
-                </button>
-                <button
-                  onClick={() => removeFromFile(livre.id)}
-                  className="p-1 text-[11px] rounded text-zinc-600 hover:text-red-400 hover:bg-zinc-700 transition-colors"
-                  title="Supprimer"
-                >
-                  ×
-                </button>
-              </div>
-            </div>
+            <WaitlistCard
+              key={livre.id}
+              livre={livre}
+              onStart={() => {
+                if (livreEnCours && !window.confirm('Tu as déjà un livre en cours. Démarrer quand même ?')) return
+                startReading(livre.id)
+              }}
+              onRemove={() => removeFromFile(livre.id)}
+            />
           ))}
         </div>
       )}
