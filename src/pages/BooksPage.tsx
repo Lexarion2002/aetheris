@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react'
 import { useBookStore } from '../store/bookStore'
-import type { BookCritique, BookAttente, BookType, BookSource } from '../store/bookStore'
+import type { BookCritique, BookAttente, BookEnCours, BookType, BookSource } from '../store/bookStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -26,12 +26,6 @@ function noteColor(note: number) {
   return 'text-zinc-500'
 }
 
-function noteBg(note: number) {
-  if (note >= 9) return 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-  if (note >= 7) return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-  if (note >= 5) return 'bg-zinc-700/50 border-zinc-600/30 text-zinc-300'
-  return 'bg-zinc-800/50 border-zinc-700/30 text-zinc-500'
-}
 
 function fmtDate(iso: string | undefined) {
   if (!iso) return ''
