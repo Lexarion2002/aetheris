@@ -119,13 +119,9 @@ export const useBookStore = create<BookState>()(
 
       deleteCritique: (id) => {
         if (!id) return
-        set((s) => {
-          const exists = s.bibliotheque.some((b) => b.id === id)
-          if (!exists) return s
-          const filtered = s.bibliotheque.filter((b) => b.id !== id)
-          if (filtered.length === 0 && s.bibliotheque.length > 1) return s
-          return { bibliotheque: filtered }
-        })
+        set((s) => ({
+          bibliotheque: s.bibliotheque.filter((b) => b.id !== id),
+        }))
       },
 
       addFileAttente: (livre) => {

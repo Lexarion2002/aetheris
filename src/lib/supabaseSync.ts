@@ -30,23 +30,25 @@ export const supabaseStorage: StateStorage = {
     const key = scopedKey(name)
     console.log(`[Supabase] 📥 getItem("${key}") — localStorage vide, lecture cloud`)
     try {
+      // .limit(1) + order au lieu de .single() pour éviter l'erreur 406
+      // quand des lignes dupliquées existent (e.g. après un bug de re-render)
       const { data, error } = await supabase
         .from('stores')
         .select('value')
         .eq('key', key)
-        .single()
+        .order('updated_at', { ascending: false })
+        .limit(1)
 
       if (error) {
-        if (error.code !== 'PGRST116') {
-          console.error(`[Supabase] ❌ getItem(${key}) :`, error.code, error.message)
-        }
+        console.error(`[Supabase] ❌ getItem(${key}) :`, error.code, error.message)
         return null
       }
 
-      if (data?.value) {
+      const value = Array.isArray(data) ? data[0]?.value : (data as { value?: string } | null)?.value
+      if (value) {
         console.log(`[Supabase] ✅ getItem("${key}") — données récupérées du cloud`)
-        localStorage.setItem(name, data.value)
-        return data.value
+        localStorage.setItem(name, value)
+        return value
       }
 
       return null
