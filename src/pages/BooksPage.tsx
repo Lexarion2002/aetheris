@@ -1003,7 +1003,8 @@ function BibliothequeSection({ onEdit }: BibliothequeSectionProps) {
 // ─── Panthéon Section ─────────────────────────────────────────────────────────
 
 function PantheonSection({ onEdit }: { onEdit: (livre: BookCritique) => void }) {
-  const pantheon = useBookStore((s) => s.bibliotheque.filter((b) => b.note >= 9))
+  const bibliotheque = useBookStore((s) => s.bibliotheque)
+  const pantheon = bibliotheque.filter((b) => b.note >= 9)
 
   if (pantheon.length === 0) return null
 
