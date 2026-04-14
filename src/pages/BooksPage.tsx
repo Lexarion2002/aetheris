@@ -391,13 +391,13 @@ function CritiqueModal({ initial, fromFile, onClose }: CritiqueModalProps) {
             <div className="flex items-center justify-between">
               <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Note</label>
               <span className={`text-2xl font-bold tabular-nums font-serif ${noteColor(note)}`}>
-                {note}<span className="text-sm font-normal text-zinc-600">/10</span>
+                {note % 1 === 0 ? note : note.toFixed(1)}<span className="text-sm font-normal text-zinc-600">/10</span>
               </span>
             </div>
             <input
-              type="range" min={1} max={10} step={1}
+              type="range" min={1} max={10} step={0.5}
               value={note}
-              onChange={(e) => setNote(Number(e.target.value))}
+              onChange={(e) => setNote(parseFloat(e.target.value))}
               className="w-full accent-emerald-500"
             />
             <div className="flex justify-between text-[10px] text-zinc-700 font-mono">

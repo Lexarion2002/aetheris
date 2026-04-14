@@ -360,16 +360,16 @@ function ModalCritique({ item, onClose }: ModalCritiqueProps) {
           <div className="flex items-center justify-between">
             <label className="text-xs text-zinc-500 font-medium">Note</label>
             <span className={`text-2xl font-bold tabular-nums ${ratingColor(rating)}`}>
-              {rating}<span className="text-sm font-normal text-zinc-600">/10</span>
+              {rating % 1 === 0 ? rating : rating.toFixed(1)}<span className="text-sm font-normal text-zinc-600">/10</span>
             </span>
           </div>
           <input
             type="range"
             min={1}
             max={10}
-            step={1}
+            step={0.5}
             value={rating}
-            onChange={(e) => setRating(Number(e.target.value))}
+            onChange={(e) => setRating(parseFloat(e.target.value))}
             className="w-full accent-violet-500"
           />
           <div className="flex justify-between text-[10px] text-zinc-700">
@@ -611,16 +611,16 @@ function ModalEditItem({ item, onClose }: ModalEditItemProps) {
             <div className="flex items-center justify-between">
               <label className="text-xs text-zinc-500 font-medium">Note</label>
               <span className={`text-2xl font-bold tabular-nums ${ratingColor(rating)}`}>
-                {rating}<span className="text-sm font-normal text-zinc-600">/10</span>
+                {rating % 1 === 0 ? rating : rating.toFixed(1)}<span className="text-sm font-normal text-zinc-600">/10</span>
               </span>
             </div>
             <input
               type="range"
               min={1}
               max={10}
-              step={1}
+              step={0.5}
               value={rating}
-              onChange={(e) => setRating(Number(e.target.value))}
+              onChange={(e) => setRating(parseFloat(e.target.value))}
               className="w-full accent-violet-500"
             />
           </div>

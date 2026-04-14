@@ -279,7 +279,7 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
           {/* Note */}
           <div>
             <label className="text-[11px] text-zinc-500 mb-2 block">
-              Note : <span className={`font-bold ${noteColor(note)}`}>{note}/10</span>
+              Note : <span className={`font-bold ${noteColor(note)}`}>{note % 1 === 0 ? note : note.toFixed(1)}/10</span>
             </label>
             <input
               type="range" min={1} max={10} step={0.5} value={note}
