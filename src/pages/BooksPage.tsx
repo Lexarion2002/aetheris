@@ -91,25 +91,6 @@ function CouvertureImg({ src, alt, size = 52 }: { src: string; alt: string; size
   )
 }
 
-function GenrePill({ genre }: { genre: string }) {
-  return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-500 border border-zinc-700/50">
-      {genre}
-    </span>
-  )
-}
-
-function TypeBadge({ type }: { type: BookType }) {
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] border ${
-      type === 'fiction'
-        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500'
-        : 'bg-sky-500/10 border-sky-500/20 text-sky-500'
-    }`}>
-      {type === 'fiction' ? 'Fiction' : 'Non-fiction'}
-    </span>
-  )
-}
 
 // ─── Book Card (grille) ───────────────────────────────────────────────────────
 
