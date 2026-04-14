@@ -26,6 +26,7 @@ const MusicPage      = lazy(() => import('./pages/MusicPage').then((m) => ({ def
 const CuisinePage    = lazy(() => import('./pages/CuisinePage').then((m) => ({ default: m.CuisinePage })))
 const ShoppingPage      = lazy(() => import('./pages/ShoppingPage').then((m) => ({ default: m.ShoppingPage })))
 const FilmsSeriesPage   = lazy(() => import('./pages/FilmsSeriesPage').then((m) => ({ default: m.FilmsSeriesPage })))
+const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ default: m.BooksPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -143,6 +144,7 @@ export default function App() {
           <Route path="cuisine" element={<Suspense fallback={<PageLoader />}><CuisinePage /></Suspense>} />
           <Route path="achats" element={<Suspense fallback={<PageLoader />}><ShoppingPage /></Suspense>} />
           <Route path="films" element={<Suspense fallback={<PageLoader />}><FilmsSeriesPage /></Suspense>} />
+          <Route path="livres" element={<Suspense fallback={<PageLoader />}><BooksPage /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

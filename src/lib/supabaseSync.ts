@@ -92,7 +92,7 @@ export const supabaseStorage: StateStorage = {
 
 // ─── Online/offline watcher ───────────────────────────────────────────────────
 
-const STORE_KEYS = ['aetheris-app', 'aetheris-music-v1', 'aetheris-shopping-v1', 'aetheris-cuisine-v1']
+const STORE_KEYS = ['aetheris-app', 'aetheris-music-v1', 'aetheris-shopping-v1', 'aetheris-cuisine-v1', 'aetheris-books-v1']
 
 export function watchOnlineStatus(): () => void {
   const onOnline = async () => {
