@@ -1,6 +1,4 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,9 +72,9 @@ export interface BookState {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useBookStore = create<BookState>()(
-  persist(
-    (set, get) => ({
+export const useBookStore = createPersistedStore<BookState>(
+  'aetheris-books-v1',
+  (set, get) => ({
       _hasHydrated:   false,
       setHasHydrated: (v) => set({ _hasHydrated: v }),
 
@@ -164,13 +162,5 @@ export const useBookStore = create<BookState>()(
 
       removeGenrePerso: (genre) =>
         set((s) => ({ genresPerso: s.genresPerso.filter((g) => g !== genre) })),
-    }),
-    {
-      name: 'aetheris-books-v1',
-      storage: createJSONStorage(() => supabaseStorage),
-      onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true)
-      },
-    },
-  ),
+  }),
 )

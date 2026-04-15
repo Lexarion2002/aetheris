@@ -1,7 +1,5 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -98,9 +96,9 @@ const DEFAULT_MOUVEMENTS: Mouvement[] = [
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useSportStore = create<SportState>()(
-  persist(
-    (set) => ({
+export const useSportStore = createPersistedStore<SportState>(
+  'aetheris-sport-v1',
+  (set) => ({
       currentStatus:  'reprise',
       parcoursFavori: '',
       parcFavori:     '',
@@ -171,7 +169,5 @@ export const useSportStore = create<SportState>()(
 
       deleteObjectif: (id) =>
         set((s) => ({ objectifs: s.objectifs.filter((o) => o.id !== id) })),
-    }),
-    { name: 'aetheris-sport-v1', storage: createJSONStorage(() => supabaseStorage) },
-  ),
+  }),
 )

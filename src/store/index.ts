@@ -1,10 +1,6 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
-import { supabaseStorage } from '../lib/supabaseSync'
-
-const activeStorage = supabaseStorage
+import { createPersistedStore } from '../lib/persistenceManager'
 import type { Domain, Task, SubTask, Objective, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
@@ -131,9 +127,9 @@ const trackProgress = (history: ProgressEntry[] | undefined, value: number): Pro
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useStore = create<AetherisState>()(
-  persist(
-    (set) => ({
+export const useStore = createPersistedStore<AetherisState>(
+  'aetheris-app',
+  (set) => ({
       seeded:    true,
       onboarded: false,
       theme:     'dark'  as AppTheme,
@@ -480,12 +476,7 @@ export const useStore = create<AetherisState>()(
       // ── Dashboard context ────────────────────────────────────────────────────
 
       setUserContext: (ctx) => set({ userContext: ctx }),
-    }),
-    {
-      name: 'aetheris-app',
-      storage: createJSONStorage(() => activeStorage),
-    },
-  ),
+  }),
 )
 
 // ─── Selectors ────────────────────────────────────────────────────────────────

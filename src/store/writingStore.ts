@@ -1,7 +1,5 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -97,9 +95,9 @@ const DEFAULT_ARCS: WritingArc[] = [
 const now   = () => new Date().toISOString()
 const today = () => new Date().toISOString().split('T')[0]
 
-export const useWritingStore = create<WritingState>()(
-  persist(
-    (set) => ({
+export const useWritingStore = createPersistedStore<WritingState>(
+  'aetheris-writing-v1',
+  (set) => ({
       lastSentence:   '',
       moodKeywords:   ['tension', 'absurde', 'silence', 'sang'],
       chapterCurrent: 1,
@@ -203,7 +201,5 @@ export const useWritingStore = create<WritingState>()(
 
       deleteCitation: (id) =>
         set((s) => ({ citations: s.citations.filter((c) => c.id !== id) })),
-    }),
-    { name: 'aetheris-writing-v1', storage: createJSONStorage(() => supabaseStorage) },
-  ),
+  }),
 )

@@ -1,7 +1,5 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import { nanoid } from '../utils/nanoid'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -132,9 +130,9 @@ export interface CareerState {
 
 const now = () => new Date().toISOString()
 
-export const useCareerStore = create<CareerState>()(
-  persist(
-    (set) => ({
+export const useCareerStore = createPersistedStore<CareerState>(
+  'aetheris-career-v1',
+  (set) => ({
       cabinetInfo: {
         nom: '', maitreStage: '', dateDebut: null, dateFin: null, prochainePrese: null,
       },
@@ -244,7 +242,5 @@ export const useCareerStore = create<CareerState>()(
 
       deleteContact: (id) =>
         set((s) => ({ contacts: s.contacts.filter((c) => c.id !== id) })),
-    }),
-    { name: 'aetheris-career-v1', storage: createJSONStorage(() => supabaseStorage) },
-  ),
+  }),
 )

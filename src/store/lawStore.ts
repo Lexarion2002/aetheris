@@ -1,6 +1,4 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 export type GlobalStatus = 'recherches' | 'redaction' | 'repetition' | 'finalisation'
 
@@ -16,9 +14,9 @@ export interface LawState {
   setNotionUrl:     (url: string) => void
 }
 
-export const useLawStore = create<LawState>()(
-  persist(
-    (set) => ({
+export const useLawStore = createPersistedStore<LawState>(
+  'aetheris-law-v1',
+  (set) => ({
       grandOralDate: null,
       rapportDate:   null,
       globalStatus:  'recherches',
@@ -28,7 +26,5 @@ export const useLawStore = create<LawState>()(
       setRapportDate:   (date)   => set({ rapportDate: date }),
       setGlobalStatus:  (status) => set({ globalStatus: status }),
       setNotionUrl:     (url)    => set({ notionUrl: url }),
-    }),
-    { name: 'aetheris-law-v1', storage: createJSONStorage(() => supabaseStorage) },
-  ),
+  }),
 )

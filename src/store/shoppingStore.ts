@@ -1,7 +1,5 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import type { ShoppingItem, BoughtItem, ShoppingCategory, ShoppingVerdict } from '../types'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -25,9 +23,9 @@ interface ShoppingState {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useShoppingStore = create<ShoppingState>()(
-  persist(
-    (set, get) => ({
+export const useShoppingStore = createPersistedStore<ShoppingState>(
+  'aetheris-shopping-v1',
+  (set, get) => ({
       wishlist:   [],
       bought:     [],
       categories: [],
@@ -85,10 +83,5 @@ export const useShoppingStore = create<ShoppingState>()(
           wishlist:   s.wishlist.map((i) => i.categoryId === id ? { ...i, categoryId: undefined } : i),
           bought:     s.bought.map((i)   => i.categoryId === id ? { ...i, categoryId: undefined } : i),
         })),
-    }),
-    {
-      name:    'aetheris-shopping-v1',
-      storage: createJSONStorage(() => supabaseStorage),
-    },
-  ),
+  }),
 )

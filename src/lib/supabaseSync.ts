@@ -92,15 +92,23 @@ export const supabaseStorage: StateStorage = {
   },
 }
 
-// ─── Online/offline watcher ───────────────────────────────────────────────────
+// ─── Store registry ───────────────────────────────────────────────────────────
+// Chaque store créé via createPersistedStore s'enregistre ici automatiquement.
+// Le main store (aetheris-app) est pré-enregistré car il n'utilise pas la factory.
 
-const STORE_KEYS = ['aetheris-app', 'aetheris-music-v1', 'aetheris-shopping-v1', 'aetheris-cuisine-v1', 'aetheris-books-v1']
+const _storeRegistry = new Set<string>(['aetheris-app'])
+
+export function registerStoreKey(name: string): void {
+  _storeRegistry.add(name)
+}
+
+// ─── Online/offline watcher ───────────────────────────────────────────────────
 
 export function watchOnlineStatus(): () => void {
   const onOnline = async () => {
     console.log('[Supabase] 🌐 Connexion rétablie — sync en cours...')
     await Promise.all(
-      STORE_KEYS.map(async (k) => {
+      Array.from(_storeRegistry).map(async (k) => {
         const value = localStorage.getItem(k)
         if (value) await supabaseStorage.setItem(k, value)
       }),

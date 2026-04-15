@@ -1,6 +1,4 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -81,9 +79,9 @@ export interface MusicState {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useMusicStore = create<MusicState>()(
-  persist(
-    (set, get) => ({
+export const useMusicStore = createPersistedStore<MusicState>(
+  'aetheris-music-v1',
+  (set, get) => ({
       _hasHydrated:   false,
       setHasHydrated: (state) => set({ _hasHydrated: state }),
 
@@ -185,14 +183,5 @@ export const useMusicStore = create<MusicState>()(
         set((s) => ({
           artistesSuivis: s.artistesSuivis.map((a) => (a.id === id ? { ...a, alerte } : a)),
         })),
-    }),
-    { 
-      name: 'aetheris-music-v1',
-      storage: createJSONStorage(() => supabaseStorage),
-      onRehydrateStorage: () => (state) => {
-        console.log('[MusicStore] 🔄 Hydratation terminée avec :', state?.bibliotheque)
-        state?.setHasHydrated(true)
-      },
-    },
-  ),
+  }),
 )

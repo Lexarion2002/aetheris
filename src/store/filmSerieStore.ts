@@ -1,6 +1,4 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 export type FilmSerieType   = 'film' | 'serie'
 export type FilmSerieStatus = 'à voir' | 'en cours' | 'vu'
@@ -29,9 +27,9 @@ interface FilmSerieStore {
   markInProgress: (id: string) => void
 }
 
-export const useFilmSerieStore = create<FilmSerieStore>()(
-  persist(
-    (set) => ({
+export const useFilmSerieStore = createPersistedStore<FilmSerieStore>(
+  'aetheris-filmseries-v1',
+  (set) => ({
       items: [],
       addItem: (item) =>
         set((s) => ({
@@ -58,10 +56,5 @@ export const useFilmSerieStore = create<FilmSerieStore>()(
             i.id === id ? { ...i, status: 'en cours' } : i
           ),
         })),
-    }),
-    {
-      name:    'aetheris-filmseries-v1',
-      storage: createJSONStorage(() => supabaseStorage),
-    }
-  )
+  }),
 )

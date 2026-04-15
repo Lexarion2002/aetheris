@@ -1,7 +1,5 @@
-import { create } from 'zustand'
-import { persist, createJSONStorage } from 'zustand/middleware'
 import type { Recette, Ingredient } from '../types/cuisine'
-import { supabaseStorage } from '../lib/supabaseSync'
+import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -30,9 +28,9 @@ interface CuisineState {
 
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useCuisineStore = create<CuisineState>()(
-  persist(
-    (set, get) => ({
+export const useCuisineStore = createPersistedStore<CuisineState>(
+  'aetheris-cuisine-v1',
+  (set, get) => ({
       recettes:    [],
       ingredients: [],
       listeCourses: [],
@@ -113,10 +111,5 @@ export const useCuisineStore = create<CuisineState>()(
           (i) => recette.ingredientIds.includes(i.id) && !i.disponible,
         )
       },
-    }),
-    {
-      name:    'aetheris-cuisine-v1',
-      storage: createJSONStorage(() => supabaseStorage),
-    },
-  ),
+  }),
 )
