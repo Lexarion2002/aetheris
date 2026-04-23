@@ -7,9 +7,21 @@ import type { StateStorage } from 'zustand/middleware'
 
 let _currentUserId: string | null = null
 
+// Promise résolue au premier appel de setCurrentUserId (qu'il soit connecté ou anonyme).
+// getItem attend cette résolution pour calculer la clé scopée correcte.
+let _resolveUserId!: () => void
+const _userIdReady = new Promise<void>((resolve) => {
+  _resolveUserId = resolve
+})
+
 export function setCurrentUserId(id: string | null): void {
   _currentUserId = id
+  _resolveUserId()   // résout la promise (no-op si déjà résolue)
   console.log('[Supabase] 👤 User ID:', id ?? 'non connecté')
+}
+
+export async function waitForUserId(): Promise<void> {
+  return _userIdReady
 }
 
 function scopedKey(name: string): string {
@@ -20,14 +32,27 @@ function scopedKey(name: string): string {
 
 export const supabaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
+    // Attend que l'auth soit résolue pour calculer la clé scopée correcte.
+    // Sans ce await, localStorage serait lu avec la clé brute si getItem
+    // est appelé avant setCurrentUserId() → fallback Supabase avec mauvaise clé.
+    await waitForUserId()
+    const key = scopedKey(name)
+
     // localStorage est toujours synchrone et à jour → source principale
-    const local = localStorage.getItem(name)
-    if (local) return local
+    const local = localStorage.getItem(key)
+    console.log(`[Debug] getItem("${key}") — localStorage: ${local ? `✅ ${Math.round(local.length / 1024)}kb` : '❌ absent'}`)
+    if (local) {
+      try {
+        JSON.parse(local)
+      } catch (parseErr) {
+        console.error(`[Debug] getItem("${key}") — JSON.parse échoué sur la valeur localStorage :`, parseErr)
+      }
+      return local
+    }
 
     // localStorage vide → premier chargement sur un nouvel appareil, on lit Supabase
     if (!supabase) return null
 
-    const key = scopedKey(name)
     console.log(`[Supabase] 📥 getItem("${key}") — localStorage vide, lecture cloud`)
     try {
       // .limit(1) + order au lieu de .single() pour éviter l'erreur 406
@@ -47,26 +72,25 @@ export const supabaseStorage: StateStorage = {
       const value = Array.isArray(data) ? data[0]?.value : (data as { value?: string } | null)?.value
       if (value) {
         console.log(`[Supabase] ✅ getItem("${key}") — données récupérées du cloud`)
-        localStorage.setItem(name, value)
+        localStorage.setItem(key, value)
         return value
       }
 
       return null
     } catch (err) {
-      console.error(`[Supabase] ❌ getItem(${name}) exception :`, err)
+      console.error(`[Supabase] ❌ getItem(${key}) exception :`, err)
       return null
     }
   },
 
   setItem: async (name: string, value: string): Promise<void> => {
-    localStorage.setItem(name, value)
+    const key = scopedKey(name)
+    localStorage.setItem(key, value)
 
     if (!supabase) {
       console.warn(`[Supabase] setItem(${name}) — client null, localStorage only`)
       return
     }
-
-    const key = scopedKey(name)
     console.log(`[Supabase] 📤 setItem("${key}") — ${Math.round(value.length / 1024)}kb`)
     try {
       const { error } = await supabase
@@ -86,9 +110,10 @@ export const supabaseStorage: StateStorage = {
   },
 
   removeItem: async (name: string): Promise<void> => {
-    localStorage.removeItem(name)
+    const key = scopedKey(name)
+    localStorage.removeItem(key)
     if (!supabase) return
-    await supabase.from('stores').delete().eq('key', scopedKey(name))
+    await supabase.from('stores').delete().eq('key', key)
   },
 }
 
@@ -109,7 +134,7 @@ export function watchOnlineStatus(): () => void {
     console.log('[Supabase] 🌐 Connexion rétablie — sync en cours...')
     await Promise.all(
       Array.from(_storeRegistry).map(async (k) => {
-        const value = localStorage.getItem(k)
+        const value = localStorage.getItem(scopedKey(k))
         if (value) await supabaseStorage.setItem(k, value)
       }),
     )

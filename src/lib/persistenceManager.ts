@@ -26,9 +26,18 @@ export function createPersistedStore<T>(name: string, creator: PersistCreator<T>
     persist(creator, {
       name,
       storage: createJSONStorage(() => supabaseStorage),
-      onRehydrateStorage: () => (state) => {
-        const s = state as Record<string, unknown> | null | undefined
-        if (s && typeof s.setHasHydrated === 'function') {
+      onRehydrateStorage: () => (state, error) => {
+        if (error) {
+          console.error(`[Debug] onRehydrateStorage("${name}") — erreur d'hydratation :`, error)
+          return
+        }
+        if (!state) {
+          console.warn(`[Debug] onRehydrateStorage("${name}") — state est null (hydratation échouée)`)
+          return
+        }
+        console.log(`[Debug] onRehydrateStorage("${name}") — hydratation OK`)
+        const s = state as Record<string, unknown>
+        if (typeof s.setHasHydrated === 'function') {
           ;(s.setHasHydrated as (v: boolean) => void)(true)
         }
       },
