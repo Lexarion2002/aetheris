@@ -764,7 +764,7 @@ export function DomainView() {
       <div className={['rounded-2xl border p-5', colors.bgMuted, colors.border].join(' ')}>
         <div className="flex items-start justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className="text-3xl leading-none">{domain.icon}</span>
+            <span className="flex items-center justify-center text-3xl leading-none">{DomainIcon ? <DomainIcon size={32} /> : domain.icon}</span>
             <div>
               <h1 className={['text-xl font-bold', colors.text].join(' ')}>{domain.name}</h1>
               {domain.description && (
