@@ -1,7 +1,9 @@
 import { NavLink, useNavigate } from 'react-router-dom'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
+import { getDomainIcon } from '../utils/domainColors'
 import type { Domain, Task } from '../types'
 
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
@@ -64,6 +66,11 @@ function UrgencyDot({ level }: { level: UrgencyLevel }) {
       }`}
     />
   )
+}
+
+function DomainNavIcon({ domain }: { domain: Domain }) {
+  const Icon = getDomainIcon(domain.name) ?? Circle
+  return <Icon size={14} className="shrink-0" />
 }
 
 // ─── Sidebar ──────────────────────────────────────────────────────────────────
@@ -150,7 +157,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
                 ].join(' ')
               }
             >
-              <span className="text-sm w-4 text-center shrink-0">{domain.icon}</span>
+              <DomainNavIcon domain={domain} />
               <span className="truncate">{domain.name}</span>
               <UrgencyDot level={urgency} />
             </NavLink>
@@ -168,7 +175,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
             ].join(' ')
           }
         >
-          <span className="text-sm w-4 text-center shrink-0">💶</span>
+          <Landmark size={14} className="shrink-0" />
           <span className="truncate">Finances</span>
         </NavLink>
         {/* Achats — page standalone */}
@@ -183,7 +190,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
             ].join(' ')
           }
         >
-          <span className="text-sm w-4 text-center shrink-0">🛍️</span>
+          <ShoppingBag size={14} className="shrink-0" />
           <span className="truncate">Achats</span>
         </NavLink>
         {/* Cuisine — page standalone */}
@@ -213,7 +220,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
             ].join(' ')
           }
         >
-          <span className="text-sm w-4 text-center shrink-0">📚</span>
+          <BookOpen size={14} className="shrink-0" />
           <span className="truncate">Livres</span>
         </NavLink>
         {/* Films & Séries — page standalone */}
@@ -228,7 +235,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
             ].join(' ')
           }
         >
-          <span className="text-sm w-4 text-center shrink-0">🎬</span>
+          <Film size={14} className="shrink-0" />
           <span className="truncate">Films & Séries</span>
         </NavLink>
       </div>

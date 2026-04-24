@@ -1,6 +1,6 @@
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainIcon } from '../utils/domainColors'
 import { signOut } from '../lib/supabaseAuth'
 import { isSupabaseReady } from '../lib/supabase'
 
@@ -24,10 +24,10 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
   const navigate = useNavigate()
   const domains  = useStore((s) => s.domains)
 
-  const domainMatch  = location.pathname.match(/^\/domain\/(.+)$/)
-  const activeDomain = domainMatch ? domains.find((d) => d.id === domainMatch[1]) : null
-  const colors       = activeDomain ? getDomainColors(activeDomain.color) : null
-  const meta         = ROUTE_META[location.pathname]
+  const domainMatch      = location.pathname.match(/^\/domain\/(.+)$/)
+  const activeDomain     = domainMatch ? domains.find((d) => d.id === domainMatch[1]) : null
+  const ActiveDomainIcon = activeDomain ? getDomainIcon(activeDomain.name) : null
+  const meta             = ROUTE_META[location.pathname]
 
   const title    = activeDomain?.name         ?? meta?.title    ?? 'Aetheris'
   const subtitle = activeDomain?.description  ?? meta?.subtitle ?? ''
@@ -49,9 +49,9 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
 
       {/* Title / Logo — cliquable → accueil */}
       <div className="flex min-w-0 flex-1 items-center gap-3">
-        {activeDomain && (
-          <span className={['hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-base', colors!.bg].join(' ')}>
-            {activeDomain.icon}
+        {activeDomain && ActiveDomainIcon && (
+          <span className="hidden sm:flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[var(--paper-3)] text-[var(--fg-muted)]">
+            <ActiveDomainIcon size={16} />
           </span>
         )}
         <button

@@ -114,141 +114,145 @@
 
 /* ============================================================
    Styles sémantiques de base
+   Dans @layer base : les utilities Tailwind (@layer utilities)
+   peuvent les surcharger sans conflit de cascade.
    ============================================================ */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
 
-html,
-body,
-#root {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-}
+  html,
+  body,
+  #root {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+  }
 
-html, body {
-  background: var(--bg);
-  color: var(--fg);
-  font-family: var(--font-sans);
-  font-size: var(--fs-base);
-  line-height: var(--lh-normal);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
-}
+  html, body {
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    line-height: var(--lh-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
 
-/* Titres : Newsreader, serré, encre */
-h1, .h1 {
-  font-family: var(--font-serif);
-  font-weight: 500;
-  font-size: var(--fs-4xl);
-  line-height: var(--lh-tight);
-  letter-spacing: var(--tracking-tight);
-  color: var(--fg);
-  margin: 0;
-}
-h2, .h2 {
-  font-family: var(--font-serif);
-  font-weight: 500;
-  font-size: var(--fs-2xl);
-  line-height: var(--lh-snug);
-  letter-spacing: var(--tracking-tight);
-  color: var(--fg);
-  margin: 0;
-}
-h3, .h3 {
-  font-family: var(--font-serif);
-  font-weight: 500;
-  font-size: var(--fs-xl);
-  line-height: var(--lh-snug);
-  color: var(--fg);
-  margin: 0;
-}
-h4, .h4 {
-  font-family: var(--font-sans);
-  font-weight: 600;
-  font-size: var(--fs-md);
-  line-height: var(--lh-snug);
-  color: var(--fg);
-  margin: 0;
-}
+  /* Titres : Newsreader, serré, encre */
+  h1, .h1 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: var(--fs-4xl);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--tracking-tight);
+    color: var(--fg);
+    margin: 0;
+  }
+  h2, .h2 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: var(--fs-2xl);
+    line-height: var(--lh-snug);
+    letter-spacing: var(--tracking-tight);
+    color: var(--fg);
+    margin: 0;
+  }
+  h3, .h3 {
+    font-family: var(--font-serif);
+    font-weight: 500;
+    font-size: var(--fs-xl);
+    line-height: var(--lh-snug);
+    color: var(--fg);
+    margin: 0;
+  }
+  h4, .h4 {
+    font-family: var(--font-sans);
+    font-weight: 600;
+    font-size: var(--fs-md);
+    line-height: var(--lh-snug);
+    color: var(--fg);
+    margin: 0;
+  }
 
-/* Corps */
-p, .p {
-  font-family: var(--font-sans);
-  font-size: var(--fs-base);
-  line-height: var(--lh-prose);
-  color: var(--fg);
-  max-width: var(--measure);
-  margin: 0;
-}
-.lede {
-  font-family: var(--font-serif);
-  font-size: var(--fs-lg);
-  line-height: var(--lh-snug);
-  font-style: italic;
-  color: var(--fg-muted);
-}
-small, .small {
-  font-size: var(--fs-sm);
-  color: var(--fg-muted);
-}
+  /* Corps */
+  p, .p {
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    line-height: var(--lh-prose);
+    color: var(--fg);
+    max-width: var(--measure);
+    margin: 0;
+  }
+  .lede {
+    font-family: var(--font-serif);
+    font-size: var(--fs-lg);
+    line-height: var(--lh-snug);
+    font-style: italic;
+    color: var(--fg-muted);
+  }
+  small, .small {
+    font-size: var(--fs-sm);
+    color: var(--fg-muted);
+  }
 
-/* Mono : chiffres, étiquettes, codes */
-code, kbd, .mono {
-  font-family: var(--font-mono);
-  font-size: 0.92em;
-  letter-spacing: var(--tracking-mono);
-}
-.label {
-  font-family: var(--font-mono);
-  font-size: var(--fs-xs);
-  letter-spacing: var(--tracking-wide);
-  text-transform: uppercase;
-  color: var(--fg-muted);
-}
-.num {
-  font-family: var(--font-mono);
-  font-variant-numeric: tabular-nums;
-  color: var(--fg);
-}
+  /* Mono : chiffres, étiquettes, codes */
+  code, kbd, .mono {
+    font-family: var(--font-mono);
+    font-size: 0.92em;
+    letter-spacing: var(--tracking-mono);
+  }
+  .label {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: var(--tracking-wide);
+    text-transform: uppercase;
+    color: var(--fg-muted);
+  }
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    color: var(--fg);
+  }
 
-/* Liens */
-a {
-  color: var(--accent);
-  text-decoration: none;
-  border-bottom: 1px solid transparent;
-  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
-}
-a:hover { border-bottom-color: var(--accent); }
-a:focus-visible {
-  outline: 2px solid var(--border-focus);
-  outline-offset: 2px;
-  border-radius: 2px;
-}
+  /* Liens */
+  a {
+    color: var(--accent);
+    text-decoration: none;
+    border-bottom: 1px solid transparent;
+    transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  a:hover { border-bottom-color: var(--accent); }
+  a:focus-visible {
+    outline: 2px solid var(--border-focus);
+    outline-offset: 2px;
+    border-radius: 2px;
+  }
 
-/* Citations */
-blockquote {
-  font-family: var(--font-serif);
-  font-style: italic;
-  font-size: var(--fs-lg);
-  line-height: var(--lh-snug);
-  color: var(--fg-muted);
-  border-left: 2px solid var(--terra);
-  padding-left: var(--s-5);
-  margin: 0;
-  max-width: var(--measure-narrow);
-}
+  /* Citations */
+  blockquote {
+    font-family: var(--font-serif);
+    font-style: italic;
+    font-size: var(--fs-lg);
+    line-height: var(--lh-snug);
+    color: var(--fg-muted);
+    border-left: 2px solid var(--terra);
+    padding-left: var(--s-5);
+    margin: 0;
+    max-width: var(--measure-narrow);
+  }
 
-/* Règle horizontale discrète */
-hr {
-  border: 0;
-  border-top: 1px solid var(--border);
-  margin: var(--s-7) 0;
+  /* Règle horizontale discrète */
+  hr {
+    border: 0;
+    border-top: 1px solid var(--border);
+    margin: var(--s-7) 0;
+  }
 }
 
 /* Sélection */
