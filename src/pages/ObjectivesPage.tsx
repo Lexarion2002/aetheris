@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../store'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import { ObjectiveFormModal } from '../components/ObjectiveFormModal'
 import type { Objective, ProgressEntry } from '../types'
 
@@ -61,6 +61,7 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
 
   const domain      = domains.find((d) => d.id === obj.domainId)
   const colors      = domain ? getDomainColors(domain.color) : null
+  const DomainIcon  = domain ? getDomainIcon(domain.name) : null
   const linkedTasks = tasks.filter((t) => t.objectiveId === obj.id)
   const doneTasks   = linkedTasks.filter((t) => t.status === 'done').length
 
@@ -86,7 +87,7 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
         {/* Domain badge */}
         {domain && colors && (
           <div className={['inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium', colors.bg, colors.text].join(' ')}>
-            <span>{domain.icon}</span>
+            <span>{DomainIcon ? <DomainIcon size={12} /> : domain.icon}</span>
             <span>{domain.name}</span>
           </div>
         )}
@@ -268,6 +269,7 @@ function TimelineItem({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective) 
 
   const domain = domains.find((d) => d.id === obj.domainId)
   const colors = domain ? getDomainColors(domain.color) : null
+  const DomainIcon = domain ? getDomainIcon(domain.name) : null
   const days   = obj.targetDate ? daysUntil(obj.targetDate) : null
   const pColor = progressColor(obj.progress)
 
@@ -286,7 +288,7 @@ function TimelineItem({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective) 
             <div className="min-w-0 flex-1">
               {domain && colors && (
                 <span className={['text-xs font-medium', colors.text].join(' ')}>
-                  {domain.icon} {domain.name}
+                {DomainIcon ? <DomainIcon size={12} className="inline mr-1" /> : domain.icon} {domain.name}
                 </span>
               )}
               <h4 className="mt-0.5 text-sm font-semibold text-zinc-200 leading-tight">{obj.title}</h4>
@@ -484,11 +486,14 @@ export function ObjectivesPage() {
         <div className="space-y-6">
           {domainGroups.map(({ domain, objectives: objs }) => {
             const colors = getDomainColors(domain.color)
+            const DomainIcon = getDomainIcon(domain.name)
             return (
               <div key={domain.id}>
                 <div className="mb-3 flex items-center gap-2">
                   <span className={['h-2 w-2 rounded-full', colors.dot].join(' ')} />
-                  <span className={['text-sm font-semibold', colors.text].join(' ')}>{domain.icon} {domain.name}</span>
+                  <span className={['flex items-center gap-1.5 text-sm font-semibold', colors.text].join(' ')}>
+                    {DomainIcon ? <DomainIcon size={16} /> : domain.icon} {domain.name}
+                  </span>
                   <span className="text-xs text-zinc-600 tabular-nums">({objs.length})</span>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">

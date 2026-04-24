@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import { useParams, Navigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { usePomodoroStore } from '../store/pomodoroStore'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import { TaskFormModal }      from '../components/TaskFormModal'
 import { ObjectiveFormModal } from '../components/ObjectiveFormModal'
 import { WritingView }        from './WritingView'
@@ -690,6 +690,7 @@ export function DomainView() {
   if (domain.name.trim().toLowerCase() === 'musique') return <MusicPage />
 
   const colors = getDomainColors(domain.color)
+  const DomainIcon = getDomainIcon(domain.name)
 
   // ── Computed ──────────────────────────────────────────────────────────────
 

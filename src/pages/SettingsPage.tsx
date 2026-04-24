@@ -1,7 +1,7 @@
 import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import type { DomainColor } from '../types'
 import type { AppTheme, AppLanguage, AetherisData } from '../store'
 
@@ -277,6 +277,7 @@ export function SettingsPage() {
           {domains.map((domain) => {
             const c = getDomainColors(domain.color)
             const isEditing = editingDomainId === domain.id
+            const DomainIcon = getDomainIcon(domain.name)
 
             if (isEditing) {
               return (
@@ -332,7 +333,7 @@ export function SettingsPage() {
             return (
               <div key={domain.id} className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2.5 group hover:border-zinc-700 transition-colors">
                 <span className={['flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm', c.bg, c.border].join(' ')}>
-                  {domain.icon}
+                  {DomainIcon ? <DomainIcon size={16} /> : domain.icon}
                 </span>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-zinc-200">{domain.name}</p>

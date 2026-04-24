@@ -1,4 +1,5 @@
 import type { DomainColor } from '../types'
+import { PenLine, Scale, Briefcase, Landmark, Activity, Music, Film, BookOpen, ShoppingBag, type LucideIcon } from 'lucide-react'
 
 interface ColorConfig {
   bg: string
@@ -22,3 +23,17 @@ export const DOMAIN_COLORS: Record<DomainColor, ColorConfig> = {
 }
 
 export const getDomainColors = (color: DomainColor) => DOMAIN_COLORS[color]
+
+export const getDomainIcon = (name: string): LucideIcon | null => {
+  const n = name.toLowerCase().trim()
+  if (n.includes('écriture') || n.includes('ecriture')) return PenLine
+  if (n.includes('droit')) return Scale
+  if (n.includes('carrière') || n.includes('carriere')) return Briefcase
+  if (n.includes('finance')) return Landmark
+  if (n.includes('sport')) return Activity
+  if (n.includes('musique')) return Music
+  if (n.includes('film') || n.includes('série') || n.includes('serie')) return Film
+  if (n.includes('livre')) return BookOpen
+  if (n.includes('achat') || n.includes('shopping')) return ShoppingBag
+  return null
+}

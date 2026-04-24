@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react'
 import { useStore } from '../store'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import { formatDuration, startOfCurrentWeek, startOfCurrentMonth } from '../utils/dateHelpers'
 import type { Domain, Task } from '../types'
 
@@ -252,12 +252,15 @@ export function FocusDashboard() {
             <div className="space-y-3">
               {domainStats.map(({ domain, totalMinutes: mins, sessionCount, avgFocus }) => {
                 const colors = getDomainColors(domain.color)
+                const DomainIcon = getDomainIcon(domain.name)
                 const pct    = Math.round((mins / maxMinutes) * 100)
                 return (
                   <div key={domain.id}>
                     <div className="mb-1 flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-sm">{domain.icon}</span>
+                        <span className="text-sm flex items-center">
+                          {DomainIcon ? <DomainIcon size={14} /> : domain.icon}
+                        </span>
                         <span className="text-xs font-medium text-zinc-300 truncate">{domain.name}</span>
                       </div>
                       <div className="flex items-center gap-2 flex-shrink-0 text-xs">
@@ -306,11 +309,14 @@ export function FocusDashboard() {
               <tbody>
                 {domainStats.map(({ domain, totalMinutes: mins, sessionCount, tasks: taskSet, avgFocus }) => {
                   const colors = getDomainColors(domain.color)
+                  const DomainIcon = getDomainIcon(domain.name)
                   return (
                     <tr key={domain.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-base">{domain.icon}</span>
+                          <span className="flex items-center">
+                            {DomainIcon ? <DomainIcon size={16} /> : domain.icon}
+                          </span>
                           <span className={['font-medium', colors.text].join(' ')}>{domain.name}</span>
                         </div>
                       </td>
@@ -362,6 +368,7 @@ export function FocusDashboard() {
           <div className="divide-y divide-zinc-800/40">
             {recentSessions.map(({ session, task, domain }) => {
               const colors = domain ? getDomainColors(domain.color) : null
+                const DomainIcon = domain ? getDomainIcon(domain.name) : null
               return (
                 <div key={session.id} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/20 transition-colors">
                   {/* Domain icon */}
@@ -369,7 +376,7 @@ export function FocusDashboard() {
                     'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-base',
                     colors?.bg ?? 'bg-zinc-800',
                   ].join(' ')}>
-                    {domain?.icon ?? '⋯'}
+                      {DomainIcon ? <DomainIcon size={16} /> : (domain?.icon ?? '⋯')}
                   </div>
 
                   {/* Info */}

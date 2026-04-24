@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { useTimerStore } from '../store/timerStore'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import type { Task } from '../types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ function TaskCard({ task, onStatusToggle }: {
   const timerStore = useTimerStore()
   const domain     = domains.find((d) => d.id === task.domainId)
   const c          = domain ? getDomainColors(domain.color) : null
+  const DomainIcon = domain ? getDomainIcon(domain.name) : null
   const isRunning  = timerStore.taskId === task.id && timerStore.running
 
   const today = isoDate(new Date())
@@ -93,8 +94,8 @@ function TaskCard({ task, onStatusToggle }: {
       <div className="mt-1.5 flex items-center gap-1.5">
         <span className={['h-1.5 w-1.5 rounded-full shrink-0', PRIORITY_DOT[task.priority]].join(' ')} />
         {domain && c && (
-          <span className={['text-[9px] rounded px-1 py-0.5 border leading-none', c.bg, c.border, c.text].join(' ')}>
-            {domain.icon}
+          <span className={['flex items-center justify-center text-[9px] rounded px-1 py-0.5 border leading-none', c.bg, c.border, c.text].join(' ')}>
+            {DomainIcon ? <DomainIcon size={10} /> : domain.icon}
           </span>
         )}
         {task.timeEstimate && (

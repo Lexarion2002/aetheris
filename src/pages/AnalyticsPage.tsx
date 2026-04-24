@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import { useStore } from '../store'
 import { formatAmount, formatDuration, startOfCurrentWeek } from '../utils/dateHelpers'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 
 // ─── Couleurs hex par DomainColor ──────────────────────────────────────────────
 
@@ -629,6 +629,7 @@ export function AnalyticsPage() {
                 {recentAchievements.map((obj) => {
                   const domain = domains.find((d) => d.id === obj.domainId)
                   const c = domain ? getDomainColors(domain.color) : null
+                  const DomainIcon = domain ? getDomainIcon(domain.name) : null
                   const daysAgo = Math.round((Date.now() - new Date(obj.updatedAt).getTime()) / 86400000)
                   return (
                     <div key={obj.id} className="flex items-center gap-3 rounded-lg bg-zinc-800/40 px-3 py-3">
@@ -639,8 +640,9 @@ export function AnalyticsPage() {
                         <p className="text-sm font-medium text-zinc-200 truncate">{obj.title}</p>
                         <div className="flex items-center gap-2 mt-0.5">
                           {domain && c && (
-                            <span className={['text-[10px] rounded px-1.5 py-0.5 border', c.bg, c.border, c.text].join(' ')}>
-                              {domain.icon} {domain.name}
+                            <span className={['text-[10px] rounded px-1.5 py-0.5 border flex items-center gap-1', c.bg, c.border, c.text].join(' ')}>
+                              {DomainIcon ? <DomainIcon size={10} /> : domain.icon}
+                              {domain.name}
                             </span>
                           )}
                           <span className="text-xs text-zinc-600">
@@ -669,6 +671,7 @@ export function AnalyticsPage() {
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 {neglectedDomains.map((d) => {
                   const c = getDomainColors(d.color)
+                  const DomainIcon = getDomainIcon(d.name)
                   const lastSession = timeSessions
                     .filter((s) => taskDomainMap.get(s.taskId) === d.id)
                     .sort((a, b) => b.date.localeCompare(a.date))[0]
@@ -678,7 +681,7 @@ export function AnalyticsPage() {
                   return (
                     <div key={d.id} className="flex items-center gap-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-3">
                       <span className={['flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border text-sm', c.bg, c.border].join(' ')}>
-                        {d.icon}
+                        {DomainIcon ? <DomainIcon size={16} /> : d.icon}
                       </span>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-zinc-300">{d.name}</p>
@@ -704,11 +707,12 @@ export function AnalyticsPage() {
               <div className="space-y-3">
                 {effortResultData.map(({ domain, focusH, avgProg, doneTasks }) => {
                   const c = getDomainColors(domain.color)
+                  const DomainIcon = getDomainIcon(domain.name)
                   return (
                     <div key={domain.id} className="space-y-1.5">
                       <div className="flex items-center gap-2">
                         <span className={['flex h-6 w-6 shrink-0 items-center justify-center rounded-md border text-xs', c.bg, c.border].join(' ')}>
-                          {domain.icon}
+                          {DomainIcon ? <DomainIcon size={12} /> : domain.icon}
                         </span>
                         <span className="text-xs font-medium text-zinc-300 flex-1">{domain.name}</span>
                         <div className="flex items-center gap-4 text-xs text-right">

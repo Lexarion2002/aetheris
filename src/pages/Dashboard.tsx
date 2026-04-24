@@ -11,6 +11,8 @@ import { usePomodoroStore } from '../store/pomodoroStore'
 import { useMusicStore } from '../store/musicStore'
 import type { MusicState } from '../store/musicStore'
 import { AddDomainModal } from '../components/AddDomainModal'
+import { Landmark, Music } from 'lucide-react'
+import { getDomainIcon } from '../utils/domainColors'
 import { useState } from 'react'
 import type { Domain, Task, Transaction, SavingsGoal } from '../types'
 
@@ -584,7 +586,7 @@ function FinanceCockpit({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">💶</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)] text-[var(--fg)]"><Landmark size={16} /></span>
           <span className="text-sm font-semibold text-[var(--fg)]">Finances</span>
         </div>
         <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
@@ -642,7 +644,7 @@ function MusicCockpit({ music }: { music: MusicState }) {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">🎵</span>
+              <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)] text-[var(--fg)]"><Music size={16} /></span>
           <span className="text-sm font-semibold text-[var(--fg)]">Musique</span>
         </div>
         <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
@@ -696,11 +698,12 @@ function cockpitCls() {
 }
 
 function CockpitHeader({ domain }: { domain: Domain }) {
+  const Icon = getDomainIcon(domain.name)
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">
-          {domain.icon}
+          {Icon ? <Icon size={16} /> : domain.icon}
         </span>
         <span className="text-sm font-semibold text-[var(--fg)]">{domain.name}</span>
       </div>

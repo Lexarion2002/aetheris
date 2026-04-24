@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { DEFAULT_DOMAINS } from '../store/defaults'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 
 export function OnboardingPage() {
   const navigate              = useNavigate()
@@ -52,6 +52,7 @@ export function OnboardingPage() {
           {DEFAULT_DOMAINS.map((domain) => {
             const isSelected = selected.has(domain.id)
             const colors     = getDomainColors(domain.color)
+            const DomainIcon = getDomainIcon(domain.name)
 
             return (
               <button
@@ -69,7 +70,7 @@ export function OnboardingPage() {
                   'flex h-12 w-12 items-center justify-center rounded-xl text-2xl transition-all',
                   isSelected ? colors.bg : 'bg-zinc-800',
                 ].join(' ')}>
-                  {domain.icon}
+                  {DomainIcon ? <DomainIcon size={24} /> : domain.icon}
                 </span>
 
                 <div>
