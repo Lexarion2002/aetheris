@@ -33,11 +33,11 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
   const subtitle = activeDomain?.description  ?? meta?.subtitle ?? ''
 
   return (
-    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-zinc-800/60 bg-zinc-950/80 px-4 backdrop-blur-sm">
+    <header className="flex h-14 shrink-0 items-center gap-4 border-b border-[var(--border)] bg-[var(--bg-elev)] px-4 backdrop-blur-sm">
       {/* Mobile menu */}
       <button
         onClick={onMenuToggle}
-        className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800 transition-colors lg:hidden"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:text-[var(--fg)] hover:bg-[var(--paper-2)] transition-colors lg:hidden"
         aria-label="Ouvrir le menu"
       >
         <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
@@ -58,11 +58,11 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
           onClick={() => navigate('/dashboard')}
           className="min-w-0 text-left hover:opacity-70 transition-opacity"
         >
-          <h1 className={['text-sm font-semibold truncate', colors ? colors.text : 'text-zinc-100'].join(' ')}>
+          <h1 className="text-sm font-semibold truncate text-[var(--fg)]">
             {title}
           </h1>
           {subtitle && (
-            <p className="hidden sm:block text-xs text-zinc-500 truncate leading-none mt-0.5">{subtitle}</p>
+            <p className="hidden sm:block text-xs text-[var(--fg-muted)] truncate leading-none mt-0.5">{subtitle}</p>
           )}
         </button>
       </div>
@@ -70,21 +70,21 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
       {/* Search button */}
       <button
         onClick={onSearchOpen}
-        className="flex items-center gap-2 rounded-lg border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-500 hover:border-zinc-700 hover:text-zinc-300 transition-colors"
+        className="flex items-center gap-2 rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs text-[var(--fg-muted)] hover:border-[var(--border-strong)] hover:text-[var(--fg)] transition-colors"
         aria-label="Rechercher (Cmd+K)"
       >
         <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <span className="hidden sm:inline">Rechercher</span>
-        <kbd className="hidden sm:inline-flex h-4 items-center rounded border border-zinc-700 px-1 text-[9px] text-zinc-600">⌘K</kbd>
+        <kbd className="hidden sm:inline-flex h-4 items-center rounded border border-[var(--border-strong)] px-1 text-[9px] text-[var(--fg-subtle)]">⌘K</kbd>
       </button>
 
       {/* Logout button (Supabase only) */}
       {isSupabaseReady() && (
         <button
           onClick={() => signOut()}
-          className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-600 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
+          className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--fg-subtle)] hover:text-[var(--fg)] hover:bg-[var(--paper-2)] transition-colors"
           title="Se déconnecter"
         >
           <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

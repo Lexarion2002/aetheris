@@ -10,7 +10,6 @@ import type { WritingState } from '../store/writingStore'
 import { usePomodoroStore } from '../store/pomodoroStore'
 import { useMusicStore } from '../store/musicStore'
 import type { MusicState } from '../store/musicStore'
-import { getDomainColors } from '../utils/domainColors'
 import { AddDomainModal } from '../components/AddDomainModal'
 import { useState } from 'react'
 import type { Domain, Task, Transaction, SavingsGoal } from '../types'
@@ -217,11 +216,11 @@ export function Dashboard() {
         {/* Date + week type */}
         <div className="flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-zinc-600 mb-1">
+            <p className="text-xs font-medium uppercase tracking-widest text-[var(--fg-subtle)] mb-1">
               {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
             </p>
             {hasCareerInfo && (
-              <p className="text-sm text-zinc-500">
+              <p className="text-sm text-[var(--fg-muted)]">
                 Tu es en{' '}
                 <span className={weekType === 'cabinet' ? 'text-blue-400 font-medium' : 'text-purple-400 font-medium'}>
                   semaine {weekType}
@@ -233,7 +232,7 @@ export function Dashboard() {
 
           {/* User context input */}
           <input
-            className="bg-transparent border border-zinc-800 text-zinc-400 text-xs rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:border-zinc-600 focus:text-zinc-200 placeholder-zinc-700 text-right"
+            className="bg-transparent border border-[var(--border)] text-[var(--fg-muted)] text-xs rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:border-[var(--border-strong)] focus:text-[var(--fg)] placeholder-[var(--fg-subtle)] text-right"
             placeholder="Contexte (3 mots)"
             value={userContext}
             maxLength={30}
@@ -243,15 +242,15 @@ export function Dashboard() {
 
         {/* Jalon urgent */}
         {mainJalon ? (
-          <div className="rounded-2xl border border-zinc-800 bg-zinc-900/60 px-6 py-5">
-            <p className="text-xs text-zinc-600 mb-1 uppercase tracking-wide font-medium">Prochain jalon critique</p>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] px-6 py-5">
+            <p className="text-xs text-[var(--fg-subtle)] mb-1 uppercase tracking-wide font-medium">Prochain jalon critique</p>
             <div className="flex items-end gap-4">
               <span className={`text-4xl font-bold tabular-nums leading-none ${
                 (daysUntil(mainJalon.date) ?? 99) <= 7
                   ? 'text-red-400'
                   : (daysUntil(mainJalon.date) ?? 99) <= 21
                   ? 'text-amber-400'
-                  : 'text-zinc-100'
+                  : 'text-[var(--fg)]'
               }`}>
                 {daysUntil(mainJalon.date) === 0
                   ? "Aujourd'hui"
@@ -260,16 +259,16 @@ export function Dashboard() {
                   : `J−${daysUntil(mainJalon.date)}`}
               </span>
               <div className="pb-1">
-                <p className="text-base font-semibold text-zinc-200 leading-tight">{mainJalon.label}</p>
-                <p className="text-xs text-zinc-600 mt-0.5">
-                  {mainJalon.domain && <span className="text-zinc-500">{mainJalon.domain} · </span>}
+                <p className="text-base font-semibold text-[var(--fg)] leading-tight">{mainJalon.label}</p>
+                <p className="text-xs text-[var(--fg-subtle)] mt-0.5">
+                  {mainJalon.domain && <span className="text-[var(--fg-muted)]">{mainJalon.domain} · </span>}
                   {fmtShortDate(mainJalon.date)}
                 </p>
               </div>
             </div>
           </div>
         ) : (
-          <div className="rounded-2xl border border-zinc-800/50 bg-zinc-900/30 px-6 py-4 text-sm text-zinc-600">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] px-6 py-4 text-sm text-[var(--fg-subtle)]">
             Aucun jalon urgent — tu es à jour.
           </div>
         )}
@@ -278,10 +277,10 @@ export function Dashboard() {
       {/* ── 2. DOMAIN COCKPIT GRID ────────────────────────────────────────────── */}
       <section>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-600">Domaines</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--fg-subtle)]">Domaines</h2>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+            className="flex items-center gap-1 text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors"
           >
             <span className="text-sm leading-none">+</span>
             Nouveau
@@ -323,12 +322,12 @@ export function Dashboard() {
 
       {/* ── 3. FLUX DU JOUR ───────────────────────────────────────────────────── */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-zinc-600 mb-4">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--fg-subtle)] mb-4">
           Aujourd'hui — Actions prioritaires
         </h2>
 
         {todayActions.length === 0 ? (
-          <p className="text-sm text-zinc-600 py-4">
+          <p className="text-sm text-[var(--fg-subtle)] py-4">
             Pas d'actions critiques pour aujourd'hui.
           </p>
         ) : (
@@ -341,33 +340,33 @@ export function Dashboard() {
                     ? 'border-red-500/20 bg-red-500/5'
                     : action.urgency === 1
                     ? 'border-amber-500/20 bg-amber-500/5'
-                    : 'border-zinc-800 bg-zinc-900/50'
+                    : 'border-[var(--border)] bg-[var(--bg-elev)]'
                 }`}
               >
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-0.5">
                     <span className={`text-[10px] font-medium uppercase tracking-wide ${
                       action.urgency === 0 ? 'text-red-500' :
-                      action.urgency === 1 ? 'text-amber-500' : 'text-zinc-600'
+                      action.urgency === 1 ? 'text-amber-500' : 'text-[var(--fg-subtle)]'
                     }`}>
                       {action.domain}
                     </span>
                     <span className={`text-[10px] ${
                       action.urgency === 0 ? 'text-red-400' :
-                      action.urgency === 1 ? 'text-amber-400' : 'text-zinc-600'
+                      action.urgency === 1 ? 'text-amber-400' : 'text-[var(--fg-subtle)]'
                     }`}>
                       {action.daysLeft <= 0
                         ? action.daysLeft === 0 ? "Aujourd'hui" : `${Math.abs(action.daysLeft)}j de retard`
                         : `J−${action.daysLeft}`}
                     </span>
                   </div>
-                  <p className="text-sm text-zinc-300 font-medium truncate">{action.label}</p>
+                  <p className="text-sm text-[var(--fg)] font-medium truncate">{action.label}</p>
                 </div>
 
                 {action.taskId && pom.status === 'idle' && (
                   <button
                     onClick={() => launchPom(action.taskId!)}
-                    className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-teal-500/15 text-teal-400 border border-teal-500/25 hover:bg-teal-500/25 transition-colors"
+                    className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--terra-soft)] text-[var(--terra)] border border-[var(--terra-soft)] hover:opacity-80 transition-colors"
                   >
                     ▶ Focus
                   </button>
@@ -397,7 +396,6 @@ interface DomainCockpitProps {
 
 function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, activeArc }: DomainCockpitProps) {
   const navigate = useNavigate()
-  const colors   = getDomainColors(domain.color)
   const name     = domain.name.trim().toLowerCase()
 
   const go = () => navigate(`/domain/${domain.id}`)
@@ -414,33 +412,33 @@ function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, a
     }
 
     return (
-      <button onClick={go} className={cockpitCls(colors)}>
-        <CockpitHeader domain={domain} colors={colors} />
+      <button onClick={go} className={cockpitCls()}>
+        <CockpitHeader domain={domain} />
         <div className="space-y-1.5 text-xs">
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500">Grand Oral</span>
-            <span className={goD !== null && goD <= 7 ? 'text-red-400 font-semibold' : 'text-zinc-300'}>
+            <span className="text-[var(--fg-muted)]">Grand Oral</span>
+            <span className={goD !== null && goD <= 7 ? 'text-red-400 font-semibold' : 'text-[var(--fg)]'}>
               {goD !== null ? (goD === 0 ? "Aujourd'hui" : `J−${goD}`) : '—'}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500">Rapport</span>
-            <span className={rpD !== null && rpD <= 7 ? 'text-amber-400 font-semibold' : 'text-zinc-300'}>
+            <span className="text-[var(--fg-muted)]">Rapport</span>
+            <span className={rpD !== null && rpD <= 7 ? 'text-amber-400 font-semibold' : 'text-[var(--fg)]'}>
               {rpD !== null ? (rpD === 0 ? "Aujourd'hui" : `J−${rpD}`) : '—'}
             </span>
           </div>
-          <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
-            <span className="text-zinc-500">Stade</span>
-            <span className={`${colors.text} font-medium`}>{STATUT_LABELS[law.globalStatus] ?? law.globalStatus}</span>
+          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
+            <span className="text-[var(--fg-muted)]">Stade</span>
+            <span className="text-[var(--fg)] font-medium">{STATUT_LABELS[law.globalStatus] ?? law.globalStatus}</span>
           </div>
           {tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length > 0 && (
             <div className="flex items-center justify-between">
-              <span className="text-zinc-500">Tâches actives</span>
-              <span className="text-zinc-300">{tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length}</span>
+              <span className="text-[var(--fg-muted)]">Tâches actives</span>
+              <span className="text-[var(--fg)]">{tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length}</span>
             </div>
           )}
         </div>
-        <CockpitFooter label="Ouvrir Droit" color={colors.text} />
+        <CockpitFooter label="Ouvrir Droit" />
       </button>
     )
   }
@@ -465,35 +463,35 @@ function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, a
     const lastArchive = career.missionsArchives[0]
 
     return (
-      <button onClick={go} className={cockpitCls(colors)}>
-        <CockpitHeader domain={domain} colors={colors} />
+      <button onClick={go} className={cockpitCls()}>
+        <CockpitHeader domain={domain} />
         <div className="space-y-1.5 text-xs">
           {currentMission ? (
             <>
-              <p className="text-zinc-200 font-medium leading-snug truncate">{truncateWords(currentMission.sujet, 6)}</p>
+              <p className="text-[var(--fg)] font-medium leading-snug truncate">{truncateWords(currentMission.sujet, 6)}</p>
               <div className="flex items-center gap-2">
-                <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-medium ${colors.bg} ${colors.text}`}>
+                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--paper-3)] text-[var(--fg-muted)]">
                   {STADE_LABELS[currentMission.stade] ?? currentMission.stade}
                 </span>
                 {currentMission.deadline && (
-                  <span className="text-zinc-500">
+                  <span className="text-[var(--fg-muted)]">
                     J−{Math.max(0, daysUntil(currentMission.deadline) ?? 0)}
                   </span>
                 )}
               </div>
             </>
           ) : (
-            <p className="text-zinc-600 italic">Aucune mission active</p>
+            <p className="text-[var(--fg-subtle)] italic">Aucune mission active</p>
           )}
-          <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
-            <span className="text-zinc-500">Rendues ce mois</span>
-            <span className="text-zinc-300">{renduesCeMois}</span>
+          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
+            <span className="text-[var(--fg-muted)]">Rendues ce mois</span>
+            <span className="text-[var(--fg)]">{renduesCeMois}</span>
           </div>
           {lastArchive && (
-            <p className="text-zinc-600 truncate">Dernière : {lastArchive.competenceDeveloppee}</p>
+            <p className="text-[var(--fg-subtle)] truncate">Dernière : {lastArchive.competenceDeveloppee}</p>
           )}
         </div>
-        <CockpitFooter label="Ouvrir Carrière" color={colors.text} />
+        <CockpitFooter label="Ouvrir Carrière" />
       </button>
     )
   }
@@ -501,27 +499,27 @@ function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, a
   // ── Écriture ───────────────────────────────────────────────────────────────
   if (name === 'écriture') {
     return (
-      <button onClick={go} className={cockpitCls(colors)}>
-        <CockpitHeader domain={domain} colors={colors} />
+      <button onClick={go} className={cockpitCls()}>
+        <CockpitHeader domain={domain} />
         <div className="space-y-2 text-xs">
           {writing.lastSentence ? (
-            <p className="text-zinc-400 italic leading-snug">
+            <p className="text-[var(--fg-muted)] italic leading-snug">
               "{truncateWords(writing.lastSentence, 10)}"
             </p>
           ) : (
-            <p className="text-zinc-700 italic">Aucune phrase enregistrée</p>
+            <p className="text-[var(--fg-subtle)] italic">Aucune phrase enregistrée</p>
           )}
           {activeArc && (
             <div className="flex items-center justify-between">
-              <span className="text-zinc-500">Arc en cours</span>
-              <span className={`${colors.text} font-medium`}>
+              <span className="text-[var(--fg-muted)]">Arc en cours</span>
+              <span className="text-[var(--fg)] font-medium">
                 {activeArc.name} — {activeArc.order}/{writing.arcs.length}
               </span>
             </div>
           )}
-          <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
-            <span className="text-zinc-500">Dernière session</span>
-            <span className="text-zinc-400">
+          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
+            <span className="text-[var(--fg-muted)]">Dernière session</span>
+            <span className="text-[var(--fg-muted)]">
               {lastWritingDays === null
                 ? '—'
                 : lastWritingDays === 0
@@ -530,7 +528,7 @@ function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, a
             </span>
           </div>
         </div>
-        <CockpitFooter label="Ouvrir Écriture" color={colors.text} />
+        <CockpitFooter label="Ouvrir Écriture" />
       </button>
     )
   }
@@ -542,23 +540,23 @@ function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, a
     .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))[0]
 
   return (
-    <button onClick={go} className={cockpitCls(colors)}>
-      <CockpitHeader domain={domain} colors={colors} />
+    <button onClick={go} className={cockpitCls()}>
+      <CockpitHeader domain={domain} />
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center justify-between">
-          <span className="text-zinc-500">Tâches actives</span>
-          <span className="text-zinc-300">{activeTasks.length}</span>
+          <span className="text-[var(--fg-muted)]">Tâches actives</span>
+          <span className="text-[var(--fg)]">{activeTasks.length}</span>
         </div>
         {nextDeadline && (
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500 truncate mr-2">{truncateWords(nextDeadline.title, 5)}</span>
-            <span className={`shrink-0 ${(daysUntil(nextDeadline.dueDate!) ?? 99) <= 3 ? 'text-red-400' : 'text-zinc-500'}`}>
+            <span className="text-[var(--fg-muted)] truncate mr-2">{truncateWords(nextDeadline.title, 5)}</span>
+            <span className={`shrink-0 ${(daysUntil(nextDeadline.dueDate!) ?? 99) <= 3 ? 'text-red-400' : 'text-[var(--fg-muted)]'}`}>
               {fmtShortDate(nextDeadline.dueDate!)}
             </span>
           </div>
         )}
       </div>
-      <CockpitFooter label={`Ouvrir ${domain.name}`} color={colors.text} />
+      <CockpitFooter label={`Ouvrir ${domain.name}`} />
     </button>
   )
 }
@@ -578,25 +576,23 @@ function FinanceCockpit({
   const fmt = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
   const goalPct = topGoal && topGoal.targetAmount > 0 ? Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100) : 0
 
-  const colors = getDomainColors('yellow')
-
   return (
     <button
       onClick={() => navigate('/finances')}
-      className={`group flex flex-col gap-3 rounded-2xl border p-4 text-left transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-teal-500/50 ${colors.border} ${colors.bgMuted} hover:bg-yellow-500/10`}
+      className="group flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)] hover:bg-[var(--paper-2)]"
     >
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm ${colors.bg}`}>💶</span>
-          <span className={`text-sm font-semibold ${colors.text}`}>Finances</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">💶</span>
+          <span className="text-sm font-semibold text-[var(--fg)]">Finances</span>
         </div>
-        <span className="text-zinc-700 group-hover:text-zinc-500 transition-colors text-xs">→</span>
+        <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
       </div>
 
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center justify-between">
-          <span className="text-zinc-500">Solde du mois</span>
+          <span className="text-[var(--fg-muted)]">Solde du mois</span>
           <span className={`font-semibold tabular-nums ${balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
             {balance >= 0 ? '+' : ''}{fmt(balance)}
           </span>
@@ -605,12 +601,12 @@ function FinanceCockpit({
         {topGoal && (
           <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <span className="text-zinc-500 truncate mr-2">{truncateWords(topGoal.title, 4)}</span>
-              <span className="text-zinc-400 shrink-0">{goalPct}%</span>
+              <span className="text-[var(--fg-muted)] truncate mr-2">{truncateWords(topGoal.title, 4)}</span>
+              <span className="text-[var(--fg-muted)] shrink-0">{goalPct}%</span>
             </div>
-            <div className="h-1 w-full rounded-full bg-zinc-800">
+            <div className="h-1 w-full rounded-full bg-[var(--paper-3)]">
               <div
-                className="h-1 rounded-full bg-yellow-500 transition-all duration-500"
+                className="h-1 rounded-full bg-[var(--terra)] transition-all duration-500"
                 style={{ width: `${goalPct}%` }}
               />
             </div>
@@ -618,14 +614,14 @@ function FinanceCockpit({
         )}
 
         {todayExpenses > 0 && (
-          <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
-            <span className="text-zinc-500">Dépenses aujourd'hui</span>
-            <span className="text-zinc-400">{fmt(todayExpenses)}</span>
+          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
+            <span className="text-[var(--fg-muted)]">Dépenses aujourd'hui</span>
+            <span className="text-[var(--fg-muted)]">{fmt(todayExpenses)}</span>
           </div>
         )}
       </div>
 
-      <p className={`mt-auto text-[10px] text-zinc-700 group-hover:${colors.text} transition-colors`}>
+      <p className="mt-auto text-[10px] text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors">
         Ouvrir Finances →
       </p>
     </button>
@@ -636,54 +632,52 @@ function FinanceCockpit({
 
 function MusicCockpit({ music }: { music: MusicState }) {
   const navigate = useNavigate()
-  const colors   = getDomainColors('red')
-
   const lastCritique = music.bibliotheque[0]
   const pantheonCount = music.bibliotheque.filter((a) => a.note >= 9).length
 
   return (
     <button
       onClick={() => navigate('/musique')}
-      className={`group flex flex-col gap-3 rounded-2xl border p-4 text-left transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-teal-500/50 ${colors.border} ${colors.bgMuted} hover:bg-red-500/10`}
+      className="group flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)] hover:bg-[var(--paper-2)]"
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm ${colors.bg}`}>🎵</span>
-          <span className={`text-sm font-semibold ${colors.text}`}>Musique</span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">🎵</span>
+          <span className="text-sm font-semibold text-[var(--fg)]">Musique</span>
         </div>
-        <span className="text-zinc-700 group-hover:text-zinc-500 transition-colors text-xs">→</span>
+        <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
       </div>
 
       <div className="space-y-1.5 text-xs">
         <div className="flex items-center justify-between">
-          <span className="text-zinc-500">Critiques</span>
-          <span className="text-zinc-300 tabular-nums">{music.bibliotheque.length}</span>
+          <span className="text-[var(--fg-muted)]">Critiques</span>
+          <span className="text-[var(--fg)] tabular-nums">{music.bibliotheque.length}</span>
         </div>
         {lastCritique && (
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500 truncate mr-2">Dernière</span>
-            <span className="text-zinc-400 truncate max-w-[120px]">
+            <span className="text-[var(--fg-muted)] truncate mr-2">Dernière</span>
+            <span className="text-[var(--fg-muted)] truncate max-w-[120px]">
               {truncateWords(lastCritique.titre, 4)}
             </span>
           </div>
         )}
         {pantheonCount > 0 && (
-          <div className="flex items-center justify-between pt-1 border-t border-zinc-800/60">
-            <span className="text-zinc-500">Panthéon (9-10)</span>
+          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
+            <span className="text-[var(--fg-muted)]">Panthéon (9-10)</span>
             <span className="text-amber-400 tabular-nums">{pantheonCount}</span>
           </div>
         )}
         {music.albumEnCours && (
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500">En écoute</span>
-            <span className={`${colors.text} truncate max-w-[120px]`}>
+            <span className="text-[var(--fg-muted)]">En écoute</span>
+            <span className="text-[var(--fg-muted)] truncate max-w-[120px]">
               {truncateWords(music.albumEnCours.titre, 4)}
             </span>
           </div>
         )}
       </div>
 
-      <p className={`mt-auto text-[10px] transition-colors text-zinc-700 group-hover:${colors.text}`}>
+      <p className="mt-auto text-[10px] transition-colors text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)]">
         Ouvrir Musique →
       </p>
     </button>
@@ -692,40 +686,32 @@ function MusicCockpit({ music }: { music: MusicState }) {
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function cockpitCls(colors: ReturnType<typeof getDomainColors>) {
+function cockpitCls() {
   return [
-    'group flex flex-col gap-3 rounded-2xl border p-4 text-left',
+    'group flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left',
     'transition-all duration-150 outline-none',
-    'hover:border-opacity-60 hover:bg-zinc-900',
-    'focus-visible:ring-1 focus-visible:ring-teal-500/50',
-    colors.border,
-    colors.bgMuted,
+    'hover:bg-[var(--paper-2)]',
+    'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
   ].join(' ')
 }
 
-function CockpitHeader({
-  domain,
-  colors,
-}: {
-  domain: Domain
-  colors: ReturnType<typeof getDomainColors>
-}) {
+function CockpitHeader({ domain }: { domain: Domain }) {
   return (
     <div className="flex items-center justify-between">
       <div className="flex items-center gap-2">
-        <span className={`flex h-7 w-7 items-center justify-center rounded-lg text-sm ${colors.bg}`}>
+        <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">
           {domain.icon}
         </span>
-        <span className={`text-sm font-semibold ${colors.text}`}>{domain.name}</span>
+        <span className="text-sm font-semibold text-[var(--fg)]">{domain.name}</span>
       </div>
-      <span className="text-zinc-700 group-hover:text-zinc-500 transition-colors text-xs">→</span>
+      <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
     </div>
   )
 }
 
-function CockpitFooter({ label, color }: { label: string; color: string }) {
+function CockpitFooter({ label }: { label: string }) {
   return (
-    <p className={`mt-auto text-[10px] transition-colors text-zinc-700 group-hover:${color}`}>
+    <p className="mt-auto text-[10px] transition-colors text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)]">
       {label} →
     </p>
   )
@@ -736,16 +722,16 @@ function CockpitFooter({ label, color }: { label: string; color: string }) {
 function EmptyState({ onAdd }: { onAdd: () => void }) {
   return (
     <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-zinc-800 bg-zinc-900">
-        <span className="text-xl text-zinc-700 select-none">✦</span>
+      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
+        <span className="text-xl text-[var(--fg-subtle)] select-none">✦</span>
       </div>
-      <p className="text-base font-medium text-zinc-300">Bienvenue dans Aetheris</p>
-      <p className="mt-2 max-w-xs text-sm leading-relaxed text-zinc-600">
+      <p className="text-base font-medium text-[var(--fg)]">Bienvenue dans Aetheris</p>
+      <p className="mt-2 max-w-xs text-sm leading-relaxed text-[var(--fg-subtle)]">
         Crée ton premier domaine pour commencer à organiser ta vie.
       </p>
       <button
         onClick={onAdd}
-        className="mt-8 flex items-center gap-2 rounded-xl bg-teal-500/15 border border-teal-500/25 px-6 py-3 text-sm font-medium text-teal-400 hover:bg-teal-500/25 transition-colors"
+        className="mt-8 flex items-center gap-2 rounded-xl bg-[var(--terra-soft)] border border-[var(--terra-soft)] px-6 py-3 text-sm font-medium text-[var(--terra)] hover:opacity-80 transition-colors"
       >
         <span className="text-base leading-none">+</span>
         Créer mon premier domaine
