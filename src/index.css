@@ -1,5 +1,121 @@
 @import "tailwindcss";
 
+/* ============================================================
+   Aetheris — Design tokens
+   Palette chaude, typographie littéraire.
+   Jamais de noir pur ni de blanc froid.
+   ============================================================ */
+
+:root {
+  /* ---------- Couleurs : papier (fonds) ---------- */
+  --paper:          #F4ECDC;   /* fond dominant, ivoire chaud */
+  --paper-1:        #FBF6EA;   /* surfaces surélevées */
+  --paper-2:        #EADFC8;   /* séparateurs, bandeaux */
+  --paper-3:        #DFD2B5;   /* tabs actifs, chips au repos */
+
+  /* ---------- Couleurs : encre (texte + bordures foncées) ---------- */
+  --ink:            #3A2E22;   /* sépia foncé, texte principal */
+  --ink-2:          #6B5B48;   /* texte secondaire */
+  --ink-3:          #A08B72;   /* texte tertiaire, placeholder */
+  --ink-4:          #C7B59A;   /* lignes, dividers */
+
+  /* ---------- Accents ---------- */
+  --terra:          #B5532A;   /* terre brûlée — action primaire */
+  --terra-deep:     #8E3D1C;   /* hover / pressed */
+  --terra-soft:     #EAD1BE;   /* teinte background, chips */
+
+  --sage:           #7E9A7A;   /* vert doux — positif / succès */
+  --sage-deep:      #5C7859;
+  --sage-soft:      #D5DFD0;
+
+  /* ---------- Sémantique ---------- */
+  --bg:             var(--paper);
+  --bg-elev:        var(--paper-1);
+  --bg-sunken:      var(--paper-2);
+
+  --fg:             var(--ink);
+  --fg-muted:       var(--ink-2);
+  --fg-subtle:      var(--ink-3);
+
+  --border:         var(--paper-2);
+  --border-strong:  var(--ink-4);
+  --border-focus:   var(--terra);
+
+  --accent:         var(--terra);
+  --accent-hover:   var(--terra-deep);
+  --positive:       var(--sage);
+  --positive-hover: var(--sage-deep);
+
+  --warn:           #C06A2F;
+  --danger:         #9B3A1C;
+
+  /* ---------- Typographie ---------- */
+  --font-serif:     'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-sans:      'Geist', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
+  --font-mono:      'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
+
+  /* Échelle modulaire, base 16, ratio ≈ 1.2 */
+  --fs-xs:    12px;
+  --fs-sm:    14px;
+  --fs-base:  16px;
+  --fs-md:    18px;
+  --fs-lg:    21px;
+  --fs-xl:    26px;
+  --fs-2xl:   32px;
+  --fs-3xl:   40px;
+  --fs-4xl:   52px;
+  --fs-5xl:   68px;
+
+  --lh-tight:   1.15;
+  --lh-snug:    1.3;
+  --lh-normal:  1.5;
+  --lh-prose:   1.65;
+
+  --tracking-tight:  -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide:   0.08em;
+  --tracking-mono:   0.04em;
+
+  /* ---------- Espacement (base 4) ---------- */
+  --s-0:   0;
+  --s-1:   2px;
+  --s-2:   4px;
+  --s-3:   8px;
+  --s-4:   12px;
+  --s-5:   16px;
+  --s-6:   24px;
+  --s-7:   32px;
+  --s-8:   48px;
+  --s-9:   64px;
+  --s-10:  96px;
+
+  /* ---------- Rayons ---------- */
+  --r-sm:  4px;
+  --r-md:  8px;
+  --r-lg:  12px;
+  --r-xl:  20px;
+  --r-full: 999px;
+
+  /* ---------- Ombres ---------- */
+  --shadow-1: 0 1px 2px rgba(58, 46, 34, 0.06);
+  --shadow-2: 0 6px 20px -8px rgba(58, 46, 34, 0.18);
+  --shadow-3: 0 20px 60px -20px rgba(58, 46, 34, 0.25);
+
+  /* ---------- Animation ---------- */
+  --ease:     cubic-bezier(0.2, 0.8, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur:      180ms;
+  --dur-slow: 320ms;
+
+  /* ---------- Largeurs ---------- */
+  --measure:        68ch;
+  --measure-narrow: 52ch;
+}
+
+/* ============================================================
+   Styles sémantiques de base
+   ============================================================ */
+
 *,
 *::before,
 *::after {
@@ -14,14 +130,134 @@ body,
   padding: 0;
 }
 
-body {
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+html, body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-normal);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: #09090b;
-  color: #f4f4f5;
+  text-rendering: optimizeLegibility;
 }
 
+/* Titres : Newsreader, serré, encre */
+h1, .h1 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--fs-4xl);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg);
+  margin: 0;
+}
+h2, .h2 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--fs-2xl);
+  line-height: var(--lh-snug);
+  letter-spacing: var(--tracking-tight);
+  color: var(--fg);
+  margin: 0;
+}
+h3, .h3 {
+  font-family: var(--font-serif);
+  font-weight: 500;
+  font-size: var(--fs-xl);
+  line-height: var(--lh-snug);
+  color: var(--fg);
+  margin: 0;
+}
+h4, .h4 {
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: var(--fs-md);
+  line-height: var(--lh-snug);
+  color: var(--fg);
+  margin: 0;
+}
+
+/* Corps */
+p, .p {
+  font-family: var(--font-sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-prose);
+  color: var(--fg);
+  max-width: var(--measure);
+  margin: 0;
+}
+.lede {
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  line-height: var(--lh-snug);
+  font-style: italic;
+  color: var(--fg-muted);
+}
+small, .small {
+  font-size: var(--fs-sm);
+  color: var(--fg-muted);
+}
+
+/* Mono : chiffres, étiquettes, codes */
+code, kbd, .mono {
+  font-family: var(--font-mono);
+  font-size: 0.92em;
+  letter-spacing: var(--tracking-mono);
+}
+.label {
+  font-family: var(--font-mono);
+  font-size: var(--fs-xs);
+  letter-spacing: var(--tracking-wide);
+  text-transform: uppercase;
+  color: var(--fg-muted);
+}
+.num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--fg);
+}
+
+/* Liens */
+a {
+  color: var(--accent);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+}
+a:hover { border-bottom-color: var(--accent); }
+a:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Citations */
+blockquote {
+  font-family: var(--font-serif);
+  font-style: italic;
+  font-size: var(--fs-lg);
+  line-height: var(--lh-snug);
+  color: var(--fg-muted);
+  border-left: 2px solid var(--terra);
+  padding-left: var(--s-5);
+  margin: 0;
+  max-width: var(--measure-narrow);
+}
+
+/* Règle horizontale discrète */
+hr {
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: var(--s-7) 0;
+}
+
+/* Sélection */
+::selection {
+  background: var(--terra-soft);
+  color: var(--ink);
+}
+
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 4px;
   height: 4px;
@@ -30,11 +266,11 @@ body {
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 999px;
+  background: var(--ink-4);
+  border-radius: var(--r-full);
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--ink-3);
 }
 
 /* ── Page transition ────────────────────────────────────────────────────────── */
@@ -48,13 +284,12 @@ body {
   animation: page-enter 200ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* ── Light theme (CSS filter invert) ────────────────────────────────────────── */
+/* ── Light theme ────────────────────────────────────────────────────────────── */
 
 body.theme-light {
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* Re-invert elements that should keep their natural colors */
 body.theme-light img,
 body.theme-light video,
 body.theme-light .recharts-surface,
