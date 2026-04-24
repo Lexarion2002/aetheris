@@ -53,27 +53,27 @@ function TxPagination({ page, total, count, pageSize, onChange }: {
   const from = (page - 1) * pageSize + 1
   const to   = Math.min(page * pageSize, count)
   return (
-    <div className="flex items-center justify-between gap-3 py-2 text-xs text-zinc-500">
+    <div className="flex items-center justify-between gap-3 py-2 text-xs text-[var(--fg-muted)]">
       {/* Info */}
       <span className="tabular-nums">
-        {from}–{to} sur <span className="text-zinc-400 font-medium">{count}</span> transaction{count > 1 ? 's' : ''}
+        {from}–{to} sur <span className="text-[var(--fg-muted)] font-medium">{count}</span> transaction{count > 1 ? 's' : ''}
       </span>
       {/* Buttons */}
       <div className="flex items-center gap-1">
         <button
           onClick={() => onChange(page - 1)}
           disabled={page <= 1}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1 text-xs text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           ← Précédent
         </button>
-        <span className="px-2 tabular-nums text-zinc-600">
+        <span className="px-2 tabular-nums text-[var(--fg-subtle)]">
           {page} / {total}
         </span>
         <button
           onClick={() => onChange(page + 1)}
           disabled={page >= total}
-          className="rounded-lg border border-zinc-800 bg-zinc-900 px-2.5 py-1 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+          className="rounded-lg border border-[var(--border)] bg-[var(--bg-elev)] px-2.5 py-1 text-xs text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
         >
           Suivant →
         </button>
@@ -176,15 +176,15 @@ export function FinancePage() {
       {/* ── Header ────────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-zinc-100">Finances</h1>
-          <p className="mt-1 text-sm text-zinc-500 capitalize">{monthLabel(month)}</p>
+          <h1 className="text-2xl font-semibold text-[var(--fg)]">Finances</h1>
+          <p className="mt-1 text-sm text-[var(--fg-muted)] capitalize">{monthLabel(month)}</p>
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-zinc-800 bg-zinc-900 p-1">
+        <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-1">
           <button onClick={() => setMonth((m) => shiftMonth(m, -1))}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors">‹</button>
-          <span className="min-w-[110px] text-center text-xs font-medium capitalize text-zinc-300">{monthLabel(month)}</span>
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors">‹</button>
+          <span className="min-w-[110px] text-center text-xs font-medium capitalize text-[var(--fg)]">{monthLabel(month)}</span>
           <button onClick={() => setMonth((m) => shiftMonth(m, +1))}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-zinc-400 hover:bg-zinc-800 hover:text-zinc-100 transition-colors">›</button>
+            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors">›</button>
         </div>
       </div>
 
@@ -206,43 +206,43 @@ export function FinancePage() {
 
       {/* ── Section 2 : Graphiques ────────────────────────────────────────────── */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <PieSection title="Dépenses par catégorie" data={expensePie} total={totalExpense} empty="Aucune dépense ce mois" />
-        <PieSection title="Revenus par catégorie"  data={incomePie}  total={totalIncome}  empty="Aucun revenu ce mois"   />
+        <PieSection title="Dépenses par catégorie" data={expensePie} total={totalExpense} empty="Aucune dépense ce mois" colorScheme="expense" />
+        <PieSection title="Revenus par catégorie"  data={incomePie}  total={totalIncome}  empty="Aucun revenu ce mois"   colorScheme="income"  />
       </div>
 
       {/* ── Section 3 : Budgets ───────────────────────────────────────────────── */}
       <section>
-        <h2 className="mb-5 text-base font-semibold text-zinc-100">Budgets mensuels</h2>
+        <h2 className="mb-5 text-base font-semibold text-[var(--fg)]">Budgets mensuels</h2>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {expenseCats.map((cat) => {
             const budget   = budgetMap.get(cat.id) ?? 0
             const spent    = spentMap.get(cat.id) ?? 0
             const realPct  = budget > 0 ? (spent / budget) * 100 : 0
             const barWidth = budget > 0 ? Math.min(100, realPct) : 0
-            const bar      = realPct >= 100 ? 'bg-red-500' : realPct >= 50 ? 'bg-amber-500' : 'bg-green-500'
-            const pctText  = realPct >= 100 ? 'text-red-400' : realPct >= 50 ? 'text-amber-400' : 'text-green-500'
+            const bar      = realPct >= 100 ? 'bg-[var(--danger)]' : realPct >= 50 ? 'bg-amber-500' : 'bg-[var(--positive)]'
+            const pctText  = realPct >= 100 ? 'text-[var(--danger)]' : realPct >= 50 ? 'text-amber-400' : 'text-[var(--positive)]'
             const overage  = spent - budget
             return (
-              <div key={cat.id} className="space-y-3 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-4">
+              <div key={cat.id} className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-sm font-medium text-zinc-200">
+                  <span className="flex items-center gap-2 text-sm font-medium text-[var(--fg)]">
                     <span className="text-base">{cat.icon}</span>
                     {cat.name}
                   </span>
                   <button onClick={() => setBudgetCat(cat.id)}
-                    className="text-zinc-600 hover:text-zinc-400 transition-colors" title="Modifier le budget">
+                    className="text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors" title="Modifier le budget">
                     ✎
                   </button>
                 </div>
                 <div>
                   <div className="mb-1.5 flex items-end justify-between text-xs">
-                    <span className={spent > 0 ? 'font-medium text-zinc-300' : 'text-zinc-600'}>{fmtDec(spent)}</span>
+                    <span className={spent > 0 ? 'font-medium text-[var(--fg)]' : 'text-[var(--fg-subtle)]'}>{fmtDec(spent)}</span>
                     {budget > 0
-                      ? <span className="text-zinc-600">/ {fmtDec(budget)}</span>
-                      : <button onClick={() => setBudgetCat(cat.id)} className="text-teal-600 hover:text-teal-400 transition-colors">+ Définir</button>
+                      ? <span className="text-[var(--fg-subtle)]">/ {fmtDec(budget)}</span>
+                      : <button onClick={() => setBudgetCat(cat.id)} className="text-[var(--accent)] hover:text-[var(--accent)] transition-colors">+ Définir</button>
                     }
                   </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--paper-3)]">
                     {budget > 0 && (
                       <div className={['h-full rounded-full transition-all duration-500', bar].join(' ')} style={{ width: `${barWidth}%` }} />
                     )}
@@ -263,17 +263,17 @@ export function FinancePage() {
       {/* ── Section 4 : Épargne ───────────────────────────────────────────────── */}
       <section>
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-zinc-100">Objectifs d'épargne</h2>
+          <h2 className="text-base font-semibold text-[var(--fg)]">Objectifs d'épargne</h2>
           <button onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
-            className="text-xs text-teal-500 hover:text-teal-400 transition-colors">
+            className="text-xs text-[var(--accent)] hover:text-[var(--accent)] transition-colors">
             + Nouvel objectif
           </button>
         </div>
         {savingsGoals.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 py-14 text-center">
-            <p className="text-sm text-zinc-600">Aucun objectif d'épargne</p>
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)] py-14 text-center">
+            <p className="text-sm text-[var(--fg-subtle)]">Aucun objectif d'épargne</p>
             <button onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
-              className="mt-3 text-xs text-teal-500 hover:text-teal-400 transition-colors">
+              className="mt-3 text-xs text-[var(--accent)] hover:text-[var(--accent)] transition-colors">
               Créer mon premier objectif →
             </button>
           </div>
@@ -304,10 +304,10 @@ export function FinancePage() {
       {/* ── Section 5 : Transactions ──────────────────────────────────────────── */}
       <section>
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-zinc-100">
+          <h2 className="text-base font-semibold text-[var(--fg)]">
             Transactions
             {filteredTx.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-zinc-600">
+              <span className="ml-2 text-xs font-normal text-[var(--fg-subtle)]">
                 {filteredTx.length > TX_PAGE_SIZE
                   ? `${(txPage - 1) * TX_PAGE_SIZE + 1}–${Math.min(txPage * TX_PAGE_SIZE, filteredTx.length)} sur ${filteredTx.length}`
                   : filteredTx.length}
@@ -315,11 +315,11 @@ export function FinancePage() {
             )}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-xl border border-zinc-800 bg-zinc-900">
+            <div className="flex overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)]">
               {(['all', 'income', 'expense'] as const).map((f) => (
                 <button key={f} onClick={() => setTxType(f)}
                   className={['px-3 py-1.5 text-xs font-medium transition-colors',
-                    txType === f ? 'bg-zinc-700 text-zinc-100' : 'text-zinc-500 hover:text-zinc-300',
+                    txType === f ? 'bg-[var(--paper-3)] text-[var(--fg)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]',
                   ].join(' ')}>
                   {f === 'all' ? 'Tout' : f === 'income' ? 'Revenus' : 'Dépenses'}
                 </button>
@@ -327,28 +327,28 @@ export function FinancePage() {
             </div>
             {usedCats.length > 1 && (
               <select value={txCat} onChange={(e) => setTxCat(e.target.value)}
-                className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-400 outline-none">
+                className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs text-[var(--fg-muted)] outline-none">
                 <option value="">Toutes catégories</option>
                 {usedCats.map((k) => <option key={k} value={k}>{catMeta(k).label}</option>)}
               </select>
             )}
             <button
               onClick={() => setShowPdfModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs font-medium text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors"
             >
               <span className="text-sm leading-none">📄</span>
               Relevé PDF
             </button>
             <button
               onClick={() => setShowCsvModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-1.5 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs font-medium text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors"
             >
               <span className="text-sm leading-none">↑</span>
               Importer CSV
             </button>
             <button
               onClick={() => { setEditTx(undefined); setShowTxModal(true) }}
-              className="flex items-center gap-1.5 rounded-xl border border-teal-500/25 bg-teal-500/15 px-3 py-1.5 text-xs font-medium text-teal-400 hover:bg-teal-500/25 transition-colors"
+              className="flex items-center gap-1.5 rounded-xl border border-[var(--terra-soft)] bg-[var(--terra-soft)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors"
             >
               <span className="text-sm leading-none">+</span>
               Transaction
@@ -357,10 +357,10 @@ export function FinancePage() {
         </div>
 
         {filteredTx.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-zinc-800 py-14 text-center">
-            <p className="text-sm text-zinc-600">Aucune transaction ce mois</p>
+          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)] py-14 text-center">
+            <p className="text-sm text-[var(--fg-subtle)]">Aucune transaction ce mois</p>
             <button onClick={() => { setEditTx(undefined); setShowTxModal(true) }}
-              className="mt-3 text-xs text-teal-500 hover:text-teal-400 transition-colors">
+              className="mt-3 text-xs text-[var(--accent)] hover:text-[var(--accent)] transition-colors">
               Ajouter une transaction →
             </button>
           </div>
@@ -371,10 +371,10 @@ export function FinancePage() {
               <TxPagination page={txPage} total={totalTxPages} count={filteredTx.length} pageSize={TX_PAGE_SIZE} onChange={setTxPage} />
             )}
 
-            <div className="overflow-hidden rounded-2xl border border-zinc-800">
+            <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-zinc-800 bg-zinc-900/60 text-[10px] uppercase tracking-wider text-zinc-600">
+                  <tr className="border-b border-[var(--border)] bg-[var(--bg-elev)] text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">
                     <th className="px-4 py-3 text-left">Date</th>
                     <th className="px-4 py-3 text-left">Catégorie</th>
                     <th className="px-4 py-3 text-right">Montant</th>
@@ -382,39 +382,39 @@ export function FinancePage() {
                     <th className="w-16 px-4 py-3" />
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-zinc-800/60">
+                <tbody className="divide-y divide-[var(--border)]">
                   {pagedTx.map((tx) => {
                     const cat = catMeta(tx.category)
                     return (
-                      <tr key={tx.id} className="group hover:bg-zinc-900/40 transition-colors">
-                        <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">
+                      <tr key={tx.id} className="group hover:bg-[var(--bg-elev)] transition-colors">
+                        <td className="px-4 py-3 text-xs text-[var(--fg-muted)] whitespace-nowrap">
                           {new Date(tx.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                         </td>
                         <td className="px-4 py-3">
-                          <span className="flex items-center gap-1.5 text-xs text-zinc-300">
+                          <span className="flex items-center gap-1.5 text-xs text-[var(--fg)]">
                             <span>{cat.icon}</span>
                             {cat.label}
                             <span className={['ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium',
-                              tx.type === 'income' ? 'bg-emerald-500/15 text-emerald-400' : 'bg-red-500/15 text-red-400',
+                              tx.type === 'income' ? 'bg-[var(--sage-soft)] text-[var(--positive)]' : 'bg-[var(--danger)]/10 text-[var(--danger)]',
                             ].join(' ')}>
                               {tx.type === 'income' ? '↑' : '↓'}
                             </span>
                           </span>
                         </td>
                         <td className={['px-4 py-3 text-right font-semibold tabular-nums',
-                          tx.type === 'income' ? 'text-emerald-400' : 'text-red-400',
+                          tx.type === 'income' ? 'text-[var(--positive)]' : 'text-[var(--danger)]',
                         ].join(' ')}>
                           {tx.type === 'income' ? '+' : '-'}{fmtDec(tx.amount)}
                         </td>
                         <td className="hidden sm:table-cell px-4 py-3 max-w-[180px]">
-                          <span className="truncate text-xs text-zinc-600">{tx.note ?? '—'}</span>
+                          <span className="truncate text-xs text-[var(--fg-subtle)]">{tx.note ?? '—'}</span>
                         </td>
                         <td className="px-4 py-3">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button onClick={() => { setEditTx(tx); setShowTxModal(true) }}
-                              className="rounded p-1 text-zinc-600 hover:text-zinc-300 transition-colors">✎</button>
+                              className="rounded p-1 text-[var(--fg-subtle)] hover:text-[var(--fg)] transition-colors">✎</button>
                             <button onClick={() => deleteTransaction(tx.id)}
-                              className="rounded p-1 text-zinc-700 hover:text-red-400 transition-colors">✕</button>
+                              className="rounded p-1 text-[var(--fg-subtle)] hover:text-[var(--danger)] transition-colors">✕</button>
                           </div>
                         </td>
                       </tr>
@@ -459,9 +459,9 @@ export function FinancePage() {
 
 type Accent = 'emerald' | 'red' | 'teal'
 const ACCENT: Record<Accent, { text: string; bg: string; border: string }> = {
-  emerald: { text: 'text-emerald-400', bg: 'bg-emerald-500/10', border: 'border-emerald-500/20' },
-  red:     { text: 'text-red-400',     bg: 'bg-red-500/10',     border: 'border-red-500/20'     },
-  teal:    { text: 'text-teal-400',    bg: 'bg-teal-500/10',    border: 'border-teal-500/20'    },
+  emerald: { text: 'text-[var(--positive)]', bg: 'bg-[var(--sage-soft)]', border: 'border-[var(--sage-soft)]' },
+  red:     { text: 'text-[var(--danger)]',     bg: 'bg-[var(--danger)]/10',     border: 'border-[var(--danger)]/20'     },
+  teal:    { text: 'text-[var(--accent)]',    bg: 'bg-[var(--terra-soft)]',    border: 'border-[var(--terra-soft)]' },
 }
 
 function SummaryCard({ label, value, sign, accent, sub }: { label: string; value: string; sign: string; accent: Accent; sub?: string }) {
@@ -470,10 +470,10 @@ function SummaryCard({ label, value, sign, accent, sub }: { label: string; value
     <div className={['rounded-2xl border p-6', cls.bg, cls.border].join(' ')}>
       <div className="mb-3 flex items-center gap-2">
         <span className={['text-lg font-bold', cls.text].join(' ')}>{sign}</span>
-        <p className="text-xs font-medium uppercase tracking-wider text-zinc-500">{label}</p>
+        <p className="text-xs font-medium uppercase tracking-wider text-[var(--fg-muted)]">{label}</p>
       </div>
       <p className={['text-3xl font-bold tabular-nums leading-none', cls.text].join(' ')}>{value}</p>
-      {sub && <p className="mt-2 text-xs tabular-nums text-zinc-600">{sub}</p>}
+      {sub && <p className="mt-2 text-xs tabular-nums text-[var(--fg-subtle)]">{sub}</p>}
     </div>
   )
 }
@@ -482,34 +482,40 @@ function SummaryCard({ label, value, sign, accent, sub }: { label: string; value
 
 type PieRow = CatEntry & { value: number }
 
-function PieSection({ title, data, total, empty }: { title: string; data: PieRow[]; total: number; empty: string }) {
+const PIE_COLORS = {
+  expense: ['#B5532A', '#8E3D1C', '#A08B72', '#C7B59A', '#DFD2B5'],
+  income:  ['#7E9A7A', '#5C7859', '#A08B72', '#C7B59A', '#DFD2B5'],
+}
+
+function PieSection({ title, data, total, empty, colorScheme }: { title: string; data: PieRow[]; total: number; empty: string; colorScheme: 'expense' | 'income' }) {
+  const colors = PIE_COLORS[colorScheme]
   if (data.length === 0) {
     return (
-      <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-        <h3 className="mb-6 text-sm font-semibold text-zinc-200">{title}</h3>
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-6">
+        <h3 className="mb-6 text-sm font-semibold text-[var(--fg)]">{title}</h3>
         <div className="flex h-36 items-center justify-center">
-          <p className="text-sm text-zinc-700">{empty}</p>
+          <p className="text-sm text-[var(--fg-subtle)]">{empty}</p>
         </div>
       </div>
     )
   }
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-6">
-      <h3 className="mb-5 text-sm font-semibold text-zinc-200">{title}</h3>
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-6">
+      <h3 className="mb-5 text-sm font-semibold text-[var(--fg)]">{title}</h3>
       <div className="flex items-center gap-6">
         <div className="h-36 w-36 shrink-0">
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie data={data} cx="50%" cy="50%" outerRadius={62} innerRadius={38} dataKey="value" paddingAngle={2}>
-                {data.map((_entry, i) => <Cell key={i} fill={data[i].color} />)}
+                {data.map((_entry, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
               </Pie>
               <Tooltip content={({ payload }) => {
                 if (!payload?.length) return null
                 const d = payload[0]?.payload as PieRow
                 return (
-                  <div className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs shadow-xl">
-                    <p className="text-zinc-400">{d.icon} {d.label}</p>
-                    <p className="mt-0.5 font-semibold text-zinc-100">{fmtDec(d.value)}</p>
+                  <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-elev)] px-3 py-2 text-xs shadow-xl">
+                    <p className="text-[var(--fg-muted)]">{d.icon} {d.label}</p>
+                    <p className="mt-0.5 font-semibold text-[var(--fg)]">{fmtDec(d.value)}</p>
                   </div>
                 )
               }} />
@@ -517,16 +523,16 @@ function PieSection({ title, data, total, empty }: { title: string; data: PieRow
           </ResponsiveContainer>
         </div>
         <div className="min-w-0 flex-1 space-y-2">
-          {data.map((item) => (
+          {data.map((item, i) => (
             <div key={item.key} className="flex items-center gap-2 text-xs">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: item.color }} />
-              <span className="min-w-0 truncate text-zinc-400">{item.icon} {item.label}</span>
-              <span className="ml-auto shrink-0 font-semibold tabular-nums text-zinc-300">{fmtDec(item.value)}</span>
+              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
+              <span className="min-w-0 truncate text-[var(--fg-muted)]">{item.icon} {item.label}</span>
+              <span className="ml-auto shrink-0 font-semibold tabular-nums text-[var(--fg)]">{fmtDec(item.value)}</span>
             </div>
           ))}
-          <div className="border-t border-zinc-800 pt-2 flex justify-between text-xs">
-            <span className="text-zinc-600">Total</span>
-            <span className="font-semibold text-zinc-200">{fmtDec(total)}</span>
+          <div className="border-t border-[var(--border)] pt-2 flex justify-between text-xs">
+            <span className="text-[var(--fg-subtle)]">Total</span>
+            <span className="font-semibold text-[var(--fg)]">{fmtDec(total)}</span>
           </div>
         </div>
       </div>
@@ -556,13 +562,13 @@ function ContextLine({ month, monthTx, categoryBudgets, financeCategories }: {
   const tempsPct    = daysInMonth > 0 ? (daysElapsed / daysInMonth) * 100 : 0
   const depensePct  = totalBudget > 0 ? (totalExpense / totalBudget) * 100 : null
 
-  let rythmeCls = 'text-emerald-400'
+  let rythmeCls = 'text-[var(--positive)]'
   let rythmeMsg = ''
   if (depensePct !== null && totalBudget > 0) {
     rythmeMsg = `${Math.round(depensePct)}% du budget dépensé en ${Math.round(tempsPct)}% du mois`
-    if (depensePct > tempsPct * 1.4) rythmeCls = 'text-red-400'
+    if (depensePct > tempsPct * 1.4) rythmeCls = 'text-[var(--danger)]'
     else if (depensePct > tempsPct * 1.1) rythmeCls = 'text-amber-400'
-    else rythmeCls = 'text-emerald-400'
+    else rythmeCls = 'text-[var(--positive)]'
   }
 
   // Épargne projetée
@@ -582,7 +588,7 @@ function ContextLine({ month, monthTx, categoryBudgets, financeCategories }: {
   if (!rythmeMsg && epargneProjete === null && !worstCat) return null
 
   return (
-    <div className="flex flex-wrap items-start gap-x-8 gap-y-2 rounded-xl border border-zinc-800/60 bg-zinc-900/30 px-5 py-3">
+    <div className="flex flex-wrap items-start gap-x-8 gap-y-2 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-5 py-3">
       {/* Rythme */}
       {rythmeMsg && (
         <p className={`text-xs ${rythmeCls}`}>{rythmeMsg}</p>
@@ -590,14 +596,14 @@ function ContextLine({ month, monthTx, categoryBudgets, financeCategories }: {
 
       {/* Épargne projetée */}
       {epargneProjete !== null && (
-        <p className={`text-xs ${epargneProjete >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+        <p className={`text-xs ${epargneProjete >= 0 ? 'text-[var(--positive)]' : 'text-[var(--danger)]'}`}>
           Épargne estimée ce mois : {epargneProjete >= 0 ? '+' : ''}{fmtDec(epargneProjete)}
         </p>
       )}
 
       {/* Alerte catégorie */}
       {worstCat && (
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-[var(--fg-muted)]">
           Attention : {catMeta(worstCat.id).label} à {Math.round(worstCat.pct)}% du budget
         </p>
       )}
@@ -625,32 +631,32 @@ function SavingsConsolidated({ goals }: { goals: SavingsGoal[] }) {
     }, 0)
 
   return (
-    <div className="rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+    <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="flex items-center gap-6 text-sm">
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-zinc-600 mb-0.5">Total visé</p>
-            <p className="font-semibold text-zinc-200">{fmt(totalTarget)}</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-subtle)] mb-0.5">Total visé</p>
+            <p className="font-semibold text-[var(--fg)]">{fmt(totalTarget)}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-zinc-600 mb-0.5">Total épargné</p>
-            <p className="font-semibold text-emerald-400">{fmt(totalSaved)}</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-subtle)] mb-0.5">Total épargné</p>
+            <p className="font-semibold text-[var(--positive)]">{fmt(totalSaved)}</p>
           </div>
           <div>
-            <p className="text-[10px] uppercase tracking-wide text-zinc-600 mb-0.5">Progression</p>
-            <p className="font-semibold text-zinc-200">{globalPct}%</p>
+            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-subtle)] mb-0.5">Progression</p>
+            <p className="font-semibold text-[var(--fg)]">{globalPct}%</p>
           </div>
         </div>
         {totalContribNeeded > 0 && (
-          <p className="text-xs text-zinc-500 self-end">
+          <p className="text-xs text-[var(--fg-muted)] self-end">
             Pour être dans les temps, épargner{' '}
-            <span className="font-semibold text-zinc-300">{fmt(totalContribNeeded)}/mois</span>
+            <span className="font-semibold text-[var(--fg)]">{fmt(totalContribNeeded)}/mois</span>
           </p>
         )}
       </div>
       {/* Progress bar */}
-      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-        <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${globalPct}%` }} />
+      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[var(--paper-3)]">
+        <div className="h-full rounded-full bg-[var(--positive)] transition-all duration-700" style={{ width: `${globalPct}%` }} />
       </div>
     </div>
   )
@@ -698,29 +704,29 @@ function SavingsCard({ goal, onEdit, onContribute }: {
     a_accelerer:    'À accélérer',
   }
   const STATUS_CLS: Record<GoalStatus, string> = {
-    achieved:      'bg-emerald-500/15 text-emerald-400',
-    en_pause:      'bg-zinc-700/40 text-zinc-500',
-    en_bonne_voie: 'bg-teal-500/15 text-teal-400',
+    achieved:      'bg-[var(--sage-soft)] text-[var(--positive)]',
+    en_pause:      'bg-[var(--paper-3)] text-[var(--fg-muted)]',
+    en_bonne_voie: 'bg-[var(--terra-soft)] text-[var(--accent)]',
     a_accelerer:   'bg-amber-500/15 text-amber-400',
   }
 
   return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/40 p-5">
+    <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-5">
 
       {/* Header */}
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight text-zinc-200 truncate">{goal.title}</p>
-          <p className="mt-0.5 text-xl font-bold tabular-nums text-zinc-100">{fmtDec(goal.targetAmount)}</p>
+          <p className="text-sm font-semibold leading-tight text-[var(--fg)] truncate">{goal.title}</p>
+          <p className="mt-0.5 text-xl font-bold tabular-nums text-[var(--fg)]">{fmtDec(goal.targetAmount)}</p>
         </div>
         <div className="flex shrink-0 items-center gap-1">
           <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_CLS[status]}`}>
             {STATUS_LABELS[status]}
           </span>
-          <button onClick={onEdit} className="rounded p-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors" title="Modifier">✎</button>
+          <button onClick={onEdit} className="rounded p-1 text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors" title="Modifier">✎</button>
           {confirmDel
-            ? <button onClick={() => deleteSavingsGoal(goal.id)} className="rounded px-1.5 py-0.5 text-[10px] text-red-400 hover:text-red-300 transition-colors">Confirmer</button>
-            : <button onClick={() => setConfirmDel(true)} className="rounded p-1 text-xs text-zinc-700 hover:text-red-400 transition-colors" title="Supprimer">✕</button>
+            ? <button onClick={() => deleteSavingsGoal(goal.id)} className="rounded px-1.5 py-0.5 text-[10px] text-[var(--danger)] hover:text-[var(--danger)] transition-colors">Confirmer</button>
+            : <button onClick={() => setConfirmDel(true)} className="rounded p-1 text-xs text-[var(--fg-subtle)] hover:text-[var(--danger)] transition-colors" title="Supprimer">✕</button>
           }
         </div>
       </div>
@@ -728,11 +734,11 @@ function SavingsCard({ goal, onEdit, onContribute }: {
       {/* Progress */}
       <div>
         <div className="mb-1.5 flex items-end justify-between text-xs">
-          <span className="font-semibold text-emerald-400 tabular-nums">{fmtDec(goal.currentAmount)}</span>
-          <span className="text-zinc-500 tabular-nums">/ {fmtDec(goal.targetAmount)}</span>
+          <span className="font-semibold text-[var(--positive)] tabular-nums">{fmtDec(goal.currentAmount)}</span>
+          <span className="text-[var(--fg-muted)] tabular-nums">/ {fmtDec(goal.targetAmount)}</span>
         </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-          <div className="h-full rounded-full bg-emerald-500 transition-all duration-700" style={{ width: `${pct}%` }} />
+        <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--paper-3)]">
+          <div className="h-full rounded-full bg-[var(--positive)] transition-all duration-700" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
@@ -740,25 +746,25 @@ function SavingsCard({ goal, onEdit, onContribute }: {
       <div className="space-y-1.5 text-xs">
         {goal.targetDate && (
           <div className="flex items-center justify-between">
-            <span className="text-zinc-500">Date cible</span>
-            <span className="text-zinc-400">
+            <span className="text-[var(--fg-muted)]">Date cible</span>
+            <span className="text-[var(--fg-muted)]">
               {new Date(goal.targetDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
               {monthsLeft !== null && monthsLeft > 0 && (
-                <span className="ml-1 text-zinc-600">({monthsLeft} mois)</span>
+                <span className="ml-1 text-[var(--fg-subtle)]">({monthsLeft} mois)</span>
               )}
             </span>
           </div>
         )}
         <div className="flex items-center justify-between">
           {achieved ? (
-            <span className="text-emerald-400 font-medium">Objectif atteint !</span>
+            <span className="text-[var(--positive)] font-medium">Objectif atteint !</span>
           ) : contribNeeded !== null ? (
             <>
-              <span className="text-zinc-500">À épargner / mois</span>
-              <span className="font-semibold text-zinc-200 tabular-nums">{fmt(contribNeeded)}</span>
+              <span className="text-[var(--fg-muted)]">À épargner / mois</span>
+              <span className="font-semibold text-[var(--fg)] tabular-nums">{fmt(contribNeeded)}</span>
             </>
           ) : !goal.targetDate ? (
-            <span className="text-zinc-600">Aucune date cible définie</span>
+            <span className="text-[var(--fg-subtle)]">Aucune date cible définie</span>
           ) : null}
         </div>
       </div>
@@ -766,13 +772,13 @@ function SavingsCard({ goal, onEdit, onContribute }: {
       {/* Footer actions */}
       <div className="mt-auto flex items-center gap-2">
         <button onClick={onContribute}
-          className="flex-1 rounded-xl border border-emerald-500/20 bg-emerald-500/10 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/20 transition-colors">
+          className="flex-1 rounded-xl border border-[var(--sage-soft)] bg-[var(--sage-soft)] py-2 text-xs font-medium text-[var(--positive)] hover:bg-[var(--sage-soft)] transition-colors">
           + Contribuer
         </button>
         {!achieved && (
           <button
             onClick={() => updateSavingsGoal(goal.id, { paused: !goal.paused })}
-            className="rounded-xl border border-zinc-800 bg-zinc-900 px-3 py-2 text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+            className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-2 text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors"
             title={goal.paused ? 'Reprendre' : 'Mettre en pause'}
           >
             {goal.paused ? '▶' : '⏸'}
@@ -791,10 +797,10 @@ function Modal({ onClose, title, maxW, children }: {
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={['w-full rounded-2xl border border-zinc-700/60 bg-zinc-900 shadow-2xl', maxW].join(' ')}>
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-          <h2 className="text-sm font-semibold text-zinc-200">{title}</h2>
-          <button onClick={onClose} className="leading-none text-zinc-600 hover:text-zinc-300 transition-colors">✕</button>
+      <div className={['w-full rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] shadow-2xl', maxW].join(' ')}>
+        <div className="flex items-center justify-between border-b border-[var(--border)] px-5 py-4">
+          <h2 className="text-sm font-semibold text-[var(--fg)]">{title}</h2>
+          <button onClick={onClose} className="leading-none text-[var(--fg-subtle)] hover:text-[var(--fg)] transition-colors">✕</button>
         </div>
         {children}
       </div>
@@ -806,9 +812,9 @@ function ModalActions({ onClose, disabled, label }: { onClose: () => void; disab
   return (
     <div className="flex justify-end gap-2 pt-1">
       <button type="button" onClick={onClose}
-        className="rounded-xl px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 transition-colors">Annuler</button>
+        className="rounded-xl px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] transition-colors">Annuler</button>
       <button type="submit" disabled={disabled}
-        className="rounded-xl bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white transition-colors disabled:opacity-40">
+        className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40">
         {label}
       </button>
     </div>
@@ -853,8 +859,8 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
             <button key={t} type="button" onClick={() => setType(t)}
               className={['rounded-xl border py-2.5 text-sm font-medium transition-all',
                 type === t
-                  ? t === 'expense' ? 'border-red-500/40 bg-red-500/15 text-red-400' : 'border-emerald-500/40 bg-emerald-500/15 text-emerald-400'
-                  : 'border-zinc-800 text-zinc-500 hover:border-zinc-700',
+                  ? t === 'expense' ? 'border-[var(--danger)]/40 bg-[var(--danger)]/10 text-[var(--danger)]' : 'border-[var(--sage-soft)] bg-[var(--sage-soft)] text-[var(--positive)]'
+                  : 'border-[var(--border)] text-[var(--fg-muted)] hover:border-[var(--border-strong)]',
               ].join(' ')}>
               {t === 'expense' ? '↓ Dépense' : '↑ Revenu'}
             </button>
@@ -864,26 +870,26 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
         {/* Amount + Date */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-500">Montant (€)</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Montant (€)</label>
             <input type="number" min="0.01" step="0.01" value={amount}
               onChange={(e) => setAmount(e.target.value)} placeholder="0.00" required autoFocus
-              className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-500">Date</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Date</label>
             <input type="date" value={date} onChange={(e) => setDate(e.target.value)} required
-              className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-zinc-600 transition-colors [color-scheme:dark]" />
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] outline-none focus:border-[var(--border-strong)] transition-colors [color-scheme:light]" />
           </div>
         </div>
 
         {/* Category */}
         <div>
-          <label className="mb-2 block text-xs font-medium text-zinc-500">Catégorie</label>
+          <label className="mb-2 block text-xs font-medium text-[var(--fg-muted)]">Catégorie</label>
           <div className="grid grid-cols-4 gap-2 sm:grid-cols-6 lg:grid-cols-7">
             {cats.map((cat) => (
               <button key={cat.id} type="button" onClick={() => setCategory(cat.id)}
                 className={['flex w-full overflow-hidden flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all',
-                  validCat === cat.id ? 'border-teal-500/40 bg-teal-500/10 text-teal-300' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700',
+                  validCat === cat.id ? 'border-[var(--terra-soft)] bg-[var(--terra-soft)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--fg-muted)] hover:border-[var(--border-strong)]',
                 ].join(' ')}>
                 <span className="text-xl leading-none shrink-0">{cat.icon}</span>
                 <span className="text-[10px] truncate w-full text-center leading-tight">{cat.name}</span>
@@ -894,9 +900,9 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
 
         {/* Note */}
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-zinc-500">Note (optionnel)</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Note (optionnel)</label>
           <textarea value={note} onChange={(e) => setNote(e.target.value)} placeholder="Ajouter une note…" rows={2}
-            className="w-full resize-none rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-300 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+            className="w-full resize-none rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
         </div>
 
         <ModalActions onClose={onClose} disabled={!validCat || !amount} label={tx ? 'Enregistrer' : 'Ajouter'} />
@@ -930,28 +936,28 @@ function BudgetModal({ category, current, onClose }: { category: string; current
   return (
     <Modal onClose={onClose} title={`Budget — ${cat.label}`} maxW="max-w-sm">
       <form onSubmit={handleSubmit} className="space-y-4 p-5">
-        <div className="flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-800/40 px-4 py-3">
+        <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-4 py-3">
           <span className="text-2xl">{cat.icon}</span>
-          <p className="text-sm text-zinc-400">Budget mensuel pour <span className="font-medium text-zinc-200">{cat.label}</span></p>
+          <p className="text-sm text-[var(--fg-muted)]">Budget mensuel pour <span className="font-medium text-[var(--fg)]">{cat.label}</span></p>
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-zinc-500">Montant (€ / mois)</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Montant (€ / mois)</label>
           <input type="number" min="1" step="1" value={amount} onChange={(e) => setAmount(e.target.value)}
             placeholder="ex: 500" autoFocus
-            className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
         </div>
         <div className="flex items-center gap-2">
           {current > 0 && (
             <button type="button" onClick={() => { deleteCategoryBudget(category); onClose() }}
-              className="text-xs text-red-500/70 hover:text-red-400 transition-colors">
+              className="text-xs text-[var(--danger)]/70 hover:text-[var(--danger)] transition-colors">
               Supprimer le budget
             </button>
           )}
           <div className="ml-auto flex gap-2">
             <button type="button" onClick={onClose}
-              className="rounded-xl px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 transition-colors">Annuler</button>
+              className="rounded-xl px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] transition-colors">Annuler</button>
             <button type="submit" disabled={!amount}
-              className="rounded-xl bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white transition-colors disabled:opacity-40">
+              className="rounded-full bg-[var(--accent)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40">
               Enregistrer
             </button>
           </div>
@@ -994,27 +1000,27 @@ function SavingsGoalModal({ goal, onClose }: { goal?: SavingsGoal; onClose: () =
     <Modal onClose={onClose} title={goal ? "Modifier l'objectif" : "Nouvel objectif d'épargne"} maxW="max-w-sm">
       <form onSubmit={handleSubmit} className="space-y-4 p-5">
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-zinc-500">Titre</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Titre</label>
           <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
             placeholder="Vacances, Voiture, Fond d'urgence…" required autoFocus
-            className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-500">Objectif (€)</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Objectif (€)</label>
             <input type="number" min="1" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="5 000" required
-              className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-zinc-500">Déjà épargné (€)</label>
+            <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Déjà épargné (€)</label>
             <input type="number" min="0" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="0"
-              className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+              className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
           </div>
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-zinc-500">Date cible (optionnel)</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Date cible (optionnel)</label>
           <input type="month" value={targetDate} onChange={(e) => setTargetDate(e.target.value)}
-            className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-200 outline-none focus:border-zinc-600 transition-colors [color-scheme:dark]" />
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] outline-none focus:border-[var(--border-strong)] transition-colors [color-scheme:light]" />
         </div>
         <ModalActions onClose={onClose} disabled={!title.trim() || !target} label={goal ? 'Enregistrer' : 'Créer'} />
       </form>
@@ -1045,21 +1051,21 @@ function ContributeModal({ goal, onClose }: { goal: SavingsGoal; onClose: () => 
   return (
     <Modal onClose={onClose} title="Contribuer à l'objectif" maxW="max-w-sm">
       <form onSubmit={handleSubmit} className="space-y-4 p-5">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-800/40 px-4 py-3">
-          <p className="text-sm font-medium text-zinc-200">{goal.title}</p>
-          <p className="mt-0.5 text-xs text-zinc-500">{fmtDec(remaining)} restants pour atteindre l'objectif</p>
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-4 py-3">
+          <p className="text-sm font-medium text-[var(--fg)]">{goal.title}</p>
+          <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{fmtDec(remaining)} restants pour atteindre l'objectif</p>
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-zinc-500">Montant à ajouter (€)</label>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Montant à ajouter (€)</label>
           <input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)}
             placeholder="100" required autoFocus
-            className="w-full rounded-xl border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-600 transition-colors" />
+            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
         </div>
         <div className="flex justify-end gap-2">
           <button type="button" onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 transition-colors">Annuler</button>
+            className="rounded-xl px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] transition-colors">Annuler</button>
           <button type="submit" disabled={!amount || parseFloat(amount) <= 0}
-            className="rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-emerald-400 transition-colors disabled:opacity-40">
+            className="rounded-xl bg-[var(--positive)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--positive-hover)] transition-colors disabled:opacity-40">
             Contribuer
           </button>
         </div>
@@ -1258,11 +1264,11 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
     return (
       <Modal onClose={onClose} title="Import terminé" maxW="max-w-sm">
         <div className="flex flex-col items-center gap-4 p-8 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500/15 text-2xl text-teal-400">✓</div>
-          <p className="text-sm font-medium text-zinc-200">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--terra-soft)] text-2xl text-[var(--accent)]">✓</div>
+          <p className="text-sm font-medium text-[var(--fg)]">
             {done} transaction{done > 1 ? 's' : ''} importée{done > 1 ? 's' : ''} avec succès
           </p>
-          <button onClick={onClose} className="rounded-xl bg-zinc-100 px-6 py-2 text-sm font-medium text-zinc-900 hover:bg-white transition-colors">
+          <button onClick={onClose} className="rounded-full bg-[var(--accent)] px-6 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] transition-colors">
             Voir les transactions
           </button>
         </div>
@@ -1280,12 +1286,12 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
               ⚠ {dupCount} transaction{dupCount > 1 ? 's semblent' : ' semble'} déjà exister (même date + montant + description).
             </div>
           )}
-          <div className="overflow-y-auto flex-1 mx-5 mt-4 rounded-xl border border-zinc-800">
+          <div className="overflow-y-auto flex-1 mx-5 mt-4 rounded-xl border border-[var(--border)]">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-zinc-900 border-b border-zinc-800">
-                <tr className="text-[10px] uppercase tracking-wider text-zinc-600">
+              <thead className="sticky top-0 bg-[var(--bg-elev)] border-b border-[var(--border)]">
+                <tr className="text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">
                   <th className="px-3 py-2.5 text-left">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-teal-500 cursor-pointer" />
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-[var(--accent)] cursor-pointer" />
                   </th>
                   <th className="px-3 py-2.5 text-left">Date</th>
                   <th className="px-3 py-2.5 text-left">Description</th>
@@ -1293,25 +1299,25 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
                   <th className="px-3 py-2.5 text-left">Catégorie</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-[var(--border)]">
                 {rows.map((row) => {
                   const typeCats = financeCategories.filter((c) => c.type === row.type)
                   return (
                     <tr key={row.id} className={['transition-colors', !row.selected ? 'opacity-40' : row.duplicate ? 'bg-amber-500/5' : ''].join(' ')}>
                       <td className="px-3 py-2">
-                        <input type="checkbox" checked={row.selected} onChange={() => toggle(row.id)} className="accent-teal-500 cursor-pointer" />
+                        <input type="checkbox" checked={row.selected} onChange={() => toggle(row.id)} className="accent-[var(--accent)] cursor-pointer" />
                       </td>
-                      <td className="px-3 py-2 tabular-nums text-zinc-400 whitespace-nowrap">{row.date}</td>
+                      <td className="px-3 py-2 tabular-nums text-[var(--fg-muted)] whitespace-nowrap">{row.date}</td>
                       <td className="px-3 py-2 max-w-[200px]">
-                        <span className="block truncate text-zinc-300">{row.description || '—'}</span>
+                        <span className="block truncate text-[var(--fg)]">{row.description || '—'}</span>
                         {row.duplicate && <span className="text-[9px] text-amber-500">doublon possible</span>}
                       </td>
-                      <td className={['px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap', row.type === 'income' ? 'text-emerald-400' : 'text-red-400'].join(' ')}>
+                      <td className={['px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap', row.type === 'income' ? 'text-[var(--positive)]' : 'text-[var(--danger)]'].join(' ')}>
                         {row.type === 'income' ? '+' : '−'}{fmtDec(row.amount)}
                       </td>
                       <td className="px-3 py-2">
                         <select value={row.category} onChange={(e) => setCat(row.id, e.target.value)}
-                          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300 outline-none">
+                          className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--paper-3)] px-2 py-1 text-xs text-[var(--fg)] outline-none">
                           {typeCats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                           {typeCats.length === 0 && <option value="">—</option>}
                         </select>
@@ -1323,11 +1329,11 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
             </table>
           </div>
           <div className="flex items-center justify-between gap-3 p-5 pt-4">
-            <p className="text-xs text-zinc-600">{selectedCount} / {rows.length} sélectionnée{selectedCount > 1 ? 's' : ''}</p>
+            <p className="text-xs text-[var(--fg-subtle)]">{selectedCount} / {rows.length} sélectionnée{selectedCount > 1 ? 's' : ''}</p>
             <div className="flex gap-2">
-              <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 transition-colors">Annuler</button>
+              <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] transition-colors">Annuler</button>
               <button onClick={handleImport} disabled={selectedCount === 0}
-                className="rounded-xl bg-teal-500 px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-teal-400 transition-colors disabled:opacity-40">
+                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40">
                 Importer {selectedCount > 0 ? selectedCount : ''} transaction{selectedCount > 1 ? 's' : ''}
               </button>
             </div>
@@ -1346,30 +1352,30 @@ function CSVImportModal({ onClose }: { onClose: () => void }) {
           onDrop={handleDrop}
           onClick={() => fileRef.current?.click()}
           className={['flex cursor-pointer flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed py-12 transition-colors',
-            dragging ? 'border-teal-500/60 bg-teal-500/5' : 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/30',
+            dragging ? 'border-[var(--accent)]/60 bg-[var(--paper-2)]' : 'border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:bg-[var(--paper-2)]',
           ].join(' ')}
         >
-          <svg className="h-8 w-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+          <svg className="h-8 w-8 text-[var(--fg-subtle)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m6.75 12l-3-3m0 0l-3 3m3-3v6m-1.5-15H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
           </svg>
           <div className="text-center">
-            <p className="text-sm font-medium text-zinc-300">Déposer un fichier CSV</p>
-            <p className="mt-1 text-xs text-zinc-600">ou cliquer pour sélectionner</p>
+            <p className="text-sm font-medium text-[var(--fg)]">Déposer un fichier CSV</p>
+            <p className="mt-1 text-xs text-[var(--fg-subtle)]">ou cliquer pour sélectionner</p>
           </div>
           <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden"
             onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
         </div>
         {error && (
-          <p className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">{error}</p>
+          <p className="rounded-xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-2.5 text-xs text-[var(--danger)]">{error}</p>
         )}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">Formats acceptés</p>
-          <div className="font-mono text-[10px] leading-relaxed text-zinc-700 space-y-0.5">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-[var(--fg-subtle)]">Formats acceptés</p>
+          <div className="font-mono text-[10px] leading-relaxed text-[var(--fg-subtle)] space-y-0.5">
             <p>Date;Description;Montant</p>
             <p>Date;Libellé;Débit;Crédit</p>
             <p>Date,Description,Amount</p>
             <p>Booking Date,Partner Name,Amount (EUR)</p>
-            <p className="text-zinc-800">Séparateurs : ; , | tab · Encodage : UTF-8</p>
+            <p className="text-[var(--fg-subtle)]">Séparateurs : ; , | tab · Encodage : UTF-8</p>
           </div>
         </div>
       </div>
@@ -1527,11 +1533,11 @@ function PDFImportModal({ onClose }: { onClose: () => void }) {
     return (
       <Modal onClose={onClose} title="Import terminé" maxW="max-w-sm">
         <div className="flex flex-col items-center gap-4 p-8 text-center">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-500/15 text-2xl text-teal-400">✓</div>
-          <p className="text-sm font-medium text-zinc-200">
+          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--terra-soft)] text-2xl text-[var(--accent)]">✓</div>
+          <p className="text-sm font-medium text-[var(--fg)]">
             {done} transaction{done > 1 ? 's' : ''} importée{done > 1 ? 's' : ''} avec succès
           </p>
-          <button onClick={onClose} className="rounded-xl bg-zinc-100 px-6 py-2 text-sm font-medium text-zinc-900 hover:bg-white transition-colors">
+          <button onClick={onClose} className="rounded-full bg-[var(--accent)] px-6 py-2 text-sm font-medium text-white hover:bg-[var(--accent-hover)] transition-colors">
             Voir les transactions
           </button>
         </div>
@@ -1544,15 +1550,15 @@ function PDFImportModal({ onClose }: { onClose: () => void }) {
     return (
       <Modal onClose={onClose} title={`Aperçu PDF — ${rows.length} transaction${rows.length > 1 ? 's' : ''} détectée${rows.length > 1 ? 's' : ''}`} maxW="max-w-3xl">
         <div className="flex flex-col" style={{ maxHeight: '70vh' }}>
-          <div className="mx-5 mt-4 rounded-xl border border-zinc-800 bg-zinc-900/40 px-4 py-2.5 text-xs text-zinc-500">
+          <div className="mx-5 mt-4 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-4 py-2.5 text-xs text-[var(--fg-muted)]">
             ℹ Résultats best-effort — vérifiez et corrigez avant d'importer.
           </div>
-          <div className="overflow-y-auto flex-1 mx-5 mt-3 rounded-xl border border-zinc-800">
+          <div className="overflow-y-auto flex-1 mx-5 mt-3 rounded-xl border border-[var(--border)]">
             <table className="w-full text-xs">
-              <thead className="sticky top-0 bg-zinc-900 border-b border-zinc-800">
-                <tr className="text-[10px] uppercase tracking-wider text-zinc-600">
+              <thead className="sticky top-0 bg-[var(--bg-elev)] border-b border-[var(--border)]">
+                <tr className="text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">
                   <th className="px-3 py-2.5 text-left">
-                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-teal-500 cursor-pointer" />
+                    <input type="checkbox" checked={allSelected} onChange={toggleAll} className="accent-[var(--accent)] cursor-pointer" />
                   </th>
                   <th className="px-3 py-2.5 text-left">Date</th>
                   <th className="px-3 py-2.5 text-left">Description</th>
@@ -1560,24 +1566,24 @@ function PDFImportModal({ onClose }: { onClose: () => void }) {
                   <th className="px-3 py-2.5 text-left">Catégorie</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-zinc-800/60">
+              <tbody className="divide-y divide-[var(--border)]">
                 {rows.map((row) => {
                   const typeCats = financeCategories.filter((c) => c.type === row.type)
                   return (
                     <tr key={row.id} className={['transition-colors', !row.selected ? 'opacity-40' : ''].join(' ')}>
                       <td className="px-3 py-2">
-                        <input type="checkbox" checked={row.selected} onChange={() => toggle(row.id)} className="accent-teal-500 cursor-pointer" />
+                        <input type="checkbox" checked={row.selected} onChange={() => toggle(row.id)} className="accent-[var(--accent)] cursor-pointer" />
                       </td>
-                      <td className="px-3 py-2 tabular-nums text-zinc-400 whitespace-nowrap">{row.date}</td>
+                      <td className="px-3 py-2 tabular-nums text-[var(--fg-muted)] whitespace-nowrap">{row.date}</td>
                       <td className="px-3 py-2 max-w-[200px]">
-                        <span className="block truncate text-zinc-300">{row.description || '—'}</span>
+                        <span className="block truncate text-[var(--fg)]">{row.description || '—'}</span>
                       </td>
-                      <td className={['px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap', row.type === 'income' ? 'text-emerald-400' : 'text-red-400'].join(' ')}>
+                      <td className={['px-3 py-2 text-right font-semibold tabular-nums whitespace-nowrap', row.type === 'income' ? 'text-[var(--positive)]' : 'text-[var(--danger)]'].join(' ')}>
                         {row.type === 'income' ? '+' : '−'}{fmtDec(row.amount)}
                       </td>
                       <td className="px-3 py-2">
                         <select value={row.category} onChange={(e) => setCat(row.id, e.target.value)}
-                          className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-2 py-1 text-xs text-zinc-300 outline-none">
+                          className="w-full rounded-lg border border-[var(--border-strong)] bg-[var(--paper-3)] px-2 py-1 text-xs text-[var(--fg)] outline-none">
                           {typeCats.map((c) => <option key={c.id} value={c.id}>{c.icon} {c.name}</option>)}
                           {typeCats.length === 0 && <option value="">—</option>}
                         </select>
@@ -1589,15 +1595,15 @@ function PDFImportModal({ onClose }: { onClose: () => void }) {
             </table>
           </div>
           <div className="flex items-center justify-between gap-3 p-5 pt-4">
-            <p className="text-xs text-zinc-600">{selectedCount} / {rows.length} sélectionnée{selectedCount > 1 ? 's' : ''}</p>
+            <p className="text-xs text-[var(--fg-subtle)]">{selectedCount} / {rows.length} sélectionnée{selectedCount > 1 ? 's' : ''}</p>
             <div className="flex gap-2">
               <button onClick={() => downloadCsvFromRows(rows)} disabled={selectedCount === 0}
-                className="flex items-center gap-1.5 rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors disabled:opacity-40">
+                className="flex items-center gap-1.5 rounded-xl border border-[var(--border-strong)] px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors disabled:opacity-40">
                 ↓ CSV
               </button>
-              <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 transition-colors">Annuler</button>
+              <button onClick={onClose} className="rounded-xl px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] transition-colors">Annuler</button>
               <button onClick={handleImport} disabled={selectedCount === 0}
-                className="rounded-xl bg-teal-500 px-5 py-2 text-sm font-semibold text-zinc-950 hover:bg-teal-400 transition-colors disabled:opacity-40">
+                className="rounded-xl bg-[var(--accent)] px-5 py-2 text-sm font-semibold text-white hover:bg-[var(--accent-hover)] transition-colors disabled:opacity-40">
                 Importer {selectedCount > 0 ? selectedCount : ''} transaction{selectedCount > 1 ? 's' : ''}
               </button>
             </div>
@@ -1616,27 +1622,27 @@ function PDFImportModal({ onClose }: { onClose: () => void }) {
           onDrop={handleDrop}
           onClick={() => !loading && fileRef.current?.click()}
           className={['flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed py-12 transition-colors',
-            loading ? 'border-zinc-800 cursor-default' :
-            dragging ? 'border-teal-500/60 bg-teal-500/5 cursor-copy' : 'border-zinc-700 hover:border-zinc-600 hover:bg-zinc-800/30 cursor-pointer',
+            loading ? 'border-[var(--border)] cursor-default' :
+            dragging ? 'border-[var(--accent)]/60 bg-[var(--paper-2)] cursor-copy' : 'border-[var(--border-strong)] hover:border-[var(--border-strong)] hover:bg-[var(--paper-2)] cursor-pointer',
           ].join(' ')}
         >
           {loading ? (
             <>
               <div className="flex gap-1.5">
                 {[0, 1, 2].map((i) => (
-                  <span key={i} className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
+                  <span key={i} className="h-1.5 w-1.5 rounded-full bg-[var(--accent)] animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
                 ))}
               </div>
-              <p className="text-xs text-zinc-500">Analyse du PDF en cours…</p>
+              <p className="text-xs text-[var(--fg-muted)]">Analyse du PDF en cours…</p>
             </>
           ) : (
             <>
-              <svg className="h-8 w-8 text-zinc-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+              <svg className="h-8 w-8 text-[var(--fg-subtle)]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m.75 12l3 3m0 0l3-3m-3 3v-6m-1.5-9H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
               </svg>
               <div className="text-center">
-                <p className="text-sm font-medium text-zinc-300">Déposer un relevé PDF</p>
-                <p className="mt-1 text-xs text-zinc-600">ou cliquer pour sélectionner</p>
+                <p className="text-sm font-medium text-[var(--fg)]">Déposer un relevé PDF</p>
+                <p className="mt-1 text-xs text-[var(--fg-subtle)]">ou cliquer pour sélectionner</p>
               </div>
               <input ref={fileRef} type="file" accept=".pdf,application/pdf" className="hidden"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
@@ -1644,11 +1650,11 @@ function PDFImportModal({ onClose }: { onClose: () => void }) {
           )}
         </div>
         {error && (
-          <p className="rounded-xl border border-red-500/25 bg-red-500/10 px-4 py-2.5 text-xs text-red-400">{error}</p>
+          <p className="rounded-xl border border-[var(--danger)]/20 bg-[var(--danger)]/10 px-4 py-2.5 text-xs text-[var(--danger)]">{error}</p>
         )}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900/40 p-4 space-y-2">
-          <p className="text-xs font-medium uppercase tracking-wider text-zinc-600">Comment ça marche</p>
-          <ul className="space-y-1 text-[11px] text-zinc-600 leading-relaxed">
+        <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 space-y-2">
+          <p className="text-xs font-medium uppercase tracking-wider text-[var(--fg-subtle)]">Comment ça marche</p>
+          <ul className="space-y-1 text-[11px] text-[var(--fg-subtle)] leading-relaxed">
             <li>• Extrait le texte du PDF (relevés bancaires numériques uniquement)</li>
             <li>• Détecte les lignes Date + Libellé + Montant</li>
             <li>• Résultats best-effort — corrigez les erreurs avant d'importer</li>
