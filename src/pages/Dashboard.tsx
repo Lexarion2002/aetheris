@@ -1,20 +1,35 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ArrowUpRight, Landmark } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
-import type { LawState } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
-import type { CareerState } from '../store/careerStore'
 import { useWritingStore } from '../store/writingStore'
-import type { WritingState } from '../store/writingStore'
 import { usePomodoroStore } from '../store/pomodoroStore'
 import { useMusicStore } from '../store/musicStore'
-import type { MusicState } from '../store/musicStore'
+import { useSportStore } from '../store/sportStore'
+import { useBookStore } from '../store/bookStore'
+import { useFilmSerieStore } from '../store/filmSerieStore'
+import { useShoppingStore } from '../store/shoppingStore'
 import { AddDomainModal } from '../components/AddDomainModal'
-import { Landmark, Music } from 'lucide-react'
 import { getDomainIcon } from '../utils/domainColors'
-import { useState } from 'react'
 import type { Domain, Task, Transaction, SavingsGoal } from '../types'
+
+// ─── Locale ───────────────────────────────────────────────────────────────────
+
+const MONTHS = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+const DAYS   = ['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi']
+const cap    = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
+const fmtEur = (n: number) =>
+  new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
+
+function getWeekNumber(d: Date): number {
+  const date   = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
+  const dayNum = date.getUTCDay() || 7
+  date.setUTCDate(date.getUTCDate() + 4 - dayNum)
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
+  return Math.ceil((((date.getTime() - yearStart.getTime()) / 86400000) + 1) / 7)
+}
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -22,60 +37,42 @@ const daysUntil = (iso: string | null | undefined): number | null => {
   if (!iso) return null
   return Math.ceil((new Date(iso).getTime() - Date.now()) / 86400000)
 }
-
-const todayStr = () => new Date().toISOString().split('T')[0]
-
-const fmtShortDate = (iso: string) =>
+const todayStr   = () => new Date().toISOString().split('T')[0]
+const weekAgoStr = () => { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString().split('T')[0] }
+const fmtDate    = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-function truncateWords(text: string, max: number): string {
+function trunc(text: string, max: number): string {
   const words = text.trim().split(/\s+/)
-  if (words.length <= max) return text
-  return words.slice(0, max).join(' ') + '…'
+  return words.length <= max ? text : words.slice(0, max).join(' ') + '…'
 }
 
-// ─── Urgency jalon ────────────────────────────────────────────────────────────
+// ─── Finance helpers ──────────────────────────────────────────────────────────
 
-interface Jalon {
-  label:   string
-  date:    string
-  domain?: string
+function computeMonthBalance(transactions: Transaction[]): number {
+  const key = new Date().toISOString().slice(0, 7)
+  return transactions
+    .filter(t => t.date.startsWith(key))
+    .reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0)
 }
 
-function computeMainJalon(
-  tasks: Task[],
-  law: { grandOralDate: string | null; rapportDate: string | null },
-  missions: Array<{ sujet: string; deadline: string | null }>,
-): Jalon | null {
-  const today = todayStr()
-  const candidates: Jalon[] = []
-
-  if (law.grandOralDate) candidates.push({ label: 'Grand Oral', date: law.grandOralDate, domain: 'Droit' })
-  if (law.rapportDate)   candidates.push({ label: 'Rapport de stage', date: law.rapportDate, domain: 'Droit' })
-
-  missions.filter((m) => m.deadline).forEach((m) =>
-    candidates.push({ label: truncateWords(m.sujet, 5), date: m.deadline!, domain: 'Carrière' }),
-  )
-
-  tasks
-    .filter((t) => t.dueDate && t.status !== 'done' && t.status !== 'cancelled')
-    .forEach((t) => candidates.push({ label: truncateWords(t.title, 6), date: t.dueDate! }))
-
+function topSavingsGoal(goals: SavingsGoal[]): SavingsGoal | null {
   return (
-    candidates
-      .filter((c) => c.date >= today)
-      .sort((a, b) => a.date.localeCompare(b.date))[0] ?? null
+    goals
+      .filter(g => g.currentAmount < g.targetAmount)
+      .sort((a, b) => b.currentAmount / b.targetAmount - a.currentAmount / a.targetAmount)[0] ??
+    goals[0] ?? null
   )
 }
 
 // ─── Today actions ────────────────────────────────────────────────────────────
 
 interface TodayAction {
-  label:    string
-  domain:   string
-  taskId?:  string
+  label:   string
+  domain:  string
+  taskId?: string
   daysLeft: number
-  urgency:  0 | 1 | 2   // 0 = overdue/today, 1 = 1-2 days, 2 = this week
+  urgency:  0 | 1 | 2
 }
 
 function computeTodayActions(
@@ -86,62 +83,391 @@ function computeTodayActions(
 ): TodayAction[] {
   const actions: TodayAction[] = []
 
-  // All active tasks due this week
   tasks
-    .filter((t) => t.dueDate && t.status !== 'done' && t.status !== 'cancelled')
-    .forEach((t) => {
+    .filter(t => t.dueDate && t.status !== 'done' && t.status !== 'cancelled')
+    .forEach(t => {
       const days = daysUntil(t.dueDate!)
       if (days === null || days > 7) return
-      const dom = domains.find((d) => d.id === t.domainId)
-      actions.push({
-        label:    t.title,
-        domain:   dom?.name ?? '—',
-        taskId:   t.id,
-        daysLeft: days,
-        urgency:  days <= 0 ? 0 : days <= 2 ? 1 : 2,
-      })
+      const dom = domains.find(d => d.id === t.domainId)
+      actions.push({ label: t.title, domain: dom?.name ?? '—', taskId: t.id, daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
     })
 
-  // Career missions: relecture or redaction with close deadline
   missions
-    .filter((m) => m.deadline && ['redaction', 'relecture'].includes(m.stade))
-    .forEach((m) => {
+    .filter(m => m.deadline && ['redaction', 'relecture'].includes(m.stade))
+    .forEach(m => {
       const days = daysUntil(m.deadline!)
       if (days === null || days > 7) return
-      actions.push({
-        label:    `Mission : ${truncateWords(m.sujet, 5)}`,
-        domain:   'Carrière',
-        daysLeft: days,
-        urgency:  days <= 0 ? 0 : days <= 2 ? 1 : 2,
-      })
+      actions.push({ label: `Mission : ${trunc(m.sujet, 5)}`, domain: 'Carrière', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
     })
 
-  // Law jalons if close
   ;[
-    { label: 'Grand Oral', date: law.grandOralDate },
-    { label: 'Rapport de stage', date: law.rapportDate },
+    { label: 'Grand Oral',       date: law.grandOralDate },
+    { label: 'Rapport de stage', date: law.rapportDate   },
   ].forEach(({ label, date }) => {
     const days = daysUntil(date)
     if (days === null || days > 7) return
     actions.push({ label, domain: 'Droit', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
   })
 
-  return actions
-    .sort((a, b) => a.urgency - b.urgency || a.daysLeft - b.daysLeft)
-    .slice(0, 3)
+  return actions.sort((a, b) => a.urgency - b.urgency || a.daysLeft - b.daysLeft)
 }
 
-// ─── Finance helpers ──────────────────────────────────────────────────────────
+// ─── DashHeader ───────────────────────────────────────────────────────────────
 
-function computeMonthBalance(transactions: Transaction[]): number {
-  const key = new Date().toISOString().slice(0, 7) // YYYY-MM
-  return transactions
-    .filter((t) => t.date.startsWith(key))
-    .reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0)
+function DashHeader({
+  date, doneCount, totalCount, weekType, hasCareerInfo, cabinetNom,
+}: {
+  date:          Date
+  doneCount:     number
+  totalCount:    number
+  weekType:      string
+  hasCareerInfo: boolean
+  cabinetNom:    string
+}) {
+  const pct = totalCount > 0 ? doneCount / totalCount : 0
+
+  return (
+    <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, marginBottom: 48 }}>
+      <div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+          <span>Aujourd'hui</span>
+          <span style={{ color: 'var(--ink-4)' }}>·</span>
+          <span>semaine {getWeekNumber(date)}</span>
+        </div>
+
+        <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 'clamp(40px, 5vw, 60px)', lineHeight: 1.05, letterSpacing: '-0.015em', color: 'var(--ink)' }}>
+          {cap(DAYS[date.getDay()])}{' '}
+          <span style={{ color: 'var(--ink-2)' }}>{date.getDate()}</span>{' '}
+          <span style={{ fontStyle: 'italic', color: 'var(--ink-2)' }}>{MONTHS[date.getMonth()]}</span>
+        </div>
+
+        {hasCareerInfo && (
+          <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontStyle: 'italic', color: 'var(--ink-3)', marginTop: 14, maxWidth: '48ch' }}>
+            {weekType === 'cabinet'
+              ? `Semaine cabinet${cabinetNom ? ` · ${cabinetNom}` : ''}.`
+              : 'Semaine académique.'}
+          </p>
+        )}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, paddingBottom: 8, flexShrink: 0 }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+          Avancement du jour
+        </span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 36, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{doneCount}</span>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--ink-3)', fontStyle: 'italic' }}>sur</span>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 36, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{totalCount}</span>
+        </div>
+        <div style={{ width: 180, height: 3, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
+          <div style={{ width: `${pct * 100}%`, height: '100%', background: 'var(--sage)', transition: 'width 320ms ease' }} />
+        </div>
+      </div>
+    </header>
+  )
 }
 
-function topSavingsGoal(goals: SavingsGoal[]): SavingsGoal | null {
-  return goals.filter((g) => g.currentAmount < g.targetAmount).sort((a, b) => b.currentAmount / b.targetAmount - a.currentAmount / a.targetAmount)[0] ?? goals[0] ?? null
+// ─── OngoingCard ──────────────────────────────────────────────────────────────
+
+function OngoingCard({
+  label, title, meta, kicker, progress, progressLabel,
+  icon: IconComp, onClick,
+}: {
+  label:         string
+  title:         string
+  meta:          string
+  kicker:        string
+  progress:      number
+  progressLabel: string
+  icon:          React.ComponentType<{ size: number }> | null
+  onClick:       () => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: 'var(--paper-1)',
+        border: `1px solid ${hover ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+        borderRadius: 12, padding: '20px 22px',
+        display: 'flex', flexDirection: 'column', gap: 14, minHeight: 168,
+        cursor: 'pointer', transition: 'border-color var(--dur) var(--ease)',
+      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {IconComp && <IconComp size={15} />}
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+            {label}
+          </span>
+        </div>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-3)' }}>
+          {kicker}
+        </span>
+      </div>
+
+      <div>
+        <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, lineHeight: 1.15, color: 'var(--ink)', letterSpacing: '-0.005em', marginBottom: 6 }}>
+          {title}
+        </div>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
+          {meta}
+        </div>
+      </div>
+
+      <div style={{ marginTop: 'auto' }}>
+        <div style={{ height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden', marginBottom: 8 }}>
+          <div style={{ width: `${Math.min(100, Math.max(0, progress * 100))}%`, height: '100%', background: 'var(--terra)' }} />
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
+            {progressLabel}
+          </span>
+          <ArrowUpRight size={14} style={{ color: hover ? 'var(--terra)' : 'var(--ink-3)', transition: 'color var(--dur) var(--ease)' }} />
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── TodaySection ─────────────────────────────────────────────────────────────
+
+function TodayGroup({
+  groupLabel, actions, pomIdle, launchPom,
+}: {
+  groupLabel: string
+  actions:    TodayAction[]
+  pomIdle:    boolean
+  launchPom:  (taskId: string) => void
+}) {
+  return (
+    <div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px 8px', background: 'var(--paper)', borderBottom: '1px solid var(--paper-2)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+          {groupLabel}
+        </span>
+        <div style={{ height: 1, background: 'var(--paper-2)', flex: 1 }} />
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{actions.length}</span>
+      </div>
+      {actions.map((action, i) => (
+        <TodayRow key={i} action={action} pomIdle={pomIdle} launchPom={launchPom} />
+      ))}
+    </div>
+  )
+}
+
+function TodayRow({
+  action, pomIdle, launchPom,
+}: {
+  action:    TodayAction
+  pomIdle:   boolean
+  launchPom: (id: string) => void
+}) {
+  const [hover, setHover] = useState(false)
+  const overdue = action.daysLeft < 0
+  const today   = action.daysLeft === 0
+  const urgencyLabel = overdue
+    ? `${Math.abs(action.daysLeft)}j retard`
+    : today ? "Aujourd'hui"
+    : `J−${action.daysLeft}`
+
+  const dotBg = action.urgency === 0
+    ? (overdue ? 'var(--danger)' : 'var(--terra)')
+    : action.urgency === 1 ? 'var(--warn)' : 'transparent'
+  const dotBorder = action.urgency === 2 ? '1.5px solid var(--ink-4)' : 'none'
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '80px 14px 1fr auto',
+        alignItems: 'center', gap: 16, padding: '12px 18px',
+        borderBottom: '1px solid var(--paper-2)',
+        background: hover ? 'var(--paper-1)' : 'transparent',
+        transition: 'background var(--dur) var(--ease)',
+      }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: action.urgency === 0 ? 'var(--danger)' : 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>
+        {urgencyLabel}
+      </span>
+
+      <span style={{ width: 8, height: 8, borderRadius: 999, background: dotBg, border: dotBorder, display: 'inline-block', flexShrink: 0 }} />
+
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 450, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {action.label}
+        </div>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+          {action.domain}
+        </div>
+      </div>
+
+      {action.taskId && pomIdle && (
+        <button
+          onClick={() => launchPom(action.taskId!)}
+          style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 6, border: 0, background: 'var(--terra-soft)', color: 'var(--terra)', cursor: 'pointer' }}>
+          Focus
+        </button>
+      )}
+    </div>
+  )
+}
+
+function TodaySection({ actions, pomIdle, launchPom }: { actions: TodayAction[]; pomIdle: boolean; launchPom: (id: string) => void }) {
+  const urgent = actions.filter(a => a.urgency === 0)
+  const week   = actions.filter(a => a.urgency > 0)
+
+  return (
+    <section style={{ marginBottom: 56 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 28, color: 'var(--ink)', margin: 0 }}>
+          Aujourd'hui
+        </h2>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+          {actions.length > 0 ? `${actions.length} action${actions.length > 1 ? 's' : ''}` : "Rien d'urgent · tu es à jour"}
+        </span>
+      </div>
+
+      {actions.length === 0 ? (
+        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '24px 22px', fontFamily: 'var(--font-serif)', fontSize: 16, fontStyle: 'italic', color: 'var(--ink-3)' }}>
+          Pas d'actions critiques cette semaine.
+        </div>
+      ) : (
+        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+          {urgent.length > 0 && <TodayGroup groupLabel="Urgent" actions={urgent} pomIdle={pomIdle} launchPom={launchPom} />}
+          {week.length > 0  && <TodayGroup groupLabel="Cette semaine" actions={week} pomIdle={pomIdle} launchPom={launchPom} />}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─── DomainCard ───────────────────────────────────────────────────────────────
+
+function DomainCard({ domain, primary, unit, secondary, onClick }: {
+  domain:    Domain
+  primary:   string
+  unit:      string
+  secondary: string
+  onClick:   () => void
+}) {
+  const Icon  = getDomainIcon(domain.name)
+  const [hover, setHover] = useState(false)
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        textAlign: 'left', fontFamily: 'inherit',
+        background: 'var(--paper-1)',
+        border: `1px solid ${hover ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+        borderRadius: 12, padding: '18px 20px 20px',
+        display: 'flex', flexDirection: 'column', gap: 14,
+        cursor: 'pointer', minHeight: 148,
+        transition: 'border-color var(--dur) var(--ease)',
+      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ width: 34, height: 34, borderRadius: 8, background: hover ? 'var(--terra-soft)' : 'var(--paper-2)', color: hover ? 'var(--terra-deep)' : 'var(--ink-2)', display: 'grid', placeItems: 'center', transition: 'background var(--dur) var(--ease), color var(--dur) var(--ease)' }}>
+          {Icon ? <Icon size={18} /> : <span style={{ fontSize: 16 }}>{domain.icon}</span>}
+        </div>
+        <ArrowUpRight size={14} style={{ color: hover ? 'var(--terra)' : 'var(--ink-4)', transition: 'color var(--dur) var(--ease)' }} />
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 20, color: 'var(--ink)', letterSpacing: '-0.005em' }}>
+          {domain.name}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 500, color: 'var(--ink)' }}>{primary}</span>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>{unit}</span>
+        </div>
+      </div>
+
+      {secondary && (
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-2)', fontStyle: 'italic', paddingTop: 10, borderTop: '1px solid var(--paper-2)' }}>
+          {secondary}
+        </div>
+      )}
+    </button>
+  )
+}
+
+function FinanceDomainCard({ balance, topGoal, onNavigate }: { balance: number; topGoal: SavingsGoal | null; onNavigate: () => void }) {
+  const [hover, setHover] = useState(false)
+  const goalPct = topGoal && topGoal.targetAmount > 0 ? Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100) : 0
+
+  return (
+    <button
+      onClick={onNavigate}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        textAlign: 'left', fontFamily: 'inherit',
+        background: 'var(--paper-1)',
+        border: `1px solid ${hover ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+        borderRadius: 12, padding: '18px 20px 20px',
+        display: 'flex', flexDirection: 'column', gap: 14,
+        cursor: 'pointer', minHeight: 148,
+        transition: 'border-color var(--dur) var(--ease)',
+      }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ width: 34, height: 34, borderRadius: 8, background: hover ? 'var(--terra-soft)' : 'var(--paper-2)', color: hover ? 'var(--terra-deep)' : 'var(--ink-2)', display: 'grid', placeItems: 'center', transition: 'background var(--dur) var(--ease), color var(--dur) var(--ease)' }}>
+          <Landmark size={18} />
+        </div>
+        <ArrowUpRight size={14} style={{ color: hover ? 'var(--terra)' : 'var(--ink-4)', transition: 'color var(--dur) var(--ease)' }} />
+      </div>
+
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 20, color: 'var(--ink)', letterSpacing: '-0.005em' }}>
+          Finances
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, fontWeight: 500, color: balance >= 0 ? 'var(--sage-deep)' : 'var(--danger)' }}>
+            {balance >= 0 ? '+' : ''}{fmtEur(balance)}
+          </span>
+        </div>
+        {topGoal && (
+          <div style={{ marginTop: 6 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>{trunc(topGoal.title, 4)}</span>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{goalPct}%</span>
+            </div>
+            <div style={{ height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
+              <div style={{ width: `${goalPct}%`, height: '100%', background: 'var(--terra)' }} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-2)', fontStyle: 'italic', paddingTop: 10, borderTop: '1px solid var(--paper-2)' }}>
+        {new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+      </div>
+    </button>
+  )
+}
+
+// ─── EmptyState ───────────────────────────────────────────────────────────────
+
+function EmptyState({ onAdd }: { onAdd: () => void }) {
+  return (
+    <div style={{ gridColumn: '1/-1', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '64px 0', textAlign: 'center' }}>
+      <div style={{ marginBottom: 24, width: 56, height: 56, borderRadius: 16, border: '1px solid var(--paper-2)', background: 'var(--paper-1)', display: 'grid', placeItems: 'center', fontSize: 22, color: 'var(--ink-3)' }}>
+        ✦
+      </div>
+      <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink)', margin: 0 }}>Bienvenue dans Aetheris</p>
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink-3)', marginTop: 8, marginBottom: 0, maxWidth: '36ch' }}>
+        Crée ton premier domaine pour commencer à organiser ta vie.
+      </p>
+      <button
+        onClick={onAdd}
+        style={{ marginTop: 32, fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, padding: '10px 24px', borderRadius: 10, background: 'var(--terra-soft)', border: '1px solid var(--terra-soft)', color: 'var(--terra)', cursor: 'pointer' }}>
+        + Créer mon premier domaine
+      </button>
+    </div>
+  )
 }
 
 // ─── Dashboard ────────────────────────────────────────────────────────────────
@@ -150,59 +476,131 @@ export function Dashboard() {
   const [showModal, setShowModal] = useState(false)
   const navigate = useNavigate()
 
-  // Stores
-  const domains      = useStore((s) => s.domains)
-  const tasks        = useStore((s) => s.tasks)
-  const transactions = useStore((s) => s.transactions)
-  const savingsGoals = useStore((s) => s.savingsGoals)
-  const userContext  = useStore((s) => s.userContext)
-  const setUserContext = useStore((s) => s.setUserContext)
-  const pomSettings  = useStore((s) => s.pomodoroSettings)
+  // ── Stores ────────────────────────────────────────────────────────────────
+  const domains      = useStore(s => s.domains)
+  const tasks        = useStore(s => s.tasks)
+  const transactions = useStore(s => s.transactions)
+  const savingsGoals = useStore(s => s.savingsGoals)
+  const pomSettings  = useStore(s => s.pomodoroSettings)
   const law          = useLawStore()
   const career       = useCareerStore()
   const writing      = useWritingStore()
   const pom          = usePomodoroStore()
   const music        = useMusicStore()
+  const sport        = useSportStore()
+  const books        = useBookStore()
+  const films        = useFilmSerieStore()
+  const shopping     = useShoppingStore()
 
-  // Computed
-  const weekType = career.statusSemaine === 'semaine_academique' ? 'cours' : 'cabinet'
+  const today    = new Date()
+  const monthStr = today.toISOString().slice(0, 7)
+  const waStr    = weekAgoStr()
+
+  // ── Computed ──────────────────────────────────────────────────────────────
+  const weekType      = career.statusSemaine === 'semaine_academique' ? 'académique' : 'cabinet'
   const hasCareerInfo = !!(career.cabinetInfo.nom || career.cabinetInfo.maitreStage)
+  const cabinetNom    = career.cabinetInfo.nom ?? ''
 
-  const mainJalon = useMemo(
-    () => computeMainJalon(tasks, law, career.missions),
-    [tasks, law.grandOralDate, law.rapportDate, career.missions],
-  )
+  const doneCount  = useMemo(() => tasks.filter(t => t.status === 'done').length, [tasks])
+  const totalCount = useMemo(() => tasks.filter(t => t.status !== 'cancelled').length, [tasks])
+
+  const monthBalance = useMemo(() => computeMonthBalance(transactions), [transactions])
+  const topGoal      = useMemo(() => topSavingsGoal(savingsGoals), [savingsGoals])
+  const todayTxTotal = useMemo(() => {
+    const d = todayStr()
+    return transactions.filter(t => t.type === 'expense' && t.date === d).reduce((s, t) => s + t.amount, 0)
+  }, [transactions])
 
   const todayActions = useMemo(
     () => computeTodayActions(domains, tasks, career.missions, law),
     [domains, tasks, career.missions, law.grandOralDate, law.rapportDate],
   )
 
-  const monthBalance = useMemo(() => computeMonthBalance(transactions), [transactions])
-  const topGoal      = useMemo(() => topSavingsGoal(savingsGoals), [savingsGoals])
-
-  const todayTxTotal = useMemo(() => {
-    const today = todayStr()
-    return transactions
-      .filter((t) => t.type === 'expense' && t.date === today)
-      .reduce((s, t) => s + t.amount, 0)
-  }, [transactions])
-
-  // Writing: last session date
+  // Writing
+  const activeArc = writing.arcs.find(a => a.isActive) ?? writing.arcs[0]
   const lastWritingDays = useMemo(() => {
-    if (writing.dailySessions.length === 0) return null
-    const latest = writing.dailySessions
-      .map((s) => s.date)
-      .sort()
-      .at(-1)
+    const latest = writing.dailySessions.map(s => s.date).sort().at(-1)
     if (!latest) return null
     const d = daysUntil(latest + 'T23:59:59')
     return d !== null ? Math.abs(d) : null
   }, [writing.dailySessions])
+  const writingSessionsWeek = writing.dailySessions.filter(s => s.date >= waStr).length
+  const writingDomain       = domains.find(d => d.name.trim().toLowerCase() === 'écriture')
 
-  const activeArc = writing.arcs.find((a) => a.isActive) ?? writing.arcs[0]
+  // Sport
+  const sportSessionsWeek = sport.historique.filter(s => s.date >= waStr).length
 
-  // Pomodoro launch helper
+  // ── Domain stats lookup ───────────────────────────────────────────────────
+  const domainStatMap = useMemo(() => {
+    const map: Record<string, { primary: string; unit: string; secondary: string }> = {}
+
+    for (const d of domains) {
+      const n        = d.name.trim().toLowerCase()
+      const domTasks = tasks.filter(t => t.domainId === d.id && t.status !== 'cancelled')
+      const active   = domTasks.filter(t => t.status !== 'done')
+      const nextTask = active.filter(t => t.dueDate).sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))[0]
+
+      let primary   = String(active.length)
+      let unit      = active.length === 1 ? 'tâche active' : 'tâches actives'
+      let secondary = nextTask ? `Prochain : ${fmtDate(nextTask.dueDate!)}` : ''
+
+      if (n === 'écriture') {
+        const sessions = writing.dailySessions.filter(s => s.date >= waStr).length
+        primary   = writing.chapterTotal > 0 ? `${writing.chapterCurrent}` : String(active.length)
+        unit      = writing.chapterTotal > 0 ? `sur ${writing.chapterTotal} chapitres` : (active.length === 1 ? 'tâche active' : 'tâches actives')
+        secondary = activeArc ? `Arc : ${activeArc.name} · ${sessions} sessions/7j` : ''
+      }
+      else if (n === 'droit') {
+        const goD = daysUntil(law.grandOralDate)
+        secondary = goD !== null
+          ? (goD === 0 ? "Grand Oral : aujourd'hui !" : goD > 0 ? `Grand Oral : J−${goD}` : 'Grand Oral passé')
+          : law.globalStatus ? `Stade : ${law.globalStatus}` : ''
+      }
+      else if (n === 'carrière') {
+        const actMissions = career.missions.filter(m => m.stade !== 'rendu').length
+        const rendues     = career.missionsArchives.filter(a => a.archivedAt.startsWith(monthStr)).length
+        primary   = String(actMissions)
+        unit      = actMissions === 1 ? 'mission active' : 'missions actives'
+        secondary = `${rendues} rendue${rendues > 1 ? 's' : ''} ce mois`
+      }
+      else if (n === 'sport') {
+        primary   = String(sportSessionsWeek)
+        unit      = 'séances · 7 jours'
+        secondary = sport.currentStatus === 'en_rythme' ? 'En rythme' : sport.currentStatus === 'reprise' ? 'En reprise' : 'Pause assumée'
+      }
+      else if (n === 'musique') {
+        primary   = String(music.bibliotheque.length)
+        unit      = 'critiques'
+        secondary = music.albumEnCours
+          ? `En écoute : ${trunc(music.albumEnCours.titre, 4)}`
+          : `File : ${music.fileAttente.length} album${music.fileAttente.length > 1 ? 's' : ''}`
+      }
+      else if (n.includes('film')) {
+        const vus   = films.items.filter(f => f.status === 'vu').length
+        const aVoir = films.items.filter(f => f.status === 'à voir').length
+        const ec    = films.items.find(f => f.status === 'en cours')
+        primary   = `${vus} · ${aVoir}`
+        unit      = 'vus · à voir'
+        secondary = ec ? `En cours : ${trunc(ec.title, 4)}` : ''
+      }
+      else if (n === 'livres') {
+        const lus = books.bibliotheque.length
+        primary   = `${lus} · ${books.livreEnCours ? '1' : '0'}`
+        unit      = 'lus · en cours'
+        secondary = books.livreEnCours ? trunc(books.livreEnCours.titre, 5) : `Objectif : ${books.objectifAnnuel}/an`
+      }
+      else if (n === 'achats') {
+        primary   = String(shopping.wishlist.length)
+        unit      = shopping.wishlist.length === 1 ? 'article wishlist' : 'articles wishlist'
+        secondary = `${shopping.bought.filter(b => b.boughtDate?.startsWith(monthStr)).length} acheté${shopping.bought.filter(b => b.boughtDate?.startsWith(monthStr)).length > 1 ? 's' : ''} ce mois`
+      }
+
+      map[d.id] = { primary, unit, secondary }
+    }
+    return map
+  }, [domains, tasks, writing, law, career, sport, music, films, books, shopping, monthStr, waStr, activeArc, sportSessionsWeek])
+
+  // Pomodoro
   const launchPom = (taskId: string) => {
     if (pom.status !== 'idle') return
     pom.init(taskId, pomSettings.focusDuration * 60)
@@ -210,535 +608,163 @@ export function Dashboard() {
     navigate('/focus')
   }
 
+  // Finance excluded from domain grid (always rendered as fixed card)
+  const domainGridItems = domains.filter(d => !['finance', 'finances'].includes(d.name.trim().toLowerCase()))
+
+  // Icons for ongoing cards
+  const writingIcon = getDomainIcon('Écriture')
+  const bookIcon    = getDomainIcon('Livres')
+  const musicIcon   = getDomainIcon('Musique')
+  const financeIcon = getDomainIcon('Finance')
+
+  // Book ongoing card data
+  const bookProgress = books.livreEnCours?.pageActuelle && books.livreEnCours?.pagesTotal
+    ? books.livreEnCours.pageActuelle / books.livreEnCours.pagesTotal : 0
+
   return (
-    <div className="space-y-10 py-2">
+    <div style={{ padding: '8px 0 80px' }}>
 
-      {/* ── 1. HEADER ─────────────────────────────────────────────────────────── */}
-      <section className="space-y-4">
-        {/* Date + week type */}
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-widest text-[var(--fg-subtle)] mb-1">
-              {new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-            </p>
-            {hasCareerInfo && (
-              <p className="text-sm text-[var(--fg-muted)]">
-                Tu es en{' '}
-                <span className={weekType === 'cabinet' ? 'text-blue-400 font-medium' : 'text-purple-400 font-medium'}>
-                  semaine {weekType}
-                </span>
-                {weekType === 'cabinet' && career.cabinetInfo.nom ? ` — ${career.cabinetInfo.nom}` : ''}
-              </p>
-            )}
-          </div>
+      {/* ── 1. Header ──────────────────────────────────────────────────────── */}
+      <DashHeader
+        date={today}
+        doneCount={doneCount}
+        totalCount={totalCount}
+        weekType={weekType}
+        hasCareerInfo={hasCareerInfo}
+        cabinetNom={cabinetNom}
+      />
 
-          {/* User context input */}
-          <input
-            className="bg-transparent border border-[var(--border)] text-[var(--fg-muted)] text-xs rounded-lg px-3 py-1.5 w-44 focus:outline-none focus:border-[var(--border-strong)] focus:text-[var(--fg)] placeholder-[var(--fg-subtle)] text-right"
-            placeholder="Contexte (3 mots)"
-            value={userContext}
-            maxLength={30}
-            onChange={(e) => setUserContext(e.target.value)}
-          />
+      {/* ── 2. En cours ────────────────────────────────────────────────────── */}
+      <section style={{ marginBottom: 48 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, color: 'var(--ink)', margin: 0 }}>
+            En cours
+          </h2>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+            Tes fils actifs du moment
+          </span>
         </div>
 
-        {/* Jalon urgent */}
-        {mainJalon ? (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] px-6 py-5">
-            <p className="text-xs text-[var(--fg-subtle)] mb-1 uppercase tracking-wide font-medium">Prochain jalon critique</p>
-            <div className="flex items-end gap-4">
-              <span className={`text-4xl font-bold tabular-nums leading-none ${
-                (daysUntil(mainJalon.date) ?? 99) <= 7
-                  ? 'text-red-400'
-                  : (daysUntil(mainJalon.date) ?? 99) <= 21
-                  ? 'text-amber-400'
-                  : 'text-[var(--fg)]'
-              }`}>
-                {daysUntil(mainJalon.date) === 0
-                  ? "Aujourd'hui"
-                  : daysUntil(mainJalon.date) !== null && daysUntil(mainJalon.date)! < 0
-                  ? 'En retard'
-                  : `J−${daysUntil(mainJalon.date)}`}
-              </span>
-              <div className="pb-1">
-                <p className="text-base font-semibold text-[var(--fg)] leading-tight">{mainJalon.label}</p>
-                <p className="text-xs text-[var(--fg-subtle)] mt-0.5">
-                  {mainJalon.domain && <span className="text-[var(--fg-muted)]">{mainJalon.domain} · </span>}
-                  {fmtShortDate(mainJalon.date)}
-                </p>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] px-6 py-4 text-sm text-[var(--fg-subtle)]">
-            Aucun jalon urgent — tu es à jour.
-          </div>
-        )}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
+          {/* Writing */}
+          <OngoingCard
+            label="Arc en cours"
+            title={activeArc?.name ?? 'Écriture'}
+            meta={writing.chapterTotal > 0
+              ? `Chapitre ${writing.chapterCurrent} · ${writingSessionsWeek} session${writingSessionsWeek > 1 ? 's' : ''} cette semaine`
+              : writing.lastSentence
+              ? trunc(writing.lastSentence, 12)
+              : 'Aucune session enregistrée'}
+            kicker={lastWritingDays === null ? 'Pas encore' : lastWritingDays === 0 ? "Aujourd'hui" : `il y a ${lastWritingDays}j`}
+            progress={writing.chapterTotal > 0 ? writing.chapterCurrent / writing.chapterTotal : 0}
+            progressLabel={writing.chapterTotal > 0
+              ? `${Math.round((writing.chapterCurrent / writing.chapterTotal) * 100)}% du premier jet`
+              : 'Pas de jalons définis'}
+            icon={writingIcon}
+            onClick={() => writingDomain ? navigate(`/domain/${writingDomain.id}`) : undefined}
+          />
+
+          {/* Books ou Music */}
+          {books.livreEnCours ? (
+            <OngoingCard
+              label="Lecture en cours"
+              title={books.livreEnCours.titre}
+              meta={`${books.livreEnCours.auteur}${books.livreEnCours.pageActuelle && books.livreEnCours.pagesTotal ? ` · p. ${books.livreEnCours.pageActuelle}/${books.livreEnCours.pagesTotal}` : ''}`}
+              kicker={`Depuis le ${fmtDate(books.livreEnCours.dateDebut)}`}
+              progress={bookProgress}
+              progressLabel={bookProgress > 0 ? `${Math.round(bookProgress * 100)}% lu` : 'En cours'}
+              icon={bookIcon}
+              onClick={() => navigate('/livres')}
+            />
+          ) : music.albumEnCours ? (
+            <OngoingCard
+              label="En écoute"
+              title={music.albumEnCours.titre}
+              meta={`${music.albumEnCours.artiste} · ${music.bibliotheque.length} critique${music.bibliotheque.length > 1 ? 's' : ''}`}
+              kicker={`Depuis le ${fmtDate(music.albumEnCours.startedAt)}`}
+              progress={Math.min(1, music.bibliotheque.length / 50)}
+              progressLabel={`${music.bibliotheque.length} albums critiqués`}
+              icon={musicIcon}
+              onClick={() => navigate('/musique')}
+            />
+          ) : (
+            <OngoingCard
+              label="Bibliothèque"
+              title={`${books.bibliotheque.length} livre${books.bibliotheque.length > 1 ? 's' : ''} lus`}
+              meta={`Objectif ${books.objectifAnnuel}/an · ${music.bibliotheque.length} critiques musicales`}
+              kicker="Cette année"
+              progress={books.objectifAnnuel > 0 ? Math.min(1, books.bibliotheque.length / books.objectifAnnuel) : 0}
+              progressLabel={`${books.objectifAnnuel > 0 ? Math.round((books.bibliotheque.length / books.objectifAnnuel) * 100) : 0}% de l'objectif annuel`}
+              icon={bookIcon}
+              onClick={() => navigate('/livres')}
+            />
+          )}
+
+          {/* Finance */}
+          <OngoingCard
+            label="Solde du mois"
+            title={fmtEur(monthBalance)}
+            meta={topGoal
+              ? `${trunc(topGoal.title, 4)} · ${Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100)}%`
+              : 'Aucun objectif d\'épargne'}
+            kicker={todayTxTotal > 0 ? `${fmtEur(todayTxTotal)} aujourd'hui` : 'Aucune dépense aujourd\'hui'}
+            progress={topGoal && topGoal.targetAmount > 0 ? topGoal.currentAmount / topGoal.targetAmount : Math.min(1, Math.max(0, monthBalance / 2000))}
+            progressLabel={topGoal ? `${Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100)}% de l'objectif` : new Date().toLocaleDateString('fr-FR', { month: 'long' })}
+            icon={financeIcon}
+            onClick={() => navigate('/finances')}
+          />
+        </div>
       </section>
 
-      {/* ── 2. DOMAIN COCKPIT GRID ────────────────────────────────────────────── */}
+      {/* ── 3. Aujourd'hui ─────────────────────────────────────────────────── */}
+      <TodaySection
+        actions={todayActions}
+        pomIdle={pom.status === 'idle'}
+        launchPom={launchPom}
+      />
+
+      {/* ── 4. Domaines ────────────────────────────────────────────────────── */}
       <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--fg-subtle)]">Domaines</h2>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 28, color: 'var(--ink)', margin: 0 }}>
+            Tes domaines
+          </h2>
           <button
             onClick={() => setShowModal(true)}
-            className="flex items-center gap-1 text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors"
-          >
-            <span className="text-sm leading-none">+</span>
-            Nouveau
+            style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', background: 'transparent', border: 0, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ fontSize: 16, lineHeight: 1 }}>+</span> Nouveau
           </button>
         </div>
 
         {domains.length === 0 ? (
-          <EmptyState onAdd={() => setShowModal(true)} />
+          <div style={{ display: 'grid' }}>
+            <EmptyState onAdd={() => setShowModal(true)} />
+          </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {/* Finance + Musique hidden from generic loop — have dedicated cockpits */}
-            {domains
-              .filter((d) => !['finance', 'finances', 'musique'].includes(d.name.trim().toLowerCase()))
-              .map((domain) => (
-                <DomainCockpit
-                  key={domain.id}
-                  domain={domain}
-                  tasks={tasks.filter((t) => t.domainId === domain.id)}
-                  law={law}
-                  career={career}
-                  writing={writing}
-                  lastWritingDays={lastWritingDays}
-                  activeArc={activeArc}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+            {domainGridItems.map(d => {
+              const stats = domainStatMap[d.id] ?? { primary: '0', unit: 'tâches', secondary: '' }
+              return (
+                <DomainCard
+                  key={d.id}
+                  domain={d}
+                  primary={stats.primary}
+                  unit={stats.unit}
+                  secondary={stats.secondary}
+                  onClick={() => navigate(`/domain/${d.id}`)}
                 />
-              ))}
-
-            {/* Music cockpit — always shown */}
-            <MusicCockpit music={music} />
-
-            {/* Finance cockpit — always shown */}
-            <FinanceCockpit
+              )
+            })}
+            <FinanceDomainCard
               balance={monthBalance}
               topGoal={topGoal}
-              todayExpenses={todayTxTotal}
+              onNavigate={() => navigate('/finances')}
             />
           </div>
         )}
       </section>
 
-      {/* ── 3. FLUX DU JOUR ───────────────────────────────────────────────────── */}
-      <section>
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-[var(--fg-subtle)] mb-4">
-          Aujourd'hui — Actions prioritaires
-        </h2>
-
-        {todayActions.length === 0 ? (
-          <p className="text-sm text-[var(--fg-subtle)] py-4">
-            Pas d'actions critiques pour aujourd'hui.
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {todayActions.map((action, i) => (
-              <div
-                key={i}
-                className={`flex items-center justify-between gap-3 rounded-xl border px-4 py-3 ${
-                  action.urgency === 0
-                    ? 'border-red-500/20 bg-red-500/5'
-                    : action.urgency === 1
-                    ? 'border-amber-500/20 bg-amber-500/5'
-                    : 'border-[var(--border)] bg-[var(--bg-elev)]'
-                }`}
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className={`text-[10px] font-medium uppercase tracking-wide ${
-                      action.urgency === 0 ? 'text-red-500' :
-                      action.urgency === 1 ? 'text-amber-500' : 'text-[var(--fg-subtle)]'
-                    }`}>
-                      {action.domain}
-                    </span>
-                    <span className={`text-[10px] ${
-                      action.urgency === 0 ? 'text-red-400' :
-                      action.urgency === 1 ? 'text-amber-400' : 'text-[var(--fg-subtle)]'
-                    }`}>
-                      {action.daysLeft <= 0
-                        ? action.daysLeft === 0 ? "Aujourd'hui" : `${Math.abs(action.daysLeft)}j de retard`
-                        : `J−${action.daysLeft}`}
-                    </span>
-                  </div>
-                  <p className="text-sm text-[var(--fg)] font-medium truncate">{action.label}</p>
-                </div>
-
-                {action.taskId && pom.status === 'idle' && (
-                  <button
-                    onClick={() => launchPom(action.taskId!)}
-                    className="shrink-0 flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg bg-[var(--terra-soft)] text-[var(--terra)] border border-[var(--terra-soft)] hover:opacity-80 transition-colors"
-                  >
-                    ▶ Focus
-                  </button>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
       {showModal && <AddDomainModal onClose={() => setShowModal(false)} />}
-    </div>
-  )
-}
-
-// ─── DomainCockpit ────────────────────────────────────────────────────────────
-
-interface DomainCockpitProps {
-  domain:         Domain
-  tasks:          Task[]
-  law:            LawState
-  career:         CareerState
-  writing:        WritingState
-  lastWritingDays: number | null
-  activeArc:      WritingState['arcs'][number] | undefined
-}
-
-function DomainCockpit({ domain, tasks, law, career, writing, lastWritingDays, activeArc }: DomainCockpitProps) {
-  const navigate = useNavigate()
-  const name     = domain.name.trim().toLowerCase()
-
-  const go = () => navigate(`/domain/${domain.id}`)
-
-  // ── Droit ──────────────────────────────────────────────────────────────────
-  if (name === 'droit') {
-    const goD = daysUntil(law.grandOralDate)
-    const rpD = daysUntil(law.rapportDate)
-    const STATUT_LABELS: Record<string, string> = {
-      recherches:    'Recherches',
-      redaction:     'Rédaction',
-      repetition:    'Répétition',
-      finalisation:  'Finalisation',
-    }
-
-    return (
-      <button onClick={go} className={cockpitCls()}>
-        <CockpitHeader domain={domain} />
-        <div className="space-y-1.5 text-xs">
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--fg-muted)]">Grand Oral</span>
-            <span className={goD !== null && goD <= 7 ? 'text-red-400 font-semibold' : 'text-[var(--fg)]'}>
-              {goD !== null ? (goD === 0 ? "Aujourd'hui" : `J−${goD}`) : '—'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--fg-muted)]">Rapport</span>
-            <span className={rpD !== null && rpD <= 7 ? 'text-amber-400 font-semibold' : 'text-[var(--fg)]'}>
-              {rpD !== null ? (rpD === 0 ? "Aujourd'hui" : `J−${rpD}`) : '—'}
-            </span>
-          </div>
-          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
-            <span className="text-[var(--fg-muted)]">Stade</span>
-            <span className="text-[var(--fg)] font-medium">{STATUT_LABELS[law.globalStatus] ?? law.globalStatus}</span>
-          </div>
-          {tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length > 0 && (
-            <div className="flex items-center justify-between">
-              <span className="text-[var(--fg-muted)]">Tâches actives</span>
-              <span className="text-[var(--fg)]">{tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled').length}</span>
-            </div>
-          )}
-        </div>
-        <CockpitFooter label="Ouvrir Droit" />
-      </button>
-    )
-  }
-
-  // ── Carrière ───────────────────────────────────────────────────────────────
-  if (name === 'carrière') {
-    const activeMissions = career.missions.filter((m) => m.stade !== 'rendu')
-    const currentMission = activeMissions.sort((a, b) => {
-      if (!a.deadline) return 1
-      if (!b.deadline) return -1
-      return a.deadline.localeCompare(b.deadline)
-    })[0]
-    const STADE_LABELS: Record<string, string> = {
-      briefing:   'Briefing',
-      recherches: 'Recherches',
-      redaction:  'Rédaction',
-      relecture:  'En relecture',
-      rendu:      'Rendu',
-    }
-    const monthStr = new Date().toISOString().slice(0, 7)
-    const renduesCeMois = career.missionsArchives.filter((a) => a.archivedAt.startsWith(monthStr)).length
-    const lastArchive = career.missionsArchives[0]
-
-    return (
-      <button onClick={go} className={cockpitCls()}>
-        <CockpitHeader domain={domain} />
-        <div className="space-y-1.5 text-xs">
-          {currentMission ? (
-            <>
-              <p className="text-[var(--fg)] font-medium leading-snug truncate">{truncateWords(currentMission.sujet, 6)}</p>
-              <div className="flex items-center gap-2">
-                <span className="px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-[var(--paper-3)] text-[var(--fg-muted)]">
-                  {STADE_LABELS[currentMission.stade] ?? currentMission.stade}
-                </span>
-                {currentMission.deadline && (
-                  <span className="text-[var(--fg-muted)]">
-                    J−{Math.max(0, daysUntil(currentMission.deadline) ?? 0)}
-                  </span>
-                )}
-              </div>
-            </>
-          ) : (
-            <p className="text-[var(--fg-subtle)] italic">Aucune mission active</p>
-          )}
-          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
-            <span className="text-[var(--fg-muted)]">Rendues ce mois</span>
-            <span className="text-[var(--fg)]">{renduesCeMois}</span>
-          </div>
-          {lastArchive && (
-            <p className="text-[var(--fg-subtle)] truncate">Dernière : {lastArchive.competenceDeveloppee}</p>
-          )}
-        </div>
-        <CockpitFooter label="Ouvrir Carrière" />
-      </button>
-    )
-  }
-
-  // ── Écriture ───────────────────────────────────────────────────────────────
-  if (name === 'écriture') {
-    return (
-      <button onClick={go} className={cockpitCls()}>
-        <CockpitHeader domain={domain} />
-        <div className="space-y-2 text-xs">
-          {writing.lastSentence ? (
-            <p className="text-[var(--fg-muted)] italic leading-snug">
-              "{truncateWords(writing.lastSentence, 10)}"
-            </p>
-          ) : (
-            <p className="text-[var(--fg-subtle)] italic">Aucune phrase enregistrée</p>
-          )}
-          {activeArc && (
-            <div className="flex items-center justify-between">
-              <span className="text-[var(--fg-muted)]">Arc en cours</span>
-              <span className="text-[var(--fg)] font-medium">
-                {activeArc.name} — {activeArc.order}/{writing.arcs.length}
-              </span>
-            </div>
-          )}
-          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
-            <span className="text-[var(--fg-muted)]">Dernière session</span>
-            <span className="text-[var(--fg-muted)]">
-              {lastWritingDays === null
-                ? '—'
-                : lastWritingDays === 0
-                ? "Aujourd'hui"
-                : `il y a ${lastWritingDays}j`}
-            </span>
-          </div>
-        </div>
-        <CockpitFooter label="Ouvrir Écriture" />
-      </button>
-    )
-  }
-
-  // ── Generic domain ─────────────────────────────────────────────────────────
-  const activeTasks  = tasks.filter((t) => t.status !== 'done' && t.status !== 'cancelled')
-  const nextDeadline = activeTasks
-    .filter((t) => t.dueDate)
-    .sort((a, b) => a.dueDate!.localeCompare(b.dueDate!))[0]
-
-  return (
-    <button onClick={go} className={cockpitCls()}>
-      <CockpitHeader domain={domain} />
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-[var(--fg-muted)]">Tâches actives</span>
-          <span className="text-[var(--fg)]">{activeTasks.length}</span>
-        </div>
-        {nextDeadline && (
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--fg-muted)] truncate mr-2">{truncateWords(nextDeadline.title, 5)}</span>
-            <span className={`shrink-0 ${(daysUntil(nextDeadline.dueDate!) ?? 99) <= 3 ? 'text-red-400' : 'text-[var(--fg-muted)]'}`}>
-              {fmtShortDate(nextDeadline.dueDate!)}
-            </span>
-          </div>
-        )}
-      </div>
-      <CockpitFooter label={`Ouvrir ${domain.name}`} />
-    </button>
-  )
-}
-
-// ─── FinanceCockpit ───────────────────────────────────────────────────────────
-
-function FinanceCockpit({
-  balance,
-  topGoal,
-  todayExpenses,
-}: {
-  balance:       number
-  topGoal:       SavingsGoal | null
-  todayExpenses: number
-}) {
-  const navigate = useNavigate()
-  const fmt = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
-  const goalPct = topGoal && topGoal.targetAmount > 0 ? Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100) : 0
-
-  return (
-    <button
-      onClick={() => navigate('/finances')}
-      className="group flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)] hover:bg-[var(--paper-2)]"
-    >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)] text-[var(--fg)]"><Landmark size={16} /></span>
-          <span className="text-sm font-semibold text-[var(--fg)]">Finances</span>
-        </div>
-        <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
-      </div>
-
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-[var(--fg-muted)]">Solde du mois</span>
-          <span className={`font-semibold tabular-nums ${balance >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-            {balance >= 0 ? '+' : ''}{fmt(balance)}
-          </span>
-        </div>
-
-        {topGoal && (
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[var(--fg-muted)] truncate mr-2">{truncateWords(topGoal.title, 4)}</span>
-              <span className="text-[var(--fg-muted)] shrink-0">{goalPct}%</span>
-            </div>
-            <div className="h-1 w-full rounded-full bg-[var(--paper-3)]">
-              <div
-                className="h-1 rounded-full bg-[var(--terra)] transition-all duration-500"
-                style={{ width: `${goalPct}%` }}
-              />
-            </div>
-          </div>
-        )}
-
-        {todayExpenses > 0 && (
-          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
-            <span className="text-[var(--fg-muted)]">Dépenses aujourd'hui</span>
-            <span className="text-[var(--fg-muted)]">{fmt(todayExpenses)}</span>
-          </div>
-        )}
-      </div>
-
-      <p className="mt-auto text-[10px] text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors">
-        Ouvrir Finances →
-      </p>
-    </button>
-  )
-}
-
-// ─── MusicCockpit ─────────────────────────────────────────────────────────────
-
-function MusicCockpit({ music }: { music: MusicState }) {
-  const navigate = useNavigate()
-  const lastCritique = music.bibliotheque[0]
-  const pantheonCount = music.bibliotheque.filter((a) => a.note >= 9).length
-
-  return (
-    <button
-      onClick={() => navigate('/musique')}
-      className="group flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)] hover:bg-[var(--paper-2)]"
-    >
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-              <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)] text-[var(--fg)]"><Music size={16} /></span>
-          <span className="text-sm font-semibold text-[var(--fg)]">Musique</span>
-        </div>
-        <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
-      </div>
-
-      <div className="space-y-1.5 text-xs">
-        <div className="flex items-center justify-between">
-          <span className="text-[var(--fg-muted)]">Critiques</span>
-          <span className="text-[var(--fg)] tabular-nums">{music.bibliotheque.length}</span>
-        </div>
-        {lastCritique && (
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--fg-muted)] truncate mr-2">Dernière</span>
-            <span className="text-[var(--fg-muted)] truncate max-w-[120px]">
-              {truncateWords(lastCritique.titre, 4)}
-            </span>
-          </div>
-        )}
-        {pantheonCount > 0 && (
-          <div className="flex items-center justify-between pt-1 border-t border-[var(--border)]">
-            <span className="text-[var(--fg-muted)]">Panthéon (9-10)</span>
-            <span className="text-amber-400 tabular-nums">{pantheonCount}</span>
-          </div>
-        )}
-        {music.albumEnCours && (
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--fg-muted)]">En écoute</span>
-            <span className="text-[var(--fg-muted)] truncate max-w-[120px]">
-              {truncateWords(music.albumEnCours.titre, 4)}
-            </span>
-          </div>
-        )}
-      </div>
-
-      <p className="mt-auto text-[10px] transition-colors text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)]">
-        Ouvrir Musique →
-      </p>
-    </button>
-  )
-}
-
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function cockpitCls() {
-  return [
-    'group flex flex-col gap-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4 text-left',
-    'transition-all duration-150 outline-none',
-    'hover:bg-[var(--paper-2)]',
-    'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
-  ].join(' ')
-}
-
-function CockpitHeader({ domain }: { domain: Domain }) {
-  const Icon = getDomainIcon(domain.name)
-  return (
-    <div className="flex items-center justify-between">
-      <div className="flex items-center gap-2">
-        <span className="flex h-7 w-7 items-center justify-center rounded-lg text-sm bg-[var(--paper-3)]">
-          {Icon ? <Icon size={16} /> : domain.icon}
-        </span>
-        <span className="text-sm font-semibold text-[var(--fg)]">{domain.name}</span>
-      </div>
-      <span className="text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)] transition-colors text-xs">→</span>
-    </div>
-  )
-}
-
-function CockpitFooter({ label }: { label: string }) {
-  return (
-    <p className="mt-auto text-[10px] transition-colors text-[var(--fg-subtle)] group-hover:text-[var(--fg-muted)]">
-      {label} →
-    </p>
-  )
-}
-
-// ─── EmptyState ───────────────────────────────────────────────────────────────
-
-function EmptyState({ onAdd }: { onAdd: () => void }) {
-  return (
-    <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-      <div className="mb-6 flex h-14 w-14 items-center justify-center rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)]">
-        <span className="text-xl text-[var(--fg-subtle)] select-none">✦</span>
-      </div>
-      <p className="text-base font-medium text-[var(--fg)]">Bienvenue dans Aetheris</p>
-      <p className="mt-2 max-w-xs text-sm leading-relaxed text-[var(--fg-subtle)]">
-        Crée ton premier domaine pour commencer à organiser ta vie.
-      </p>
-      <button
-        onClick={onAdd}
-        className="mt-8 flex items-center gap-2 rounded-xl bg-[var(--terra-soft)] border border-[var(--terra-soft)] px-6 py-3 text-sm font-medium text-[var(--terra)] hover:opacity-80 transition-colors"
-      >
-        <span className="text-base leading-none">+</span>
-        Créer mon premier domaine
-      </button>
     </div>
   )
 }
