@@ -29,7 +29,7 @@ export function Layout() {
   }, [handleKeyDown])
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-zinc-950 text-zinc-100">
+    <div className="flex h-screen w-screen overflow-hidden bg-[var(--bg)] text-[var(--fg)]">
 
       {/* ── Sidebar desktop (w-56) ─────────────────────────────────────────────── */}
       <div className="hidden lg:flex lg:w-56 lg:shrink-0 lg:flex-col">
@@ -42,7 +42,7 @@ export function Layout() {
           className="fixed inset-0 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         >
-          <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
+          <div className="absolute inset-0 backdrop-blur-sm" style={{ background: 'rgba(58,46,34,0.5)' }} />
           <div
             className="absolute inset-y-0 left-0 w-56 shadow-2xl"
             onClick={(e) => e.stopPropagation()}

@@ -2,7 +2,6 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
-import { getDomainColors } from '../utils/domainColors'
 import type { Domain, Task } from '../types'
 
 // ─── Urgency helpers ──────────────────────────────────────────────────────────
@@ -77,14 +76,14 @@ interface SidebarProps {
 const linkCls = ({ isActive }: { isActive: boolean }) =>
   [
     'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-    'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+    'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
     isActive
-      ? 'bg-zinc-800 text-zinc-100 font-medium'
-      : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+      ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+      : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
   ].join(' ')
 
 const sectionLabel = (text: string) => (
-  <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-zinc-700">
+  <p className="px-3 mb-1.5 text-[10px] font-semibold uppercase tracking-widest text-[var(--fg-subtle)]">
     {text}
   </p>
 )
@@ -97,29 +96,29 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
   const career   = useCareerStore()
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col bg-zinc-950 border-r border-zinc-800/40 py-4 px-3 gap-0.5 overflow-y-auto">
+    <aside className="flex h-full w-56 shrink-0 flex-col bg-[var(--bg-elev)] border-r border-[var(--border)] py-4 px-3 gap-0.5 overflow-y-auto">
 
       {/* ── Brand ──────────────────────────────────────────────────────────────── */}
       <button
         onClick={() => { navigate('/dashboard'); onNavigate?.() }}
-        className="mb-3 flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-zinc-800/60 transition-colors outline-none focus-visible:ring-1 focus-visible:ring-teal-500/50"
+        className="mb-3 flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-[var(--paper-2)] transition-colors outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]"
       >
-        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-teal-500/25 bg-teal-500/12 text-xs text-teal-400 select-none">
+        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--terra-soft)] bg-[var(--terra-soft)] text-xs text-[var(--terra)] select-none">
           ✦
         </span>
-        <span className="text-sm font-semibold text-zinc-200 tracking-tight">Aetheris</span>
+        <span className="text-sm font-semibold text-[var(--fg)] tracking-tight">Aetheris</span>
       </button>
 
       {/* ── Search ─────────────────────────────────────────────────────────────── */}
       <button
         onClick={onSearch}
-        className="mb-3 flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300 transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-teal-500/50"
+        className="mb-3 flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)] transition-all duration-150 outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]"
       >
         <svg className="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
         </svg>
         <span>Rechercher</span>
-        <span className="ml-auto text-[10px] text-zinc-700 font-mono">⌘K</span>
+        <span className="ml-auto text-[10px] text-[var(--fg-subtle)] font-mono">⌘K</span>
       </button>
 
       {/* ── Navigation principale ───────────────────────────────────────────────── */}
@@ -135,7 +134,6 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
       <div className="mt-4 space-y-0.5">
         {sectionLabel('Domaines')}
         {domains.map((domain) => {
-          const colors  = getDomainColors(domain.color)
           const urgency = computeDomainUrgency(domain, tasks, law, career)
           return (
             <NavLink
@@ -145,10 +143,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
               className={({ isActive }) =>
                 [
                   'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-                  'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+                  'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
                   isActive
-                    ? `${colors.bgMuted} ${colors.text} font-medium`
-                    : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+                    ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                    : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
                 ].join(' ')
               }
             >
@@ -163,10 +161,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           className={({ isActive }) =>
             [
               'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
               isActive
-                ? 'bg-yellow-500/15 text-yellow-400 font-medium'
-                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
             ].join(' ')
           }
         >
@@ -178,10 +176,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           className={({ isActive }) =>
             [
               'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
               isActive
-                ? 'bg-sky-500/15 text-sky-400 font-medium'
-                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
             ].join(' ')
           }
         >
@@ -193,10 +191,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           className={({ isActive }) =>
             [
               'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
               isActive
-                ? 'bg-orange-500/15 text-orange-400 font-medium'
-                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
             ].join(' ')
           }
         >
@@ -208,10 +206,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           className={({ isActive }) =>
             [
               'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
               isActive
-                ? 'bg-emerald-500/15 text-emerald-400 font-medium'
-                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
             ].join(' ')
           }
         >
@@ -223,10 +221,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           className={({ isActive }) =>
             [
               'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-              'focus-visible:ring-1 focus-visible:ring-teal-500/50',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
               isActive
-                ? 'bg-violet-500/15 text-violet-400 font-medium'
-                : 'text-zinc-500 hover:bg-zinc-800/60 hover:text-zinc-300',
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
             ].join(' ')
           }
         >
@@ -239,7 +237,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
       <div className="flex-1" />
 
       {/* ── Autres ─────────────────────────────────────────────────────────────── */}
-      <div className="mt-4 border-t border-zinc-800/40 pt-4 space-y-0.5">
+      <div className="mt-4 border-t border-[var(--border)] pt-4 space-y-0.5">
         {sectionLabel('Autres')}
         <NavLink to="/week" onClick={onNavigate} className={linkCls}>
           <span className="text-xs w-4 text-center">▦</span>
