@@ -1,6 +1,32 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import {
+  Home, Utensils, Wine, ShoppingBag, PawPrint, HeartPulse,
+  CircleDot, RefreshCw, TrainFront, Package,
+  type LucideIcon,
+} from 'lucide-react'
 import { useStore } from '../store'
 import type { Transaction, SavingsGoal, FinanceCategory } from '../types'
+
+// ─── Design-system palettes for donut segments ────────────────────────────────
+
+const EXPENSE_PALETTE = ['#B5532A', '#C06A2F', '#8E3D1C', '#D08256', '#EAD1BE']
+const INCOME_PALETTE  = ['#7E9A7A', '#5C7859', '#A8BAA3']
+
+// ─── Category icon mapping ────────────────────────────────────────────────────
+
+function getCategoryIcon(name: string): LucideIcon {
+  const n = name.toLowerCase().trim()
+  if (n.includes('logement') || n.includes('loyer') || n.includes('maison') || n.includes('locat')) return Home
+  if (n.includes('nourrit') || n.includes('aliment') || n.includes('course') || n.includes('épicerie')) return Utensils
+  if (n.includes('sortie') || n.includes('restaurant') || n.includes('bar') || n.includes('loisir')) return Wine
+  if (n.includes('shopping') || n.includes('vêt') || n.includes('habit') || n.includes('mode')) return ShoppingBag
+  if (n.includes('animal') || n.includes('chien') || n.includes('chat') || n.includes('vétér')) return PawPrint
+  if (n.includes('santé') || n.includes('sante') || n.includes('médec') || n.includes('pharma') || n.includes('médic')) return HeartPulse
+  if (n.includes('abonnement') || n.includes('abonne') || n.includes('streaming')) return RefreshCw
+  if (n.includes('transport') || n.includes('voiture') || n.includes('train') || n.includes('métro') || n.includes('essence')) return TrainFront
+  if (n.includes('autre') || n.includes('divers') || n.includes('miscell')) return CircleDot
+  return Package
+}
 
 // PDF.js worker URL (must be at module level for Vite's static analysis)
 const PDF_WORKER_URL = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).href
@@ -125,13 +151,17 @@ export function FinancePage() {
   const expensePie = useMemo(() => {
     const map = new Map<string, number>()
     monthTx.filter((t) => t.type === 'expense').forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount))
-    return Array.from(map, ([catId, value]) => ({ value, ...catMeta(catId) })).sort((a, b) => b.value - a.value)
+    return Array.from(map, ([catId, value]) => ({ value, ...catMeta(catId) }))
+      .sort((a, b) => b.value - a.value)
+      .map((item, i) => ({ ...item, color: EXPENSE_PALETTE[i % EXPENSE_PALETTE.length] }))
   }, [monthTx])
 
   const incomePie = useMemo(() => {
     const map = new Map<string, number>()
     monthTx.filter((t) => t.type === 'income').forEach((t) => map.set(t.category, (map.get(t.category) ?? 0) + t.amount))
-    return Array.from(map, ([catId, value]) => ({ value, ...catMeta(catId) })).sort((a, b) => b.value - a.value)
+    return Array.from(map, ([catId, value]) => ({ value, ...catMeta(catId) }))
+      .sort((a, b) => b.value - a.value)
+      .map((item, i) => ({ ...item, color: INCOME_PALETTE[i % INCOME_PALETTE.length] }))
   }, [monthTx])
 
   // ── Budget lookups ────────────────────────────────────────────────────────────
@@ -242,7 +272,7 @@ export function FinancePage() {
           {expenseCats.map(cat => (
             <BudgetCard
               key={cat.id}
-              icon={cat.icon}
+              icon={getCategoryIcon(cat.name)}
               cat={cat.name}
               spent={spentMap.get(cat.id) ?? 0}
               budget={budgetMap.get(cat.id) ?? 0}
@@ -366,7 +396,7 @@ export function FinancePage() {
                     date={new Date(tx.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                     cat={
                       <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontFamily: 'var(--font-sans)', color: 'var(--ink)' }}>
-                        <span>{cat.icon}</span>
+                        {(() => { const I = getCategoryIcon(cat.label); return <I size={13} style={{ color: 'var(--ink-3)', flexShrink: 0 }} /> })()}
                         {cat.label}
                       </span>
                     }
@@ -556,8 +586,8 @@ function SectionHead({ label, meta }: { label: string; meta?: string }) {
 
 // ─── BudgetCard ───────────────────────────────────────────────────────────────
 
-function BudgetCard({ icon, cat, spent, budget, onEdit }: {
-  icon: string; cat: string; spent: number; budget: number; onEdit: () => void
+function BudgetCard({ icon: IconComp, cat, spent, budget, onEdit }: {
+  icon: LucideIcon; cat: string; spent: number; budget: number; onEdit: () => void
 }) {
   const pct      = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0
   const over      = budget > 0 && spent > budget
@@ -567,8 +597,8 @@ function BudgetCard({ icon, cat, spent, budget, onEdit }: {
   return (
     <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--paper)', border: '1px solid var(--paper-2)', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 15 }}>
-          {icon}
+        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--paper)', border: '1px solid var(--paper-2)', display: 'grid', placeItems: 'center', flexShrink: 0, color: 'var(--ink-2)' }}>
+          <IconComp size={15} />
         </div>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14.5, fontWeight: 500, color: 'var(--ink)', flex: 1 }}>{cat}</span>
         {over && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: 'var(--terra-soft)', color: '#6B2F14' }}>dépassé</span>}
@@ -1011,7 +1041,7 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
                 className={['flex w-full overflow-hidden flex-col items-center gap-1 rounded-xl border p-2 text-center transition-all',
                   validCat === cat.id ? 'border-[var(--terra-soft)] bg-[var(--terra-soft)] text-[var(--accent)]' : 'border-[var(--border)] text-[var(--fg-muted)] hover:border-[var(--border-strong)]',
                 ].join(' ')}>
-                <span className="text-xl leading-none shrink-0">{cat.icon}</span>
+                {(() => { const I = getCategoryIcon(cat.name); return <I size={18} className="shrink-0 text-[var(--fg-muted)]" /> })()}
                 <span className="text-[10px] truncate w-full text-center leading-tight">{cat.name}</span>
               </button>
             ))}
@@ -1057,7 +1087,7 @@ function BudgetModal({ category, current, onClose }: { category: string; current
     <Modal onClose={onClose} title={`Budget — ${cat.label}`} maxW="max-w-sm">
       <form onSubmit={handleSubmit} className="space-y-4 p-5">
         <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-4 py-3">
-          <span className="text-2xl">{cat.icon}</span>
+          {(() => { const I = getCategoryIcon(cat.label); return <I size={20} className="text-[var(--fg-muted)]" /> })()}
           <p className="text-sm text-[var(--fg-muted)]">Budget mensuel pour <span className="font-medium text-[var(--fg)]">{cat.label}</span></p>
         </div>
         <div>
