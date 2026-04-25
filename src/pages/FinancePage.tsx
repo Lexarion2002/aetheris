@@ -578,11 +578,11 @@ function DonutSection({ title, data, total, empty, centerLabel }: {
           {data.map((d, i) => {
             const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
             return (
-              <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 1fr auto auto', gap: 10, alignItems: 'center' }}>
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 16px 1fr auto auto', gap: 8, alignItems: 'center' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: 'inline-block' }} />
-                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)', overflow: 'hidden' }}>
-                  {(() => { const I = getCategoryIcon(d.label); return <I size={13} style={{ color: 'var(--ink-3)', flexShrink: 0 }} /> })()}
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
+                {(() => { const I = getCategoryIcon(d.label); return <I size={14} style={{ color: 'var(--ink-3)' }} /> })()}
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {d.label}
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
                   {fmtDec(d.value)}
