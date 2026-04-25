@@ -439,6 +439,9 @@ interface DonutSeg { label: string; value: number; color: string; icon?: string 
 function Donut({ data, centerLabel, centerValue, size = 180 }: {
   data: DonutSeg[]; centerLabel?: string; centerValue?: string; size?: number
 }) {
+  const [hovered, setHovered] = useState<number | null>(null)
+  const [mouse,   setMouse]   = useState({ x: 0, y: 0 })
+
   const total = data.reduce((s, d) => s + d.value, 0)
   const r = 70, stroke = 22, c = 2 * Math.PI * r
   const cx = size / 2, cy = size / 2
@@ -450,27 +453,71 @@ function Donut({ data, centerLabel, centerValue, size = 180 }: {
     offset += dash
     return seg
   })
+
+  const hovSeg = hovered !== null ? data[hovered] : null
+  const hovPct = hovSeg && total > 0 ? Math.round((hovSeg.value / total) * 100) : 0
+
   return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
-      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--paper-2)" strokeWidth={stroke} />
-      {arcs.map(a => (
-        <circle key={a.key} cx={cx} cy={cy} r={r} fill="none" stroke={a.color} strokeWidth={stroke}
-          strokeDasharray={a.strokeDasharray} strokeDashoffset={a.strokeDashoffset}
-          transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt" />
-      ))}
-      {centerLabel && (
-        <text x={cx} y={cy - 6} textAnchor="middle"
-          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', fill: 'var(--ink-3)' }}>
-          {centerLabel}
-        </text>
+    <>
+      <svg
+        width={size} height={size} viewBox={`0 0 ${size} ${size}`}
+        style={{ display: 'block' }}
+        onMouseLeave={() => setHovered(null)}
+      >
+        <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--paper-2)" strokeWidth={stroke} />
+        {arcs.map(a => (
+          <circle
+            key={a.key}
+            cx={cx} cy={cy} r={r}
+            fill="none"
+            stroke={a.color}
+            strokeWidth={hovered === a.key ? stroke + 5 : stroke}
+            strokeDasharray={a.strokeDasharray}
+            strokeDashoffset={a.strokeDashoffset}
+            transform={`rotate(-90 ${cx} ${cy})`}
+            strokeLinecap="butt"
+            style={{ cursor: 'pointer', transition: 'stroke-width 120ms ease' }}
+            onMouseEnter={e => { setHovered(a.key); setMouse({ x: e.clientX, y: e.clientY }) }}
+            onMouseMove={e => setMouse({ x: e.clientX, y: e.clientY })}
+          />
+        ))}
+        {centerLabel && (
+          <text x={cx} y={cy - 6} textAnchor="middle"
+            style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', fill: 'var(--ink-3)' }}>
+            {centerLabel}
+          </text>
+        )}
+        {centerValue && (
+          <text x={cx} y={cy + 16} textAnchor="middle"
+            style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, fill: 'var(--ink)', letterSpacing: '-0.01em' }}>
+            {centerValue}
+          </text>
+        )}
+      </svg>
+
+      {hovSeg && (
+        <div style={{
+          position: 'fixed',
+          left: mouse.x + 14,
+          top: mouse.y - 12,
+          pointerEvents: 'none',
+          zIndex: 200,
+          background: 'var(--ink)',
+          color: 'var(--paper-1)',
+          borderRadius: 8,
+          padding: '8px 12px',
+          boxShadow: '0 4px 16px rgba(58,46,34,0.28)',
+          whiteSpace: 'nowrap',
+        }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, marginBottom: 3 }}>
+            {hovSeg.label}
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: 'var(--paper-2)' }}>
+            {fmtDec(hovSeg.value)}<span style={{ marginLeft: 8, opacity: 0.7 }}>{hovPct}%</span>
+          </div>
+        </div>
       )}
-      {centerValue && (
-        <text x={cx} y={cy + 16} textAnchor="middle"
-          style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, fill: 'var(--ink)', letterSpacing: '-0.01em' }}>
-          {centerValue}
-        </text>
-      )}
-    </svg>
+    </>
   )
 }
 
