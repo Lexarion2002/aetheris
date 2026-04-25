@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMusicStore } from '../store/musicStore'
-import type { AlbumCritique, AlbumAttente, ArtisteFollowed, AlbumTag } from '../store/musicStore'
+import type { AlbumCritique, AlbumAttente, AlbumTag } from '../store/musicStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -11,33 +11,16 @@ const ALL_TAGS: AlbumTag[] = [
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-// Générateur d'ID sécurisé (fallback si crypto.randomUUID n'est pas dispo)
 function generateId() {
   if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID()
   return Math.random().toString(36).substring(2, 15)
 }
 
-function noteColor(note: number) {
-  if (note >= 9) return 'text-amber-400'
-  if (note >= 7) return 'text-teal-400'
-  if (note >= 5) return 'text-zinc-300'
-  return 'text-zinc-500'
-}
-
-function TagPill({ tag }: { tag: string }) {
-  return (
-    <span className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-800 text-zinc-500 border border-zinc-700/50">
-      {tag}
-    </span>
-  )
-}
-
-function NoteStars({ note }: { note: number }) {
-  return (
-    <span className={`text-lg font-bold tabular-nums ${noteColor(note)}`}>
-      {note}<span className="text-xs font-normal text-zinc-600">/10</span>
-    </span>
-  )
+function noteColor(note: number): string {
+  if (note >= 9) return '#B5532A'
+  if (note >= 7) return '#5C7859'
+  if (note >= 5) return '#6B5B48'
+  return '#A08B72'
 }
 
 function fmtDate(iso: string | undefined) {
@@ -47,21 +30,675 @@ function fmtDate(iso: string | undefined) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function PochetteImg({ src, alt, size = 48 }: { src: string; alt: string; size?: number }) {
-  if (!src) return (
-    <div
-      className="shrink-0 rounded-md bg-zinc-800 border border-zinc-700/50 flex items-center justify-center text-zinc-600 text-xs"
-      style={{ width: size, height: size }}
-    >
-      ♪
+// ─── Shared styles ────────────────────────────────────────────────────────────
+
+const primaryBtnStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 14,
+  padding: '8px 16px', borderRadius: 8, border: '1px solid transparent',
+  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+  background: 'var(--terra)', color: 'var(--paper-1)',
+}
+const ghostBtnStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontWeight: 400, fontSize: 14,
+  padding: '8px 16px', borderRadius: 8, border: '1px solid var(--ink-4)',
+  cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8,
+  background: 'transparent', color: 'var(--ink)',
+}
+const inputStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-sans)', fontSize: 14, padding: '8px 12px',
+  borderRadius: 8, border: '1px solid var(--paper-2)', background: 'var(--paper-1)',
+  color: 'var(--ink)', outline: 'none',
+}
+
+// ─── AlbumCover ───────────────────────────────────────────────────────────────
+
+const COVER_PALETTES = [
+  { bg: '#B5532A', fg: '#F4ECDC', motif: '#8E3D1C' },
+  { bg: '#7E9A7A', fg: '#FBF6EA', motif: '#5C7859' },
+  { bg: '#3A2E22', fg: '#EAD1BE', motif: '#6B5B48' },
+  { bg: '#EAD1BE', fg: '#3A2E22', motif: '#B5532A' },
+  { bg: '#D5DFD0', fg: '#3A2E22', motif: '#5C7859' },
+  { bg: '#EADFC8', fg: '#3A2E22', motif: '#A08B72' },
+  { bg: '#6B5B48', fg: '#F4ECDC', motif: '#EAD1BE' },
+  { bg: '#FBF6EA', fg: '#3A2E22', motif: '#B5532A' },
+]
+
+function AlbumCover({ titre, artiste, pochette, size, style }: {
+  titre: string; artiste: string; pochette?: string
+  size?: number   // omit or 0 → full-width fluid square
+  style?: React.CSSProperties
+}) {
+  const isFluid = !size
+  const dim: React.CSSProperties = isFluid
+    ? { width: '100%', aspectRatio: '1/1', height: 'auto' }
+    : { width: size, height: size, flexShrink: 0 }
+
+  if (pochette) {
+    return <img src={pochette} alt={titre} style={{ ...dim, borderRadius: 6, objectFit: 'cover', display: 'block', ...style }} />
+  }
+
+  const seed = (titre + artiste).split('').reduce((acc, c) => acc + c.charCodeAt(0), 0)
+  const p = COVER_PALETTES[seed % COVER_PALETTES.length]
+  const motif = seed % 4
+  const initial = titre.trim().charAt(0).toUpperCase()
+
+  return (
+    <div style={{ ...dim, borderRadius: 6, overflow: 'hidden', background: p.bg, position: 'relative', boxShadow: 'inset 0 0 0 1px rgba(58,46,34,0.08)', ...style }}>
+      <svg viewBox="0 0 180 180" width="100%" height="100%" style={{ display: 'block' }}>
+        {motif === 0 && (<>
+          <circle cx="90" cy="90" r="62" fill="none" stroke={p.motif} strokeWidth="1.2" opacity="0.55" />
+          <circle cx="90" cy="90" r="44" fill="none" stroke={p.motif} strokeWidth="1.2" opacity="0.4" />
+          <circle cx="90" cy="90" r="22" fill="none" stroke={p.motif} strokeWidth="1.2" opacity="0.3" />
+          <circle cx="90" cy="90" r="4" fill={p.fg} />
+        </>)}
+        {motif === 1 && (<>
+          <rect x="18" y="32" width="144" height="1" fill={p.motif} opacity="0.6" />
+          <rect x="18" y="148" width="144" height="1" fill={p.motif} opacity="0.6" />
+          <rect x="30" y="56" width="120" height="68" fill={p.motif} opacity="0.18" />
+        </>)}
+        {motif === 2 && (<>
+          <path d="M 20 140 Q 60 60, 90 90 T 160 40" fill="none" stroke={p.motif} strokeWidth="1.4" opacity="0.65" />
+          <path d="M 20 150 Q 60 80, 90 110 T 160 55" fill="none" stroke={p.motif} strokeWidth="1.4" opacity="0.45" />
+        </>)}
+        {motif === 3 && (<>
+          <rect x="24" y="24" width="52" height="132" fill={p.motif} opacity="0.22" />
+          <rect x="84" y="24" width="28" height="66" fill={p.motif} opacity="0.35" />
+          <rect x="120" y="90" width="36" height="66" fill={p.motif} opacity="0.22" />
+        </>)}
+        <text x="18" y="168" fill={p.fg}
+          style={{ fontFamily: 'var(--font-serif)', fontSize: 13, fontStyle: 'italic', fontWeight: 500 }}>
+          {initial}
+        </text>
+        <text x="162" y="28" textAnchor="end" fill={p.fg}
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 8, letterSpacing: '0.15em', opacity: 0.7 }}>
+          {String((seed % 99) + 1).padStart(2, '0')}
+        </text>
+      </svg>
     </div>
   )
+}
+
+// ─── SectionHeader ────────────────────────────────────────────────────────────
+
+function SectionHeader({ kicker, title, right }: {
+  kicker: string; title: string; right?: React.ReactNode
+}) {
   return (
-    <img
-      src={src} alt={alt}
-      className="shrink-0 rounded-md object-cover border border-zinc-700/50"
-      style={{ width: size, height: size }}
-    />
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 20, gap: 16, flexWrap: 'wrap' }}>
+      <div>
+        <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>
+          {kicker}
+        </span>
+        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.15, margin: 0 }}>
+          {title}
+        </h3>
+      </div>
+      {right && <div style={{ paddingBottom: 4 }}>{right}</div>}
+    </div>
+  )
+}
+
+// ─── SearchField ──────────────────────────────────────────────────────────────
+
+function SearchField({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [focus, setFocus] = useState(false)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'var(--paper-1)', border: `1px solid ${focus ? 'var(--ink)' : 'var(--paper-2)'}`, borderRadius: 8, padding: '7px 12px', flex: '0 1 320px', minWidth: 200, transition: 'border-color var(--dur) var(--ease)' }}>
+      <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="var(--ink-3)" strokeWidth={2} style={{ flexShrink: 0 }}>
+        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+      <input value={value} onChange={e => onChange(e.target.value)} onFocus={() => setFocus(true)} onBlur={() => setFocus(false)}
+        placeholder="Chercher un album, un artiste…"
+        style={{ flex: 1, border: 0, outline: 0, background: 'transparent', fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)', padding: 0 }} />
+      {value && (
+        <button onClick={() => onChange('')} style={{ border: 0, background: 'transparent', cursor: 'pointer', color: 'var(--ink-3)', padding: 0 }}>✕</button>
+      )}
+    </div>
+  )
+}
+
+// ─── SortMode + SortMenu ──────────────────────────────────────────────────────
+
+type SortMode = 'sortie_desc' | 'critique_desc' | 'note_desc' | 'note_asc' | 'artiste'
+
+const SORT_OPTIONS: { value: SortMode; label: string }[] = [
+  { value: 'sortie_desc',   label: 'Récents'       },
+  { value: 'critique_desc', label: 'Date critique'  },
+  { value: 'note_desc',     label: 'Note ↓'         },
+  { value: 'note_asc',      label: 'Note ↑'         },
+  { value: 'artiste',       label: 'Artiste A–Z'    },
+]
+
+function SortMenu({ value, onChange }: { value: SortMode; onChange: (v: SortMode) => void }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
+  const label = SORT_OPTIONS.find(o => o.value === value)?.label ?? 'Récents'
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button onClick={() => setOpen(o => !o)} style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--paper-2)', background: 'var(--paper-1)', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>
+        <span style={{ color: 'var(--ink-3)' }}>Trier ·</span>
+        <span>{label}</span>
+        <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>▾</span>
+      </button>
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, minWidth: 160, background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10, boxShadow: '0 6px 20px -8px rgba(58,46,34,0.18)', padding: 4, zIndex: 10 }}>
+          {SORT_OPTIONS.map(o => (
+            <button key={o.value} onClick={() => { onChange(o.value); setOpen(false) }} style={{ display: 'flex', alignItems: 'center', gap: 10, width: '100%', padding: '7px 10px', borderRadius: 6, border: 0, background: value === o.value ? 'var(--paper-2)' : 'transparent', color: 'var(--ink)', fontFamily: 'var(--font-sans)', fontSize: 13, cursor: 'pointer', textAlign: 'left' }}>
+              <span style={{ opacity: value === o.value ? 1 : 0, color: 'var(--terra)', fontSize: 12 }}>✓</span>
+              {o.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── ChipFilter ───────────────────────────────────────────────────────────────
+
+function ChipFilter({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button onClick={onClick} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: active ? 500 : 400, padding: '4px 10px', borderRadius: 999, background: active ? 'var(--paper-3)' : (hover ? 'var(--paper-2)' : 'var(--paper-1)'), border: `1px solid ${active ? 'var(--ink-4)' : 'var(--paper-2)'}`, color: 'var(--ink)', cursor: 'pointer', transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)' }}>
+      {children}
+    </button>
+  )
+}
+
+// ─── NowPlaying ───────────────────────────────────────────────────────────────
+
+function NowPlaying({ onCritique }: { onCritique: () => void }) {
+  const albumEnCours          = useMusicStore(s => s.albumEnCours)
+  const clearAlbumEnCours     = useMusicStore(s => s.clearAlbumEnCours)
+  const setPremiereImpression = useMusicStore(s => s.setPremiereImpression)
+  const setAlbumEnCours       = useMusicStore(s => s.setAlbumEnCours)
+  const [showForm, setShowForm] = useState(false)
+  const [titre,    setTitre]    = useState('')
+  const [artiste,  setArtiste]  = useState('')
+  const [pochette, setPochette] = useState('')
+
+  if (!albumEnCours) {
+    return (
+      <section>
+        <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 14 }}>
+          En écoute
+        </span>
+        {showForm ? (
+          <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 16, padding: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              <input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Album *" style={inputStyle} />
+              <input value={artiste} onChange={e => setArtiste(e.target.value)} placeholder="Artiste *" style={inputStyle} />
+            </div>
+            <input value={pochette} onChange={e => setPochette(e.target.value)} placeholder="URL pochette (optionnel)"
+              style={{ ...inputStyle, width: '100%', boxSizing: 'border-box', marginBottom: 12 }} />
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button
+                onClick={() => { if (!titre.trim() || !artiste.trim()) return; setAlbumEnCours({ titre: titre.trim(), artiste: artiste.trim(), pochette: pochette.trim(), premiereImpression: '' }); setShowForm(false) }}
+                disabled={!titre.trim() || !artiste.trim()}
+                style={{ flex: 1, ...primaryBtnStyle }}>
+                Démarrer l'écoute
+              </button>
+              <button onClick={() => setShowForm(false)} style={ghostBtnStyle}>Annuler</button>
+            </div>
+          </div>
+        ) : (
+          <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 16, padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-3)', margin: 0, maxWidth: '52ch', lineHeight: 1.4 }}>
+              Lance une écoute pour prendre des notes en temps réel.
+            </p>
+            <button onClick={() => setShowForm(true)} style={{ ...primaryBtnStyle, whiteSpace: 'nowrap', flexShrink: 0 }}>
+              + Démarrer
+            </button>
+          </div>
+        )}
+      </section>
+    )
+  }
+
+  return (
+    <section>
+      <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 14 }}>
+        En écoute
+      </span>
+      <div style={{ display: 'grid', gridTemplateColumns: '220px 1fr', gap: 32, alignItems: 'start', background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 16, padding: 24 }}>
+        <AlbumCover titre={albumEnCours.titre} artiste={albumEnCours.artiste} pochette={albumEnCours.pochette} size={220} />
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--terra)', display: 'inline-block' }} />
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>En lecture</span>
+          </div>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 34, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.01em', lineHeight: 1.1, margin: '0 0 6px' }}>
+            {albumEnCours.titre}
+          </h2>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 24 }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 16, color: 'var(--ink-2)' }}>{albumEnCours.artiste}</span>
+            <span style={{ color: 'var(--ink-4)' }}>·</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>
+              depuis {new Date(albumEnCours.startedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+            </span>
+          </div>
+          <textarea
+            value={albumEnCours.premiereImpression}
+            onChange={e => setPremiereImpression(e.target.value)}
+            placeholder="Première impression, ce que j'entends…"
+            rows={3}
+            style={{ width: '100%', fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)', background: 'var(--paper)', border: '1px solid var(--paper-2)', borderRadius: 8, padding: '10px 12px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', marginBottom: 16, lineHeight: 1.5 }}
+          />
+          <div style={{ display: 'flex', gap: 10 }}>
+            <button onClick={onCritique} style={{ flex: 1, ...primaryBtnStyle, justifyContent: 'center' }}>Rédiger la critique</button>
+            <button onClick={clearAlbumEnCours} style={ghostBtnStyle}>Stopper</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  )
+}
+
+// ─── AlbumCard ────────────────────────────────────────────────────────────────
+
+function AlbumCard({ album, onEdit, onDelete }: {
+  album: AlbumCritique
+  onEdit: (a: AlbumCritique) => void
+  onDelete: (id: string) => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onEdit(album)} style={{ cursor: 'pointer' }}>
+      <div style={{ position: 'relative', transform: hover ? 'translateY(-2px)' : 'translateY(0)', transition: 'transform var(--dur) var(--ease)' }}>
+        <AlbumCover titre={album.titre} artiste={album.artiste} pochette={album.pochette} />
+        <div style={{ position: 'absolute', top: 10, right: 10, width: 36, height: 36, borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', border: '2px solid var(--paper-1)', boxShadow: '0 1px 2px rgba(58,46,34,0.25)' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 500 }}>{album.note}</span>
+        </div>
+        {hover && (
+          <button onClick={e => { e.stopPropagation(); onDelete(album.id!) }}
+            style={{ position: 'absolute', top: 10, left: 10, width: 28, height: 28, borderRadius: 6, border: 0, background: 'rgba(155,58,28,0.85)', color: 'white', cursor: 'pointer', display: 'grid', placeItems: 'center', fontSize: 11 }}>
+            ✕
+          </button>
+        )}
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.25, letterSpacing: '-0.005em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {album.titre}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+            {album.artiste}
+          </span>
+          {album.dateOriginaleSortie && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', flexShrink: 0 }}>
+              {new Date(album.dateOriginaleSortie).getFullYear()}
+            </span>
+          )}
+        </div>
+        {album.tags.length > 0 && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 6, flexWrap: 'wrap' }}>
+            {album.tags.slice(0, 2).map(t => (
+              <span key={t} style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'var(--paper-2)', color: 'var(--ink-3)' }}>
+                {t}
+              </span>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── BibliothequeSection ──────────────────────────────────────────────────────
+
+function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => void; onNew: () => void }) {
+  const bibliotheque   = useMusicStore(s => s.bibliotheque)
+  const deleteCritique = useMusicStore(s => s.deleteCritique)
+  const [sort,      setSort]      = useState<SortMode>('sortie_desc')
+  const [tagFilter, setTagFilter] = useState<AlbumTag | ''>('')
+  const [searchQ,   setSearchQ]   = useState('')
+
+  const sorted = [...bibliotheque]
+    .filter(a => {
+      if (tagFilter && !a.tags.includes(tagFilter as AlbumTag)) return false
+      if (searchQ) {
+        const q = searchQ.toLowerCase()
+        return (a.titre + ' ' + a.artiste).toLowerCase().includes(q)
+      }
+      return true
+    })
+    .sort((a, b) => {
+      if (sort === 'note_desc') return b.note - a.note
+      if (sort === 'note_asc') return a.note - b.note
+      if (sort === 'artiste') return a.artiste.localeCompare(b.artiste)
+      if (sort === 'critique_desc') return new Date(b.dateCritique).getTime() - new Date(a.dateCritique).getTime()
+      const da = a.dateOriginaleSortie ?? '', db = b.dateOriginaleSortie ?? ''
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
+      return db.localeCompare(da)
+    })
+
+  const usedTags = Array.from(new Set(bibliotheque.flatMap(a => a.tags)))
+
+  return (
+    <section style={{ marginTop: 56 }}>
+      <SectionHeader
+        kicker="Bibliothèque"
+        title="Ta collection"
+        right={<button onClick={onNew} style={primaryBtnStyle}>+ Album</button>}
+      />
+
+      <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 24, flexWrap: 'wrap' }}>
+        <SearchField value={searchQ} onChange={setSearchQ} />
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          <ChipFilter active={tagFilter === ''} onClick={() => setTagFilter('')}>Tous</ChipFilter>
+          {usedTags.map(tag => (
+            <ChipFilter key={tag} active={tagFilter === tag} onClick={() => setTagFilter(tag === tagFilter ? '' : tag as AlbumTag)}>
+              {tag}
+            </ChipFilter>
+          ))}
+        </div>
+        <div style={{ marginLeft: 'auto' }}>
+          <SortMenu value={sort} onChange={setSort} />
+        </div>
+      </div>
+
+      {sorted.length === 0 ? (
+        <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-3)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
+          {bibliotheque.length === 0 ? 'Aucune critique encore. Commence par écouter un album.' : 'Rien ne correspond.'}
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 28 }}>
+          {sorted.map((album, idx) => (
+            <AlbumCard
+              key={album.id || `grid-${idx}`}
+              album={album}
+              onEdit={onEdit}
+              onDelete={id => { if (window.confirm('Supprimer cet album ?')) deleteCritique(id) }}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─── PantheonCard ─────────────────────────────────────────────────────────────
+
+function PantheonCard({ album, onEdit }: { album: AlbumCritique; onEdit: (a: AlbumCritique) => void }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onEdit(album)} style={{ cursor: 'pointer' }}>
+      <div style={{ position: 'relative', transform: hover ? 'translateY(-2px)' : 'translateY(0)', transition: 'transform var(--dur) var(--ease)' }}>
+        <AlbumCover titre={album.titre} artiste={album.artiste} pochette={album.pochette} />
+        <div style={{ position: 'absolute', top: 10, right: 10, width: 40, height: 40, borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', border: '2px solid var(--paper-1)', boxShadow: '0 1px 2px rgba(58,46,34,0.25)' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500, letterSpacing: '-0.01em', color: noteColor(album.note) }}>
+            {album.note}
+          </span>
+        </div>
+      </div>
+      <div style={{ marginTop: 12 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.25, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {album.titre}
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8, marginTop: 3 }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+            {album.artiste}
+          </span>
+          {album.dateOriginaleSortie && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11.5, color: 'var(--ink-3)', flexShrink: 0 }}>
+              {new Date(album.dateOriginaleSortie).getFullYear()}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── PantheonSection ──────────────────────────────────────────────────────────
+
+function PantheonSection({ onEdit }: { onEdit: (a: AlbumCritique) => void }) {
+  const bibliotheque = useMusicStore(s => s.bibliotheque)
+  const pantheon = bibliotheque
+    .filter(a => a.note >= 9)
+    .sort((a, b) => {
+      const da = a.dateOriginaleSortie ?? '', db = b.dateOriginaleSortie ?? ''
+      if (!da && !db) return 0
+      if (!da) return 1
+      if (!db) return -1
+      return da.localeCompare(db)
+    })
+
+  return (
+    <section style={{ marginTop: 72 }}>
+      <SectionHeader
+        kicker="Panthéon"
+        title="Tes classiques"
+        right={<span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>Albums notés 9 et 10</span>}
+      />
+      {pantheon.length === 0 ? (
+        <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-3)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
+          Aucun album noté 9 ou 10 encore.
+        </div>
+      ) : (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 28 }}>
+          {pantheon.map((album, idx) => (
+            <PantheonCard key={album.id || `panth-${idx}`} album={album} onEdit={onEdit} />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─── QueueRow ─────────────────────────────────────────────────────────────────
+
+function QueueRow({ index, album, last, onListen, onEdit, onDelete }: {
+  index: number
+  album: AlbumAttente
+  last: boolean
+  onListen: () => void
+  onEdit: (a: AlbumAttente) => void
+  onDelete: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const [confirmDel, setConfirmDel] = useState(false)
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: last ? 'none' : '1px solid var(--paper-2)', background: hover ? 'var(--paper-2)' : 'transparent', transition: 'background var(--dur) var(--ease)', cursor: 'default' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)', width: 22, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+        {String(index).padStart(2, '0')}
+      </span>
+      <AlbumCover titre={album.titre} artiste={album.artiste} size={44} style={{ borderRadius: 4 }} />
+      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {album.titre}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', minWidth: 0 }}>{album.artiste}</span>
+          {album.source && (<><span style={{ color: 'var(--ink-4)', flexShrink: 0 }}>·</span><span style={{ fontStyle: 'italic', color: 'var(--ink-3)', flexShrink: 0 }}>{album.source}</span></>)}
+        </div>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0, opacity: hover ? 1 : 0.5, transition: 'opacity var(--dur) var(--ease)' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: 'var(--paper-2)', color: 'var(--ink-2)' }}>
+          À écouter
+        </span>
+        <button onClick={onListen} style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 6, border: 0, background: 'var(--terra-soft)', color: 'var(--terra)', cursor: 'pointer' }}>
+          ▶ Écouter
+        </button>
+        <button onClick={() => onEdit(album)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', fontSize: 14, padding: '2px 4px', opacity: hover ? 1 : 0, transition: 'opacity var(--dur) var(--ease)' }}>
+          ✎
+        </button>
+        {confirmDel ? (
+          <div style={{ display: 'flex', gap: 4 }}>
+            <button onClick={onDelete} style={{ fontFamily: 'var(--font-sans)', fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 0, background: 'rgba(155,58,28,0.15)', color: 'var(--danger)', cursor: 'pointer' }}>Suppr</button>
+            <button onClick={() => setConfirmDel(false)} style={{ fontFamily: 'var(--font-sans)', fontSize: 11, padding: '3px 8px', borderRadius: 4, border: 0, background: 'var(--paper-2)', color: 'var(--ink-2)', cursor: 'pointer' }}>✕</button>
+          </div>
+        ) : (
+          <button onClick={() => setConfirmDel(true)} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', fontSize: 14, padding: '2px 4px', opacity: hover ? 1 : 0, transition: 'opacity var(--dur) var(--ease)' }}>✕</button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── FileAttenteSection ───────────────────────────────────────────────────────
+
+function FileAttenteSection({ onNew, onEdit }: { onNew: () => void; onEdit: (a: AlbumAttente) => void }) {
+  const fileAttente    = useMusicStore(s => s.fileAttente)
+  const startListening = useMusicStore(s => s.startListening)
+  const removeFromFile = useMusicStore(s => s.removeFromFile)
+  const [highlighted, setHighlighted] = useState<string | null>(null)
+  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
+
+  function randomSelect() {
+    if (fileAttente.length === 0) return
+    const album = fileAttente[Math.floor(Math.random() * fileAttente.length)]
+    const id = album.id!
+    setHighlighted(id)
+    setTimeout(() => setHighlighted(null), 2000)
+    itemRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
+
+  return (
+    <section style={{ marginTop: 72 }}>
+      <SectionHeader
+        kicker="File d'attente"
+        title={`${fileAttente.length} album${fileAttente.length > 1 ? 's' : ''} à écouter`}
+        right={
+          <div style={{ display: 'flex', gap: 8 }}>
+            {fileAttente.length > 1 && (
+              <button onClick={randomSelect} style={ghostBtnStyle}>🎲 Mélanger</button>
+            )}
+            <button onClick={onNew} style={primaryBtnStyle}>+ Ajouter</button>
+          </div>
+        }
+      />
+      {fileAttente.length === 0 ? (
+        <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-3)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
+          Aucun album en attente.
+        </div>
+      ) : (
+        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+          {fileAttente.map((album, i) => (
+            <div key={album.id || `attente-${i}`} ref={el => { if (album.id) itemRefs.current[album.id] = el }}
+              style={{ outline: highlighted === album.id ? '2px solid var(--terra-soft)' : 'none', outlineOffset: -2, transition: 'outline 300ms ease' }}>
+              <QueueRow
+                index={i + 1}
+                album={album}
+                last={i === fileAttente.length - 1}
+                onListen={() => startListening(album.id!)}
+                onEdit={onEdit}
+                onDelete={() => removeFromFile(album.id!)}
+              />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─── MusicPage ────────────────────────────────────────────────────────────────
+
+export function MusicPage() {
+  const [critiqueModal, setCritiqueModal] = useState<{ open: boolean; album?: Partial<AlbumCritique & AlbumAttente> | null }>({ open: false })
+  const [fileModal,     setFileModal]     = useState(false)
+
+  const _hasHydrated = useMusicStore(s => s._hasHydrated)
+  const bibliotheque = useMusicStore(s => s.bibliotheque)
+  const fileAttente  = useMusicStore(s => s.fileAttente)
+  const albumEnCours = useMusicStore(s => s.albumEnCours)
+
+  // Auto-fix corrupted data (missing IDs)
+  useEffect(() => {
+    if (_hasHydrated) {
+      useMusicStore.setState(state => {
+        let changed = false
+        const newBiblio   = state.bibliotheque.map(a => { if (!a.id) { changed = true; return { ...a, id: generateId() } } return a })
+        const newAttente  = state.fileAttente.map(a => { if (!a.id) { changed = true; return { ...a, id: generateId() } } return a })
+        const newArtistes = state.artistesSuivis.map(a => { if (!a.id) { changed = true; return { ...a, id: generateId() } } return a })
+        return changed ? { bibliotheque: newBiblio, fileAttente: newAttente, artistesSuivis: newArtistes } : state
+      })
+    }
+  }, [_hasHydrated])
+
+  // Stats
+  const thisYear      = new Date().getFullYear()
+  const thisYearCount = bibliotheque.filter(a => a.dateCritique.startsWith(String(thisYear))).length
+  const pantheonCount = bibliotheque.filter(a => a.note >= 9).length
+
+  return (
+    <div style={{ padding: '32px 0 96px', maxWidth: 1180, margin: '0 auto' }}>
+
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 40, gap: 32 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+            musique · bibliothèque
+          </span>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 52, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.015em', margin: '6px 0 12px', lineHeight: 1.05 }}>
+            Musique.
+          </h1>
+          <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 19, color: 'var(--ink-2)', margin: 0, maxWidth: '52ch', lineHeight: 1.4 }}>
+            « Ce qu'on écoute en ce moment, ce qu'on a aimé, ce qui attend. »
+          </p>
+        </div>
+        <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+          <button onClick={() => setCritiqueModal({ open: true })} style={primaryBtnStyle}>
+            + Album
+          </button>
+        </div>
+      </div>
+
+      {/* ── Stats strip ─────────────────────────────────────────────────────── */}
+      <div style={{ display: 'flex', gap: 40, padding: '14px 0 28px', borderBottom: '1px solid var(--paper-2)', marginBottom: 40, flexWrap: 'wrap' }}>
+        {[
+          { label: 'Bibliothèque', value: String(bibliotheque.length), unit: 'albums' },
+          { label: 'Cette année',  value: String(thisYearCount),       unit: 'critiqués' },
+          { label: 'Panthéon',     value: String(pantheonCount),       unit: 'classiques' },
+          { label: 'À écouter',   value: String(fileAttente.length),  unit: 'en attente' },
+        ].map(s => (
+          <div key={s.label} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>{s.label}</span>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+              <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>{s.value}</span>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)' }}>{s.unit}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── En écoute ───────────────────────────────────────────────────────── */}
+      <NowPlaying onCritique={() => setCritiqueModal({ open: true, album: albumEnCours ? { titre: albumEnCours.titre, artiste: albumEnCours.artiste, pochette: albumEnCours.pochette } : null })} />
+
+      {/* ── Bibliothèque ────────────────────────────────────────────────────── */}
+      <BibliothequeSection
+        onEdit={album => setCritiqueModal({ open: true, album })}
+        onNew={() => setCritiqueModal({ open: true })}
+      />
+
+      {/* ── Panthéon ────────────────────────────────────────────────────────── */}
+      <PantheonSection onEdit={album => setCritiqueModal({ open: true, album })} />
+
+      {/* ── File d'attente ──────────────────────────────────────────────────── */}
+      <FileAttenteSection
+        onNew={() => setFileModal(true)}
+        onEdit={album => setCritiqueModal({ open: true, album })}
+      />
+
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {critiqueModal.open && (
+        <CritiqueModal
+          initial={critiqueModal.album ?? null}
+          onClose={() => setCritiqueModal({ open: false })}
+        />
+      )}
+      {fileModal && <FileModal onClose={() => setFileModal(false)} />}
+    </div>
   )
 }
 
@@ -153,7 +790,7 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
       tracksFavorites:     tracks.split('\n').map((t) => t.trim()).filter(Boolean),
       contexte:            contexte.trim(),
     }
-    
+
     if (isExistingCritique) {
       updateCritique(initial.id!, data)
     } else {
@@ -228,7 +865,6 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
           <div>
             <label className="text-[11px] text-zinc-500 mb-1 block">Pochette</label>
             <div className="flex gap-3 items-start">
-              {/* Drop zone */}
               <div
                 className={`relative flex-1 flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors cursor-pointer min-h-[80px] ${
                   dragOver
@@ -279,7 +915,7 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
           {/* Note */}
           <div>
             <label className="text-[11px] text-zinc-500 mb-2 block">
-              Note : <span className={`font-bold ${noteColor(note)}`}>{note % 1 === 0 ? note : note.toFixed(1)}/10</span>
+              Note : <span className="font-bold" style={{ color: noteColor(note) }}>{note % 1 === 0 ? note : note.toFixed(1)}/10</span>
             </label>
             <input
               type="range" min={1} max={10} step={0.5} value={note}
@@ -349,21 +985,21 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
               disabled={!titre.trim() || artistes.length === 0}
               className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
-          {!!initial ? 'Enregistrer' : 'Ajouter à la bibliothèque'}
+              {!!initial ? 'Enregistrer' : 'Ajouter à la bibliothèque'}
             </button>
-  {!!initial && (
-          <button
-            onClick={() => {
-              if (window.confirm('Supprimer cette critique ?')) {
-                deleteCritique(initial.id!)
-                onClose()
-              }
-            }}
-            className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm transition-colors"
-          >
-            Supprimer
-          </button>
-        )}
+            {!!initial && (
+              <button
+                onClick={() => {
+                  if (window.confirm('Supprimer cette critique ?')) {
+                    deleteCritique(initial.id!)
+                    onClose()
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm transition-colors"
+              >
+                Supprimer
+              </button>
+            )}
             <button onClick={onClose} className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors">
               Annuler
             </button>
@@ -378,9 +1014,9 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
 
 function FileModal({ onClose }: { onClose: () => void }) {
   const addAlbumFile = useMusicStore((s) => s.addAlbumFile)
-  const [titre,   setTitre]   = useState('')
-  const [artiste, setArtiste] = useState('')
-  const [source,  setSource]  = useState('')
+  const [titre,    setTitre]    = useState('')
+  const [artiste,  setArtiste]  = useState('')
+  const [source,   setSource]   = useState('')
   const [pourquoi, setPourquoi] = useState('')
 
   function handleSubmit() {
@@ -397,7 +1033,6 @@ function FileModal({ onClose }: { onClose: () => void }) {
       >
         <div className="p-5 space-y-3">
           <h2 className="text-sm font-semibold text-zinc-200">Ajouter à la file</h2>
-
           <div>
             <label className="text-[11px] text-zinc-500 mb-1 block">Titre *</label>
             <input value={titre} onChange={(e) => setTitre(e.target.value)}
@@ -426,7 +1061,6 @@ function FileModal({ onClose }: { onClose: () => void }) {
               placeholder="Raison de l'intérêt..."
             />
           </div>
-
           <div className="flex gap-2 pt-1">
             <button
               onClick={handleSubmit}
@@ -441,844 +1075,6 @@ function FileModal({ onClose }: { onClose: () => void }) {
           </div>
         </div>
       </div>
-    </div>
-  )
-}
-
-// ─── Artiste Modal ─────────────────────────────────────────────────────────────
-
-interface ArtisteModalProps {
-  initial?: ArtisteFollowed | null
-  onClose: () => void
-}
-
-function ArtisteModal({ initial, onClose }: ArtisteModalProps) {
-  const followArtiste  = useMusicStore((s) => s.followArtiste)
-  const updateArtiste  = useMusicStore((s) => s.updateArtiste)
-
-  const [nom,      setNom]      = useState(initial?.nom      ?? '')
-  const [photo,    setPhoto]    = useState(initial?.photo    ?? '')
-  const [ecoute,   setEcoute]   = useState<string>(initial?.discographieEcoutee?.toString() ?? '0')
-  const [total,    setTotal]    = useState<string>(initial?.discographieTotal?.toString()   ?? '0')
-  const [attentes, setAttentes] = useState(initial?.attentes ?? '')
-  const [alerte,   setAlerte]   = useState(initial?.alerte   ?? false)
-
-  function handleSubmit() {
-    if (!nom.trim()) return
-    const data = {
-      nom:                  nom.trim(),
-      photo:                photo.trim(),
-      discographieEcoutee:  parseInt(ecoute) || 0,
-      discographieTotal:    parseInt(total)  || 0,
-      attentes:             attentes.trim(),
-      alerte,
-    }
-    if (initial) updateArtiste(initial.id!, data)
-    else followArtiste(data)
-    onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-      <div
-        className="w-full max-w-sm bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="p-5 space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-200">
-            {initial ? 'Modifier artiste' : 'Suivre un artiste'}
-          </h2>
-
-          <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Nom *</label>
-            <input value={nom} onChange={(e) => setNom(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-              placeholder="Nom de l'artiste"
-            />
-          </div>
-          <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Photo (URL)</label>
-            <input value={photo} onChange={(e) => setPhoto(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-              placeholder="https://..."
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Albums écoutés</label>
-              <input value={ecoute} onChange={(e) => setEcoute(e.target.value)} type="number" min={0}
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Total discographie</label>
-              <input value={total} onChange={(e) => setTotal(e.target.value)} type="number" min={0}
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Notes / attentes</label>
-            <textarea value={attentes} onChange={(e) => setAttentes(e.target.value)} rows={2}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50 resize-none"
-              placeholder="Prochain album attendu, style..."
-            />
-          </div>
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input type="checkbox" checked={alerte} onChange={(e) => setAlerte(e.target.checked)} className="accent-teal-500" />
-            <span className="text-sm text-zinc-400">Alerte nouvelle sortie</span>
-          </label>
-
-          <div className="flex gap-2 pt-1">
-            <button
-              onClick={handleSubmit}
-              disabled={!nom.trim()}
-              className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40"
-            >
-              {initial ? 'Enregistrer' : 'Suivre'}
-            </button>
-            <button onClick={onClose} className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors">
-              Annuler
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── AlbumEnCoursCard ─────────────────────────────────────────────────────────
-
-function AlbumEnCoursCard({ onCritique }: { onCritique: () => void }) {
-  const albumEnCours          = useMusicStore((s) => s.albumEnCours)
-  const clearAlbumEnCours     = useMusicStore((s) => s.clearAlbumEnCours)
-  const setPremiereImpression = useMusicStore((s) => s.setPremiereImpression)
-  const setAlbumEnCours       = useMusicStore((s) => s.setAlbumEnCours)
-  const [showForm, setShowForm] = useState(false)
-  const [titre,    setTitre]   = useState('')
-  const [artiste,  setArtiste] = useState('')
-  const [pochette, setPochette] = useState('')
-
-  if (!albumEnCours) {
-    return (
-      <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-5">
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-sm font-semibold text-zinc-300">En écoute maintenant</h2>
-          <button
-            onClick={() => setShowForm(true)}
-            className="text-xs px-2.5 py-1 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 transition-colors"
-          >
-            + Démarrer une écoute
-          </button>
-        </div>
-        {showForm ? (
-          <div className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <input value={titre} onChange={(e) => setTitre(e.target.value)}
-                placeholder="Album *"
-                className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-              />
-              <input value={artiste} onChange={(e) => setArtiste(e.target.value)}
-                placeholder="Artiste *"
-                className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-              />
-            </div>
-            <input value={pochette} onChange={(e) => setPochette(e.target.value)}
-              placeholder="URL pochette (optionnel)"
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={() => {
-                  if (!titre.trim() || !artiste.trim()) return
-                  setAlbumEnCours({ titre: titre.trim(), artiste: artiste.trim(), pochette: pochette.trim(), premiereImpression: '' })
-                  setShowForm(false)
-                }}
-                disabled={!titre.trim() || !artiste.trim()}
-                className="flex-1 py-1.5 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40"
-              >
-                Démarrer
-              </button>
-              <button onClick={() => setShowForm(false)} className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 text-sm transition-colors">
-                Annuler
-              </button>
-            </div>
-          </div>
-        ) : (
-          <p className="text-xs text-zinc-600">Aucun album en cours. Lance une écoute pour prendre des notes.</p>
-        )}
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-5">
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-zinc-300">En écoute maintenant</h2>
-        <span className="text-[10px] text-zinc-600">
-          depuis {new Date(albumEnCours.startedAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-        </span>
-      </div>
-      <div className="flex gap-4">
-        <PochetteImg src={albumEnCours.pochette} alt={albumEnCours.titre} size={64} />
-        <div className="flex-1 min-w-0">
-          <p className="text-base font-semibold text-zinc-100 truncate">{albumEnCours.titre}</p>
-          <p className="text-sm text-zinc-500 truncate">{albumEnCours.artiste}</p>
-          <div className="mt-2">
-            <input
-              value={albumEnCours.premiereImpression}
-              onChange={(e) => setPremiereImpression(e.target.value)}
-              placeholder="Première impression..."
-              className="w-full bg-zinc-800/60 border border-zinc-700/40 rounded-lg px-2.5 py-1 text-xs text-zinc-300 outline-none focus:border-teal-500/50 placeholder:text-zinc-600"
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex gap-2 mt-3">
-        <button
-          onClick={onCritique}
-          className="flex-1 py-1.5 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 text-xs font-medium transition-colors"
-        >
-          Rédiger la critique
-        </button>
-        <button
-          onClick={clearAlbumEnCours}
-          className="px-3 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-500 text-xs transition-colors"
-        >
-          Stopper
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ─── Bibliotheque ─────────────────────────────────────────────────────────────
-
-type SortMode = 'sortie_desc' | 'critique_desc' | 'note_desc' | 'note_asc' | 'artiste'
-type ViewMode = 'grid' | 'list'
-
-function BibliothequeSection({
-  onEdit,
-  onNew,
-}: {
-  onEdit: (album: AlbumCritique) => void
-  onNew: () => void
-}) {
-  const bibliotheque   = useMusicStore((s) => s.bibliotheque)
-  const deleteCritique = useMusicStore((s) => s.deleteCritique)
-  const [sort,       setSort]       = useState<SortMode>('sortie_desc')
-  const [view,       setView]       = useState<ViewMode>('grid')
-  const [tagFilter,  setTagFilter]  = useState<AlbumTag | ''>('')
-  const [searchQ,    setSearchQ]    = useState('')
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
-
-  const sorted = [...bibliotheque]
-    .filter((a) => {
-      if (tagFilter && !a.tags.includes(tagFilter)) return false
-      if (searchQ) {
-        const q = searchQ.toLowerCase()
-        return a.titre.toLowerCase().includes(q) || a.artiste.toLowerCase().includes(q)
-      }
-      return true
-    })
-    .sort((a, b) => {
-      if (sort === 'note_desc')     return b.note - a.note
-      if (sort === 'note_asc')      return a.note - b.note
-      if (sort === 'artiste')       return a.artiste.localeCompare(b.artiste)
-      if (sort === 'critique_desc') return new Date(b.dateCritique).getTime() - new Date(a.dateCritique).getTime()
-      // sortie_desc: albums récents d'abord; vide à la fin
-      const da = a.dateOriginaleSortie ?? ''
-      const db = b.dateOriginaleSortie ?? ''
-      if (!da && !db) return 0
-      if (!da) return 1
-      if (!db) return -1
-      return db.localeCompare(da)
-    })
-
-  const usedTags = Array.from(new Set(bibliotheque.flatMap((a) => a.tags)))
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-zinc-300">
-          Bibliothèque
-          <span className="ml-2 text-xs text-zinc-600 font-normal">{bibliotheque.length} critiques</span>
-        </h2>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setView(view === 'grid' ? 'list' : 'grid')}
-            className="p-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-500 text-xs transition-colors"
-          >
-            {view === 'grid' ? '☰' : '⊞'}
-          </button>
-          <button
-            onClick={onNew}
-            className="text-xs px-2.5 py-1.5 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 transition-colors"
-          >
-            + Critique
-          </button>
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <input
-          value={searchQ} onChange={(e) => setSearchQ(e.target.value)}
-          placeholder="Rechercher..."
-          className="bg-zinc-800/60 border border-zinc-700/40 rounded-lg px-3 py-1 text-xs text-zinc-300 outline-none focus:border-teal-500/50 w-36"
-        />
-        <select
-          value={sort} onChange={(e) => setSort(e.target.value as SortMode)}
-          className="bg-zinc-800 border border-zinc-700/50 rounded-lg px-2 py-1 text-xs text-zinc-400 outline-none"
-        >
-          <option value="sortie_desc">Date de sortie ↓</option>
-          <option value="critique_desc">Date critique ↓</option>
-          <option value="note_desc">Note ↓</option>
-          <option value="note_asc">Note ↑</option>
-          <option value="artiste">Artiste A-Z</option>
-        </select>
-        {usedTags.length > 0 && (
-          <div className="flex gap-1 flex-wrap">
-            <button
-              onClick={() => setTagFilter('')}
-              className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${
-                tagFilter === ''
-                  ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
-                  : 'bg-zinc-800 text-zinc-500 border-zinc-700/50 hover:border-zinc-600'
-              }`}
-            >
-              Tous
-            </button>
-            {usedTags.map((tag) => (
-              <button
-                key={tag}
-                onClick={() => setTagFilter(tag === tagFilter ? '' : tag)}
-                className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${
-                  tagFilter === tag
-                    ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
-                    : 'bg-zinc-800 text-zinc-500 border-zinc-700/50 hover:border-zinc-600'
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {sorted.length === 0 ? (
-        <div className="py-10 text-center text-xs text-zinc-600">
-          {bibliotheque.length === 0 ? 'Aucune critique encore. Commence par écouter un album.' : 'Aucun résultat.'}
-        </div>
-      ) : view === 'grid' ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-          {sorted.map((album, idx) => (
-            <div
-              key={album.id || `grid-${idx}`}
-              className="group bg-zinc-900 border border-zinc-800/60 rounded-xl overflow-hidden hover:border-zinc-700/60 transition-colors cursor-pointer"
-              onClick={() => onEdit(album)}
-            >
-              <div className="relative">
-                <PochetteImg src={album.pochette} alt={album.titre} size={0} />
-                <div
-                  className="w-full aspect-square bg-zinc-800 flex items-center justify-center overflow-hidden"
-                  style={{ height: 0, paddingBottom: '100%', position: 'relative' }}
-                >
-                  {album.pochette ? (
-                    <img src={album.pochette} alt={album.titre} className="absolute inset-0 w-full h-full object-cover" />
-                  ) : (
-                    <div className="absolute inset-0 flex items-center justify-center text-3xl text-zinc-700">♪</div>
-                  )}
-                </div>
-              <div className="absolute top-2 right-2 rounded-full bg-black/60 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
-                  {album.note}
-                </div>
-                
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    if (window.confirm('Supprimer cet album de la bibliothèque ?')) {
-                      deleteCritique(album.id!)
-                    }
-                  }}
-                  title="Supprimer l'album"
-                  className="absolute top-1.5 left-1.5 z-10 rounded bg-red-500/20 p-1 text-red-400 opacity-0 transition-opacity hover:bg-red-500/40 group-hover:opacity-100"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-              <div className="p-2.5">
-                <p className="text-xs font-semibold text-zinc-200 truncate">{album.titre}</p>
-                <p className="text-[11px] text-zinc-500 truncate">{album.artiste}</p>
-                {album.dateOriginaleSortie && (
-                  <p className="text-[10px] text-zinc-700 mt-0.5 truncate">{fmtDate(album.dateOriginaleSortie)}</p>
-                )}
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {album.tags.slice(0, 2).map((t) => <TagPill key={t} tag={t} />)}
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-1">
-          {sorted.map((album, idx) => {
-            const itemId = album.id || `list-${idx}`
-            return (
-              <div
-                key={itemId}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-zinc-900 border border-zinc-800/40 hover:border-zinc-700/50 transition-colors group"
-              >
-              <PochetteImg src={album.pochette} alt={album.titre} size={36} />
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-200 truncate">{album.titre}</span>
-                  {album.dateOriginaleSortie && (
-                    <span className="text-[11px] text-zinc-600 shrink-0">{fmtDate(album.dateOriginaleSortie)}</span>
-                  )}
-                </div>
-                <p className="text-xs text-zinc-500 truncate">{album.artiste}</p>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <div className="flex gap-1">
-                  {album.tags.map((t) => <TagPill key={t} tag={t} />)}
-                </div>
-                <NoteStars note={album.note} />
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      onEdit(album)
-                    }}
-                    className="p-1 rounded text-zinc-600 hover:text-zinc-400 transition-colors text-xs"
-                  >
-                    ✏
-                  </button>
-                  {confirmDel === itemId ? (
-                    <>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          deleteCritique(album.id!)
-                          setConfirmDel(null)
-                        }}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30"
-                      >
-                        Suppr
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation()
-                          setConfirmDel(null)
-                        }}
-                        className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500 hover:bg-zinc-700"
-                      >
-                        ✕
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        setConfirmDel(itemId)
-                      }}
-                      className="p-1 rounded text-zinc-700 hover:text-red-500 transition-colors text-xs"
-                    >
-                      🗑
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-          )})}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Panthéon ─────────────────────────────────────────────────────────────────
-
-function PantheonSection({ onEdit }: { onEdit: (album: AlbumCritique) => void }) {
-  const bibliotheque = useMusicStore((s) => s.bibliotheque)
-  const pantheon = bibliotheque
-    .filter((a) => a.note >= 9)
-    .sort((a, b) => {
-      const da = a.dateOriginaleSortie ?? ''
-      const db = b.dateOriginaleSortie ?? ''
-      if (!da && !db) return 0
-      if (!da) return 1
-      if (!db) return -1
-      return da.localeCompare(db) // ascending: oldest first
-    })
-
-  return (
-    <div>
-      <div className="flex items-center gap-2 mb-3">
-        <h2 className="text-sm font-semibold text-zinc-300">Panthéon</h2>
-        <span className="text-[10px] text-amber-500/70 px-1.5 py-0.5 rounded bg-amber-500/10 border border-amber-500/20">9-10</span>
-        <span className="text-xs text-zinc-600 font-normal">{pantheon.length} albums</span>
-      </div>
-      {pantheon.length === 0 ? (
-        <p className="text-xs text-zinc-600 py-4 text-center">Aucun album noté 9 ou 10 encore.</p>
-      ) : (
-        <div className="flex flex-wrap gap-3">
-          {pantheon.map((album, idx) => (
-            <div
-              key={album.id || `panth-${idx}`}
-              className="relative group cursor-pointer"
-              style={{ width: 80 }}
-              onClick={() => onEdit(album)}
-            >
-              <div className="w-20 h-20 rounded-lg overflow-hidden border border-amber-500/20 bg-zinc-800">
-                {album.pochette ? (
-                  <img src={album.pochette} alt={album.titre} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-2xl text-zinc-600">♪</div>
-                )}
-              </div>
-              <div className="absolute -top-1 -right-1 text-[10px] font-bold w-5 h-5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 flex items-center justify-center">
-                {album.note}
-              </div>
-              <p className="text-[10px] text-zinc-500 mt-1 text-center truncate">{album.titre}</p>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── File d'attente ────────────────────────────────────────────────────────────
-
-function FileAttenteSection({ onNew, onEdit }: { onNew: () => void; onEdit: (a: AlbumAttente) => void }) {
-  const fileAttente    = useMusicStore((s) => s.fileAttente)
-  const startListening = useMusicStore((s) => s.startListening)
-  const removeFromFile = useMusicStore((s) => s.removeFromFile)
-  const [confirmDel,  setConfirmDel]  = useState<string | null>(null)
-  const [highlighted, setHighlighted] = useState<string | null>(null)
-  const itemRefs = useRef<Record<string, HTMLDivElement | null>>({})
-
-  function randomSelect() {
-    if (fileAttente.length === 0) return
-    const album = fileAttente[Math.floor(Math.random() * fileAttente.length)]
-    const id = album.id!
-    setHighlighted(id)
-    setTimeout(() => setHighlighted(null), 2000)
-    itemRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
-  }
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-zinc-300">
-          File d'attente
-          <span className="ml-2 text-xs text-zinc-600 font-normal">{fileAttente.length}</span>
-        </h2>
-        <div className="flex items-center gap-2">
-          {fileAttente.length > 1 && (
-            <button
-              onClick={randomSelect}
-              className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
-            >
-              🎲
-            </button>
-          )}
-          <button
-            onClick={onNew}
-            className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
-          >
-            + Ajouter
-          </button>
-        </div>
-      </div>
-      {fileAttente.length === 0 ? (
-        <p className="text-xs text-zinc-600 py-3 text-center">Aucun album en attente.</p>
-      ) : (
-        <div className="space-y-1.5">
-          {fileAttente.map((album, idx) => {
-            const itemId = album.id || `attente-${idx}`
-            return (
-              <div
-                key={itemId}
-                ref={(el) => { itemRefs.current[itemId] = el }}
-                className={`flex items-center gap-3 px-3 py-2 rounded-xl border group transition-colors duration-300 ${highlighted === itemId ? 'bg-teal-500/15 border-teal-500/40' : 'bg-zinc-900 border-zinc-800/40'}`}
-              >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="text-sm font-medium text-zinc-200 truncate">{album.titre}</span>
-                </div>
-                <div className="flex items-center gap-2 mt-0.5">
-                  <span className="text-xs text-zinc-500 truncate">{album.artiste}</span>
-                  {album.source && (
-                    <span className="text-[10px] text-zinc-600 truncate">· {album.source}</span>
-                  )}
-                </div>
-                {album.pourquoi && (
-                  <p className="text-[10px] text-zinc-600 mt-0.5 truncate">{album.pourquoi}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-1 shrink-0">
-            <button onClick={() => onEdit(album)} className="p-1 rounded text-zinc-600 hover:text-zinc-400 transition-colors text-xs opacity-0 group-hover:opacity-100">✏</button>
-                <button
-                    onClick={() => startListening(album.id!)}
-                  className="text-[11px] px-2 py-1 rounded-lg bg-teal-600/15 hover:bg-teal-600/25 text-teal-400 transition-colors"
-                >
-                  ▶ Écouter
-                </button>
-                {confirmDel === itemId ? (
-                  <>
-                      <button onClick={() => { removeFromFile(album.id!); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400 hover:bg-red-500/30">Suppr</button>
-                    <button onClick={() => setConfirmDel(null)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">✕</button>
-                  </>
-                ) : (
-                  <button onClick={() => setConfirmDel(itemId)} className="p-1 rounded text-zinc-700 hover:text-red-500 transition-colors text-xs opacity-0 group-hover:opacity-100">🗑</button>
-                )}
-              </div>
-            </div>
-          )})}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Stats ────────────────────────────────────────────────────────────────────
-
-function StatsSection() {
-  const bibliotheque = useMusicStore((s) => s.bibliotheque)
-
-  if (bibliotheque.length === 0) return null
-
-  const avgNote = bibliotheque.reduce((s, a) => s + a.note, 0) / bibliotheque.length
-  const topTag  = Object.entries(
-    bibliotheque.flatMap((a) => a.tags).reduce((acc: Record<string, number>, t) => {
-      acc[t] = (acc[t] ?? 0) + 1; return acc
-    }, {})
-  ).sort((a, b) => b[1] - a[1])[0]
-  const thisYear = new Date().getFullYear()
-  const thisYearCount = bibliotheque.filter((a) => a.dateCritique.startsWith(String(thisYear))).length
-
-  return (
-    <div>
-      <h2 className="text-sm font-semibold text-zinc-300 mb-3">Stats</h2>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-4 text-center">
-          <p className={`text-2xl font-bold tabular-nums ${noteColor(Math.round(avgNote))}`}>
-            {avgNote.toFixed(1)}
-          </p>
-          <p className="text-xs text-zinc-600 mt-1">Note moyenne</p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-4 text-center">
-          <p className="text-2xl font-bold text-zinc-200 tabular-nums">{thisYearCount}</p>
-          <p className="text-xs text-zinc-600 mt-1">Critiques {thisYear}</p>
-        </div>
-        <div className="bg-zinc-900 border border-zinc-800/60 rounded-xl p-4 text-center">
-          <p className="text-lg font-bold text-teal-400">{topTag ? topTag[0] : '–'}</p>
-          <p className="text-xs text-zinc-600 mt-1">Tag dominant</p>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── Artistes suivis ──────────────────────────────────────────────────────────
-
-function ArtistesSection({
-  onEdit,
-  onNew,
-}: {
-  onEdit: (a: ArtisteFollowed) => void
-  onNew: () => void
-}) {
-  const artistesSuivis   = useMusicStore((s) => s.artistesSuivis)
-  const setArtisteAlerte = useMusicStore((s) => s.setArtisteAlerte)
-  const unfollowArtiste  = useMusicStore((s) => s.unfollowArtiste)
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-zinc-300">
-          Artistes suivis
-          <span className="ml-2 text-xs text-zinc-600 font-normal">{artistesSuivis.length}</span>
-        </h2>
-        <button
-          onClick={onNew}
-          className="text-xs px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-400 transition-colors"
-        >
-          + Suivre
-        </button>
-      </div>
-      {artistesSuivis.length === 0 ? (
-        <p className="text-xs text-zinc-600 py-3 text-center">Aucun artiste suivi.</p>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {artistesSuivis.map((artiste, idx) => {
-            const itemId = artiste.id || `art-${idx}`
-            const pct = artiste.discographieTotal > 0
-              ? Math.round((artiste.discographieEcoutee / artiste.discographieTotal) * 100)
-              : 0
-            return (
-              <div key={itemId} className="flex items-start gap-3 px-3 py-3 rounded-xl bg-zinc-900 border border-zinc-800/40 group hover:border-zinc-700/50 transition-colors">
-                <div className="w-10 h-10 shrink-0 rounded-full overflow-hidden bg-zinc-800 border border-zinc-700/40">
-                  {artiste.photo ? (
-                    <img src={artiste.photo} alt={artiste.nom} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className="w-full h-full flex items-center justify-center text-zinc-600 text-sm">♪</div>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium text-zinc-200 truncate">{artiste.nom}</span>
-                    {artiste.alerte && (
-                      <span className="text-[10px] text-teal-400 bg-teal-500/10 border border-teal-500/20 px-1 py-0.5 rounded">🔔</span>
-                    )}
-                  </div>
-                  {artiste.discographieTotal > 0 && (
-                    <div className="mt-1">
-                      <div className="flex items-center gap-1.5">
-                        <div className="flex-1 h-1 rounded-full bg-zinc-800">
-                          <div className="h-full rounded-full bg-teal-500/60" style={{ width: `${pct}%` }} />
-                        </div>
-                        <span className="text-[10px] text-zinc-600 tabular-nums">{artiste.discographieEcoutee}/{artiste.discographieTotal}</span>
-                      </div>
-                    </div>
-                  )}
-                  {artiste.attentes && (
-                    <p className="text-[11px] text-zinc-500 mt-0.5 truncate">{artiste.attentes}</p>
-                  )}
-                </div>
-                <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button onClick={() => onEdit(artiste)} className="p-1 rounded text-zinc-600 hover:text-zinc-400 text-xs">✏</button>
-                  <button onClick={() => setArtisteAlerte(artiste.id!, !artiste.alerte)} className="p-1 rounded text-zinc-600 hover:text-teal-400 text-xs">🔔</button>
-                  {confirmDel === itemId ? (
-                    <>
-                      <button onClick={() => { unfollowArtiste(artiste.id!); setConfirmDel(null) }} className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/20 text-red-400">Suppr</button>
-                      <button onClick={() => setConfirmDel(null)} className="text-[10px] px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-500">✕</button>
-                    </>
-                  ) : (
-                    <button onClick={() => setConfirmDel(itemId)} className="p-1 rounded text-zinc-700 hover:text-red-500 text-xs">🗑</button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── MusicPage ────────────────────────────────────────────────────────────────
-
-export function MusicPage() {
-  const [critiqueModal, setCritiqueModal] = useState<{ open: boolean; album?: Partial<AlbumCritique & AlbumAttente> | null }>({ open: false })
-  const [fileModal,     setFileModal]     = useState(false)
-  const [artisteModal,  setArtisteModal]  = useState<{ open: boolean; artiste?: ArtisteFollowed | null }>({ open: false })
-
-  const _hasHydrated = useMusicStore((s) => s._hasHydrated)
-  const bibliotheque = useMusicStore((s) => s.bibliotheque)
-  
-  // ─── AUTO-RÉPARATION DES DONNÉES CORROMPUES ───
-  useEffect(() => {
-    if (_hasHydrated) {
-      useMusicStore.setState((state) => {
-        let changed = false
-        const newBiblio = state.bibliotheque.map((a) => {
-          if (!a.id) { changed = true; return { ...a, id: generateId() } }
-          return a
-        })
-        const newAttente = state.fileAttente.map((a) => {
-          if (!a.id) { changed = true; return { ...a, id: generateId() } }
-          return a
-        })
-        const newArtistes = state.artistesSuivis.map((a) => {
-          if (!a.id) { changed = true; return { ...a, id: generateId() } }
-          return a
-        })
-        return changed ? { bibliotheque: newBiblio, fileAttente: newAttente, artistesSuivis: newArtistes } : state
-      })
-    }
-  }, [_hasHydrated])
-
-  console.log('[MusicPage] 🎵 Hydratation :', _hasHydrated, '| Albums chargés depuis le store:', bibliotheque)
-
-  return (
-    <div className="min-h-full bg-zinc-950 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-5xl space-y-8">
-
-        {/* ── Header ──────────────────────────────────────────────────────── */}
-        <div>
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-xl font-semibold text-zinc-100 tracking-tight">Musique</h1>
-              <p className="text-sm text-zinc-500 mt-0.5">Critique musicale personnelle</p>
-            </div>
-            <button
-              onClick={() => setCritiqueModal({ open: true })}
-              className="text-sm px-3 py-1.5 rounded-lg bg-teal-600/20 hover:bg-teal-600/30 text-teal-400 font-medium transition-colors"
-            >
-              + Nouvelle critique
-            </button>
-          </div>
-        </div>
-
-        {/* ── Album en cours ───────────────────────────────────────────────── */}
-        <AlbumEnCoursCard onCritique={() => setCritiqueModal({ open: true })} />
-
-        {/* ── Bibliothèque ─────────────────────────────────────────────────── */}
-        <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-          <BibliothequeSection
-            onEdit={(album) => setCritiqueModal({ open: true, album })}
-            onNew={() => setCritiqueModal({ open: true })}
-          />
-        </div>
-
-        {/* ── Panthéon ─────────────────────────────────────────────────────── */}
-        <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-          <PantheonSection onEdit={(album) => setCritiqueModal({ open: true, album })} />
-        </div>
-
-        {/* ── File d'attente ───────────────────────────────────────────────── */}
-        <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-          <FileAttenteSection
-            onNew={() => setFileModal(true)}
-            onEdit={(album) => setCritiqueModal({ open: true, album })}
-          />
-        </div>
-
-        {/* ── Stats ────────────────────────────────────────────────────────── */}
-        <StatsSection />
-
-        {/* ── Artistes suivis ──────────────────────────────────────────────── */}
-        <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-          <ArtistesSection
-            onEdit={(a) => setArtisteModal({ open: true, artiste: a })}
-            onNew={() => setArtisteModal({ open: true })}
-          />
-        </div>
-
-      </div>
-
-      {/* ── Modals ──────────────────────────────────────────────────────────── */}
-      {critiqueModal.open && (
-        <CritiqueModal
-          initial={critiqueModal.album ?? null}
-          onClose={() => setCritiqueModal({ open: false })}
-        />
-      )}
-      {fileModal && (
-        <FileModal onClose={() => setFileModal(false)} />
-      )}
-      {artisteModal.open && (
-        <ArtisteModal
-          initial={artisteModal.artiste ?? null}
-          onClose={() => setArtisteModal({ open: false })}
-        />
-      )}
     </div>
   )
 }
