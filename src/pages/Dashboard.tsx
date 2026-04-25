@@ -524,8 +524,25 @@ export function Dashboard() {
     const d = daysUntil(latest + 'T23:59:59')
     return d !== null ? Math.abs(d) : null
   }, [writing.dailySessions])
-  const writingSessionsWeek = writing.dailySessions.filter(s => s.date >= waStr).length
-  const writingDomain       = domains.find(d => d.name.trim().toLowerCase() === 'écriture')
+  const writingSessionsWeek  = writing.dailySessions.filter(s => s.date >= waStr).length
+  const writingSessionsTotal = writing.dailySessions.length
+  const writingDomain        = domains.find(d => d.name.trim().toLowerCase() === 'écriture')
+
+  // Books: lus cette année (BookCritique.dateLecture = YYYY-MM-DD)
+  const booksThisYear = useMemo(() => {
+    const year = new Date().getFullYear().toString()
+    return books.bibliotheque.filter(b => b.dateLecture.startsWith(year)).length
+  }, [books.bibliotheque])
+
+  // Finance: revenus et dépenses du mois courant
+  const monthIncome = useMemo(
+    () => transactions.filter(t => t.date.startsWith(monthStr) && t.type === 'income').reduce((s, t) => s + t.amount, 0),
+    [transactions, monthStr],
+  )
+  const monthExpense = useMemo(
+    () => transactions.filter(t => t.date.startsWith(monthStr) && t.type === 'expense').reduce((s, t) => s + t.amount, 0),
+    [transactions, monthStr],
+  )
 
   // Sport
   const sportSessionsWeek = sport.historique.filter(s => s.date >= waStr).length
@@ -648,18 +665,22 @@ export function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {/* Writing */}
           <OngoingCard
-            label="Arc en cours"
-            title={activeArc?.name ?? 'Écriture'}
-            meta={writing.chapterTotal > 0
-              ? `Chapitre ${writing.chapterCurrent} · ${writingSessionsWeek} session${writingSessionsWeek > 1 ? 's' : ''} cette semaine`
-              : writing.lastSentence
-              ? trunc(writing.lastSentence, 12)
-              : 'Aucune session enregistrée'}
+            label={activeArc ? `Arc · ${activeArc.name}` : 'Écriture'}
+            title={writing.chapterTotal > 0
+              ? `Chapitre ${writing.chapterCurrent} / ${writing.chapterTotal}`
+              : writingSessionsTotal > 0
+              ? `${writingSessionsTotal} session${writingSessionsTotal > 1 ? 's' : ''} enregistrée${writingSessionsTotal > 1 ? 's' : ''}`
+              : 'Pas encore démarré'}
+            meta={writing.lastSentence
+              ? `« ${trunc(writing.lastSentence, 10)} »`
+              : writingSessionsWeek > 0
+              ? `${writingSessionsWeek} session${writingSessionsWeek > 1 ? 's' : ''} cette semaine`
+              : 'Aucune session cette semaine'}
             kicker={lastWritingDays === null ? 'Pas encore' : lastWritingDays === 0 ? "Aujourd'hui" : `il y a ${lastWritingDays}j`}
             progress={writing.chapterTotal > 0 ? writing.chapterCurrent / writing.chapterTotal : 0}
             progressLabel={writing.chapterTotal > 0
               ? `${Math.round((writing.chapterCurrent / writing.chapterTotal) * 100)}% du premier jet`
-              : 'Pas de jalons définis'}
+              : 'Jalons non configurés'}
             icon={writingIcon}
             onClick={() => writingDomain ? navigate(`/domain/${writingDomain.id}`) : undefined}
           />
@@ -689,12 +710,20 @@ export function Dashboard() {
             />
           ) : (
             <OngoingCard
-              label="Bibliothèque"
-              title={`${books.bibliotheque.length} livre${books.bibliotheque.length > 1 ? 's' : ''} lus`}
-              meta={`Objectif ${books.objectifAnnuel}/an · ${music.bibliotheque.length} critiques musicales`}
-              kicker="Cette année"
-              progress={books.objectifAnnuel > 0 ? Math.min(1, books.bibliotheque.length / books.objectifAnnuel) : 0}
-              progressLabel={`${books.objectifAnnuel > 0 ? Math.round((books.bibliotheque.length / books.objectifAnnuel) * 100) : 0}% de l'objectif annuel`}
+              label={`Lectures ${new Date().getFullYear()}`}
+              title={booksThisYear > 0
+                ? `${booksThisYear} livre${booksThisYear > 1 ? 's' : ''} lu${booksThisYear > 1 ? 's' : ''}`
+                : 'Aucune lecture'}
+              meta={books.objectifAnnuel > 0
+                ? `Objectif ${books.objectifAnnuel}/an · ${books.bibliotheque.length} au total`
+                : books.bibliotheque.length > 0
+                ? `${books.bibliotheque.length} livre${books.bibliotheque.length > 1 ? 's' : ''} dans la bibliothèque`
+                : 'Aucun livre enregistré'}
+              kicker={`En ${new Date().getFullYear()}`}
+              progress={books.objectifAnnuel > 0 ? Math.min(1, booksThisYear / books.objectifAnnuel) : 0}
+              progressLabel={books.objectifAnnuel > 0
+                ? `${Math.round(Math.min(100, (booksThisYear / books.objectifAnnuel) * 100))}% de l'objectif annuel`
+                : 'Objectif non défini'}
               icon={bookIcon}
               onClick={() => navigate('/livres')}
             />
@@ -703,13 +732,19 @@ export function Dashboard() {
           {/* Finance */}
           <OngoingCard
             label="Solde du mois"
-            title={fmtEur(monthBalance)}
-            meta={topGoal
-              ? `${trunc(topGoal.title, 4)} · ${Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100)}%`
-              : 'Aucun objectif d\'épargne'}
-            kicker={todayTxTotal > 0 ? `${fmtEur(todayTxTotal)} aujourd'hui` : 'Aucune dépense aujourd\'hui'}
-            progress={topGoal && topGoal.targetAmount > 0 ? topGoal.currentAmount / topGoal.targetAmount : Math.min(1, Math.max(0, monthBalance / 2000))}
-            progressLabel={topGoal ? `${Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100)}% de l'objectif` : new Date().toLocaleDateString('fr-FR', { month: 'long' })}
+            title={monthIncome === 0 && monthExpense === 0 ? 'Aucune transaction' : fmtEur(monthBalance)}
+            meta={monthIncome > 0 || monthExpense > 0
+              ? `${fmtEur(monthIncome)} entrés · ${fmtEur(monthExpense)} sortis`
+              : 'Aucune donnée ce mois'}
+            kicker={todayTxTotal > 0 ? `${fmtEur(todayTxTotal)} aujourd'hui` : 'Rien aujourd\'hui'}
+            progress={topGoal && topGoal.targetAmount > 0
+              ? topGoal.currentAmount / topGoal.targetAmount
+              : monthIncome > 0 ? Math.min(1, Math.max(0, monthBalance / monthIncome)) : 0}
+            progressLabel={topGoal && topGoal.targetAmount > 0
+              ? `${Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100)}% de l'objectif`
+              : monthIncome > 0
+              ? `${Math.round(Math.max(0, (monthBalance / monthIncome)) * 100)}% épargné`
+              : new Date().toLocaleDateString('fr-FR', { month: 'long' })}
             icon={financeIcon}
             onClick={() => navigate('/finances')}
           />
