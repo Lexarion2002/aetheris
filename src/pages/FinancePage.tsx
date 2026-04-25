@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
+import * as XLSX from 'xlsx'
 import {
   Home, Utensils, Wine, ShoppingBag, PawPrint, HeartPulse,
   CircleDot, RefreshCw, TrainFront, Package,
@@ -203,6 +204,32 @@ export function FinancePage() {
   // Reset to page 1 when filters or month change
   useEffect(() => { setTxPage(1) }, [txType, txCat, month])
 
+  // ── Export Excel ─────────────────────────────────────────────────────────────
+  const exportToExcel = useCallback(() => {
+    // Transactions sheet — toutes les transactions, triées par date décroissante
+    const txRows = [...transactions]
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .map(t => ({
+        Date:      new Date(t.date + 'T00:00:00').toLocaleDateString('fr-FR'),
+        Type:      t.type === 'income' ? 'Revenu' : 'Dépense',
+        Catégorie: catMeta(t.category).label,
+        Montant:   t.type === 'income' ? t.amount : -t.amount,
+        Note:      t.note ?? '',
+      }))
+
+    // Résumé par mois courant
+    const summaryRows = [
+      { Indicateur: 'Revenus du mois',  Valeur: totalIncome  },
+      { Indicateur: 'Dépenses du mois', Valeur: -totalExpense },
+      { Indicateur: 'Solde net',        Valeur: totalIncome - totalExpense },
+    ]
+
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(txRows),     'Transactions')
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(summaryRows), 'Résumé')
+    XLSX.writeFile(wb, `aetheris-finances-${month}.xlsx`)
+  }, [transactions, catMeta, totalIncome, totalExpense, month])
+
   return (
     <div style={{ paddingBottom: 80 }}>
 
@@ -225,6 +252,12 @@ export function FinancePage() {
             onPrev={() => setMonth(m => shiftMonth(m, -1))}
             onNext={() => setMonth(m => shiftMonth(m, +1))}
           />
+          <button
+            onClick={exportToExcel}
+            title="Exporter toutes les transactions en Excel"
+            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 14, padding: '8px 14px', borderRadius: 8, border: '1px solid var(--ink-4)', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, background: 'transparent', color: 'var(--ink)', whiteSpace: 'nowrap' }}>
+            ↓ Excel
+          </button>
           <button
             onClick={() => { setEditTx(undefined); setShowTxModal(true) }}
             style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--terra)', color: 'var(--paper-1)', whiteSpace: 'nowrap' }}>
