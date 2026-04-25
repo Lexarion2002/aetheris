@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import {
   Home, Utensils, Wine, ShoppingBag, PawPrint, HeartPulse,
   CircleDot, RefreshCw, TrainFront, Package,
+  Banknote, HandCoins, Users,
   type LucideIcon,
 } from 'lucide-react'
 import { useStore } from '../store'
@@ -25,6 +26,9 @@ function getCategoryIcon(name: string): LucideIcon {
   if (n.includes('abonnement') || n.includes('abonne') || n.includes('streaming')) return RefreshCw
   if (n.includes('transport') || n.includes('voiture') || n.includes('train') || n.includes('métro') || n.includes('essence')) return TrainFront
   if (n.includes('autre') || n.includes('divers') || n.includes('miscell')) return CircleDot
+  if (n.includes('salaire') || n.includes('revenu') || n.includes('paie')) return Banknote
+  if (n.includes('aide') || n.includes('alloc') || n.includes('caf') || n.includes('bourse')) return HandCoins
+  if (n.includes('famille') || n.includes('parent') || n.includes('proche')) return Users
   return Package
 }
 
@@ -529,8 +533,9 @@ function DonutSection({ title, data, total, empty, centerLabel }: {
             return (
               <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 1fr auto auto', gap: 10, alignItems: 'center' }}>
                 <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: 'inline-block' }} />
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                  {d.icon} {d.label}
+                <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)', overflow: 'hidden' }}>
+                  {(() => { const I = getCategoryIcon(d.label); return <I size={13} style={{ color: 'var(--ink-3)', flexShrink: 0 }} /> })()}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{d.label}</span>
                 </span>
                 <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
                   {fmtDec(d.value)}
