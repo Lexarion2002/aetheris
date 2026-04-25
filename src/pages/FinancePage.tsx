@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useRef, useCallback } from 'react'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { useStore } from '../store'
 import type { Transaction, SavingsGoal, FinanceCategory } from '../types'
 
@@ -171,119 +170,115 @@ export function FinancePage() {
   useEffect(() => { setTxPage(1) }, [txType, txCat, month])
 
   return (
-    <div className="space-y-12">
+    <div style={{ paddingBottom: 80 }}>
 
-      {/* ── Header ────────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-4">
+      {/* ── Header ──────────────────────────────────────────────────────────── */}
+      <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, marginBottom: 40 }}>
         <div>
-          <h1 className="text-2xl font-semibold text-[var(--fg)]">Finances</h1>
-          <p className="mt-1 text-sm text-[var(--fg-muted)] capitalize">{monthLabel(month)}</p>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+            finance · {month.split('-').slice(1).concat(month.split('-').slice(0, 1)).join('.')}
+          </span>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 44, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.01em', margin: '6px 0 8px', lineHeight: 1.1 }}>
+            Finances.
+          </h1>
+          <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-2)', margin: 0, lineHeight: 1.4 }}>
+            « Tenir le compte, sans en faire une obsession. »
+          </p>
         </div>
-        <div className="flex items-center gap-1 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] p-1">
-          <button onClick={() => setMonth((m) => shiftMonth(m, -1))}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors">‹</button>
-          <span className="min-w-[110px] text-center text-xs font-medium capitalize text-[var(--fg)]">{monthLabel(month)}</span>
-          <button onClick={() => setMonth((m) => shiftMonth(m, +1))}
-            className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors">›</button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+          <MonthSwitcher
+            label={monthLabel(month)}
+            onPrev={() => setMonth(m => shiftMonth(m, -1))}
+            onNext={() => setMonth(m => shiftMonth(m, +1))}
+          />
+          <button
+            onClick={() => { setEditTx(undefined); setShowTxModal(true) }}
+            style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 14, padding: '8px 16px', borderRadius: 8, border: '1px solid transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8, background: 'var(--terra)', color: 'var(--paper-1)', whiteSpace: 'nowrap' }}>
+            + Transaction
+          </button>
         </div>
-      </div>
+      </header>
 
-      {/* ── Section 1 : Récapitulatif ─────────────────────────────────────────── */}
-      <div className="space-y-3">
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-          <SummaryCard label="Revenus"   value={fmt(totalIncome)}  sign="↑" accent="emerald" />
-          <SummaryCard label="Dépenses"  value={fmt(totalExpense)} sign="↓" accent="red"     />
-          <SummaryCard label="Solde net" value={fmt(netBalance)}   sign="⊜" accent={netBalance >= 0 ? 'teal' : 'red'}
-            sub={previousBalance !== 0 ? `Report : ${previousBalance > 0 ? '+' : ''}${fmtDec(previousBalance)}` : undefined} />
-        </div>
-        <ContextLine
-          month={month}
-          monthTx={monthTx}
-          categoryBudgets={categoryBudgets}
-          financeCategories={financeCategories}
+      {/* ── KPI ─────────────────────────────────────────────────────────────── */}
+      <section style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+        <KpiCard
+          label="Revenus"
+          value={`+ ${fmtDec(totalIncome)}`}
+          tone="sauge"
+          foot={<span>ce mois · {monthTx.filter(t => t.type === 'income').length} écriture{monthTx.filter(t => t.type === 'income').length > 1 ? 's' : ''}</span>}
         />
+        <KpiCard
+          label="Dépenses"
+          value={`− ${fmtDec(totalExpense)}`}
+          tone="terra"
+          foot={<span>ce mois · {expensePie.length} catégorie{expensePie.length > 1 ? 's' : ''}</span>}
+        />
+        <KpiCard
+          label="Solde net"
+          value={`${netBalance >= 0 ? '+ ' : ''}${fmtDec(netBalance)}`}
+          tone="neutre"
+          foot={previousBalance !== 0
+            ? <span>Report : {previousBalance >= 0 ? '+' : ''}<span style={{ fontVariantNumeric: 'tabular-nums' }}>{fmtDec(previousBalance)}</span></span>
+            : <span style={{ textTransform: 'capitalize' }}>{monthLabel(month)}</span>
+          }
+        />
+      </section>
+
+      {/* ── Context line ────────────────────────────────────────────────────── */}
+      <div style={{ marginBottom: 40 }}>
+        <ContextLine month={month} monthTx={monthTx} categoryBudgets={categoryBudgets} financeCategories={financeCategories} />
       </div>
 
-      {/* ── Section 2 : Graphiques ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <PieSection title="Dépenses par catégorie" data={expensePie} total={totalExpense} empty="Aucune dépense ce mois" colorScheme="expense" />
-        <PieSection title="Revenus par catégorie"  data={incomePie}  total={totalIncome}  empty="Aucun revenu ce mois"   colorScheme="income"  />
-      </div>
+      {/* ── Donuts ──────────────────────────────────────────────────────────── */}
+      <section style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 40 }}>
+        <DonutSection title="Dépenses par catégorie" data={expensePie} total={totalExpense} empty="Aucune dépense ce mois" centerLabel="total" />
+        <DonutSection title="Revenus par catégorie"  data={incomePie}  total={totalIncome}  empty="Aucun revenu ce mois"   centerLabel="total" />
+      </section>
 
-      {/* ── Section 3 : Budgets ───────────────────────────────────────────────── */}
-      <section>
-        <h2 className="mb-5 text-base font-semibold text-[var(--fg)]">Budgets mensuels</h2>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {expenseCats.map((cat) => {
-            const budget   = budgetMap.get(cat.id) ?? 0
-            const spent    = spentMap.get(cat.id) ?? 0
-            const realPct  = budget > 0 ? (spent / budget) * 100 : 0
-            const barWidth = budget > 0 ? Math.min(100, realPct) : 0
-            const bar      = realPct >= 100 ? 'bg-[var(--danger)]' : realPct >= 50 ? 'bg-amber-500' : 'bg-[var(--positive)]'
-            const pctText  = realPct >= 100 ? 'text-[var(--danger)]' : realPct >= 50 ? 'text-amber-400' : 'text-[var(--positive)]'
-            const overage  = spent - budget
-            return (
-              <div key={cat.id} className="space-y-3 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-4">
-                <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-2 text-sm font-medium text-[var(--fg)]">
-                    <span className="text-base">{cat.icon}</span>
-                    {cat.name}
-                  </span>
-                  <button onClick={() => setBudgetCat(cat.id)}
-                    className="text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors" title="Modifier le budget">
-                    ✎
-                  </button>
-                </div>
-                <div>
-                  <div className="mb-1.5 flex items-end justify-between text-xs">
-                    <span className={spent > 0 ? 'font-medium text-[var(--fg)]' : 'text-[var(--fg-subtle)]'}>{fmtDec(spent)}</span>
-                    {budget > 0
-                      ? <span className="text-[var(--fg-subtle)]">/ {fmtDec(budget)}</span>
-                      : <button onClick={() => setBudgetCat(cat.id)} className="text-[var(--accent)] hover:text-[var(--accent)] transition-colors">+ Définir</button>
-                    }
-                  </div>
-                  <div className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--paper-3)]">
-                    {budget > 0 && (
-                      <div className={['h-full rounded-full transition-all duration-500', bar].join(' ')} style={{ width: `${barWidth}%` }} />
-                    )}
-                  </div>
-                  {budget > 0 && (
-                    <p className={['mt-1 text-[10px]', pctText].join(' ')}>
-                      {Math.round(realPct)}% du budget
-                      {realPct >= 100 && ` — Dépassement : +${fmtDec(overage)}`}
-                    </p>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      {/* ── Budgets ─────────────────────────────────────────────────────────── */}
+      <section style={{ marginBottom: 40 }}>
+        <SectionHead label="Budgets mensuels" meta={`${expenseCats.length} catégorie${expenseCats.length > 1 ? 's' : ''}`} />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+          {expenseCats.map(cat => (
+            <BudgetCard
+              key={cat.id}
+              icon={cat.icon}
+              cat={cat.name}
+              spent={spentMap.get(cat.id) ?? 0}
+              budget={budgetMap.get(cat.id) ?? 0}
+              onEdit={() => setBudgetCat(cat.id)}
+            />
+          ))}
         </div>
       </section>
 
-      {/* ── Section 4 : Épargne ───────────────────────────────────────────────── */}
-      <section>
-        <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-base font-semibold text-[var(--fg)]">Objectifs d'épargne</h2>
-          <button onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
-            className="text-xs text-[var(--accent)] hover:text-[var(--accent)] transition-colors">
+      {/* ── Épargne ─────────────────────────────────────────────────────────── */}
+      <section style={{ marginBottom: 40 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
+          <SectionHead label="Objectifs d'épargne" meta={`${savingsGoals.length} en cours`} />
+          <button
+            onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
+            style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--terra)', background: 'transparent', border: 0, cursor: 'pointer', marginBottom: 14 }}>
             + Nouvel objectif
           </button>
         </div>
+
         {savingsGoals.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)] py-14 text-center">
-            <p className="text-sm text-[var(--fg-subtle)]">Aucun objectif d'épargne</p>
-            <button onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
-              className="mt-3 text-xs text-[var(--accent)] hover:text-[var(--accent)] transition-colors">
-              Créer mon premier objectif →
+          <div style={{ background: 'var(--paper-1)', border: '1px dashed var(--ink-4)', borderRadius: 12, padding: '40px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--paper-2)', display: 'grid', placeItems: 'center', fontSize: 20 }}>🎯</div>
+            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--ink-2)', maxWidth: '48ch', lineHeight: 1.4, margin: 0 }}>
+              Rien encore. Un voyage, un instrument, un déménagement — mets un nom sur ce que tu mets de côté.
+            </p>
+            <button
+              onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
+              style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 14, padding: '8px 16px', borderRadius: 8, background: 'var(--terra)', color: 'var(--paper-1)', border: '1px solid transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              + Créer mon premier objectif
             </button>
           </div>
         ) : (
           <>
-            {/* Level 1 — Vue consolidée */}
             <SavingsConsolidated goals={savingsGoals} />
-
-            {/* Level 2 — Cartes individuelles triées par date cible */}
-            <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 20 }}>
               {[...savingsGoals]
                 .sort((a, b) => {
                   if (!a.targetDate && !b.targetDate) return 0
@@ -291,7 +286,7 @@ export function FinancePage() {
                   if (!b.targetDate) return -1
                   return a.targetDate.localeCompare(b.targetDate)
                 })
-                .map((goal) => (
+                .map(goal => (
                   <SavingsCard key={goal.id} goal={goal}
                     onEdit={() => { setEditGoal(goal); setShowGoalModal(true) }}
                     onContribute={() => setContributeGoal(goal)} />
@@ -301,130 +296,90 @@ export function FinancePage() {
         )}
       </section>
 
-      {/* ── Section 5 : Transactions ──────────────────────────────────────────── */}
+      {/* ── Transactions ────────────────────────────────────────────────────── */}
       <section>
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-base font-semibold text-[var(--fg)]">
-            Transactions
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Transactions</span>
             {filteredTx.length > 0 && (
-              <span className="ml-2 text-xs font-normal text-[var(--fg-subtle)]">
-                {filteredTx.length > TX_PAGE_SIZE
-                  ? `${(txPage - 1) * TX_PAGE_SIZE + 1}–${Math.min(txPage * TX_PAGE_SIZE, filteredTx.length)} sur ${filteredTx.length}`
-                  : filteredTx.length}
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-3)' }}>
+                · {filteredTx.length} écriture{filteredTx.length > 1 ? 's' : ''}
               </span>
             )}
-          </h2>
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="flex overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--bg-elev)]">
-              {(['all', 'income', 'expense'] as const).map((f) => (
-                <button key={f} onClick={() => setTxType(f)}
-                  className={['px-3 py-1.5 text-xs font-medium transition-colors',
-                    txType === f ? 'bg-[var(--paper-3)] text-[var(--fg)]' : 'text-[var(--fg-muted)] hover:text-[var(--fg)]',
-                  ].join(' ')}>
-                  {f === 'all' ? 'Tout' : f === 'income' ? 'Revenus' : 'Dépenses'}
-                </button>
-              ))}
-            </div>
+          </div>
+        </div>
+
+        {/* Filtres */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, gap: 12, flexWrap: 'wrap' }}>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            <FilterChip active={txType === 'all'}     onClick={() => setTxType('all')}>Tout</FilterChip>
+            <FilterChip active={txType === 'income'}  onClick={() => setTxType('income')}>Revenus</FilterChip>
+            <FilterChip active={txType === 'expense'} onClick={() => setTxType('expense')}>Dépenses</FilterChip>
             {usedCats.length > 1 && (
-              <select value={txCat} onChange={(e) => setTxCat(e.target.value)}
-                className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs text-[var(--fg-muted)] outline-none">
+              <select
+                value={txCat}
+                onChange={e => setTxCat(e.target.value)}
+                style={{ fontFamily: 'var(--font-sans)', fontSize: 13, padding: '6px 14px', borderRadius: 999, background: 'transparent', border: '1px solid var(--paper-2)', color: 'var(--ink)', cursor: 'pointer', outline: 'none' }}>
                 <option value="">Toutes catégories</option>
-                {usedCats.map((k) => <option key={k} value={k}>{catMeta(k).label}</option>)}
+                {usedCats.map(k => <option key={k} value={k}>{catMeta(k).label}</option>)}
               </select>
             )}
-            <button
-              onClick={() => setShowPdfModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs font-medium text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors"
-            >
-              <span className="text-sm leading-none">📄</span>
-              Relevé PDF
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={() => setShowPdfModal(true)} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--paper-2)', background: 'var(--paper-1)', color: 'var(--ink-2)', cursor: 'pointer' }}>
+              📄 Relevé PDF
             </button>
-            <button
-              onClick={() => setShowCsvModal(true)}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-1.5 text-xs font-medium text-[var(--fg-muted)] hover:bg-[var(--paper-3)] hover:text-[var(--fg)] transition-colors"
-            >
-              <span className="text-sm leading-none">↑</span>
-              Importer CSV
-            </button>
-            <button
-              onClick={() => { setEditTx(undefined); setShowTxModal(true) }}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--terra-soft)] bg-[var(--terra-soft)] px-3 py-1.5 text-xs font-medium text-[var(--accent)] hover:bg-[var(--accent)]/25 transition-colors"
-            >
-              <span className="text-sm leading-none">+</span>
-              Transaction
+            <button onClick={() => setShowCsvModal(true)} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, padding: '6px 12px', borderRadius: 8, border: '1px solid var(--paper-2)', background: 'var(--paper-1)', color: 'var(--ink-2)', cursor: 'pointer' }}>
+              ↑ Importer CSV
             </button>
           </div>
         </div>
 
         {filteredTx.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-[var(--border)] py-14 text-center">
-            <p className="text-sm text-[var(--fg-subtle)]">Aucune transaction ce mois</p>
-            <button onClick={() => { setEditTx(undefined); setShowTxModal(true) }}
-              className="mt-3 text-xs text-[var(--accent)] hover:text-[var(--accent)] transition-colors">
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', borderRadius: 12, border: '1px dashed var(--paper-2)', padding: '48px 0', textAlign: 'center' }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--ink-3)', margin: 0 }}>Aucune transaction ce mois</p>
+            <button onClick={() => { setEditTx(undefined); setShowTxModal(true) }} style={{ marginTop: 12, fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--terra)', background: 'transparent', border: 0, cursor: 'pointer' }}>
               Ajouter une transaction →
             </button>
           </div>
         ) : (
           <>
-            {/* Pagination — haut */}
             {totalTxPages > 1 && (
               <TxPagination page={txPage} total={totalTxPages} count={filteredTx.length} pageSize={TX_PAGE_SIZE} onChange={setTxPage} />
             )}
 
-            <div className="overflow-hidden rounded-2xl border border-[var(--border)]">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="border-b border-[var(--border)] bg-[var(--bg-elev)] text-[10px] uppercase tracking-wider text-[var(--fg-subtle)]">
-                    <th className="px-4 py-3 text-left">Date</th>
-                    <th className="px-4 py-3 text-left">Catégorie</th>
-                    <th className="px-4 py-3 text-right">Montant</th>
-                    <th className="hidden sm:table-cell px-4 py-3 text-left">Note</th>
-                    <th className="w-16 px-4 py-3" />
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {pagedTx.map((tx) => {
-                    const cat = catMeta(tx.category)
-                    return (
-                      <tr key={tx.id} className="group hover:bg-[var(--bg-elev)] transition-colors">
-                        <td className="px-4 py-3 text-xs text-[var(--fg-muted)] whitespace-nowrap">
-                          {new Date(tx.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="flex items-center gap-1.5 text-xs text-[var(--fg)]">
-                            <span>{cat.icon}</span>
-                            {cat.label}
-                            <span className={['ml-1 rounded-full px-1.5 py-0.5 text-[9px] font-medium',
-                              tx.type === 'income' ? 'bg-[var(--sage-soft)] text-[var(--positive)]' : 'bg-[var(--danger)]/10 text-[var(--danger)]',
-                            ].join(' ')}>
-                              {tx.type === 'income' ? '↑' : '↓'}
-                            </span>
-                          </span>
-                        </td>
-                        <td className={['px-4 py-3 text-right font-semibold tabular-nums',
-                          tx.type === 'income' ? 'text-[var(--positive)]' : 'text-[var(--danger)]',
-                        ].join(' ')}>
-                          {tx.type === 'income' ? '+' : '-'}{fmtDec(tx.amount)}
-                        </td>
-                        <td className="hidden sm:table-cell px-4 py-3 max-w-[180px]">
-                          <span className="truncate text-xs text-[var(--fg-subtle)]">{tx.note ?? '—'}</span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => { setEditTx(tx); setShowTxModal(true) }}
-                              className="rounded p-1 text-[var(--fg-subtle)] hover:text-[var(--fg)] transition-colors">✎</button>
-                            <button onClick={() => deleteTransaction(tx.id)}
-                              className="rounded p-1 text-[var(--fg-subtle)] hover:text-[var(--danger)] transition-colors">✕</button>
-                          </div>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+            <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+              {/* Header row */}
+              <div style={{ display: 'grid', gridTemplateColumns: '88px 160px 1fr auto 52px', gap: 16, padding: '10px 20px', borderBottom: '1px solid var(--paper-2)', background: 'var(--paper)' }}>
+                {['Date', 'Catégorie', 'Note', 'Montant', ''].map((h, i) => (
+                  <span key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', textAlign: i === 3 ? 'right' : undefined }}>
+                    {h}
+                  </span>
+                ))}
+              </div>
+              {/* Data rows */}
+              {pagedTx.map((tx, i) => {
+                const cat = catMeta(tx.category)
+                return (
+                  <TxRow
+                    key={tx.id}
+                    date={new Date(tx.date + 'T00:00:00').toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                    cat={
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, fontFamily: 'var(--font-sans)', color: 'var(--ink)' }}>
+                        <span>{cat.icon}</span>
+                        {cat.label}
+                      </span>
+                    }
+                    amount={tx.type === 'income' ? tx.amount : -tx.amount}
+                    note={tx.note ?? '—'}
+                    last={i === pagedTx.length - 1}
+                    onEdit={() => { setEditTx(tx); setShowTxModal(true) }}
+                    onDelete={() => deleteTransaction(tx.id)}
+                  />
+                )
+              })}
             </div>
 
-            {/* Pagination — bas */}
             {totalTxPages > 1 && (
               <TxPagination page={txPage} total={totalTxPages} count={filteredTx.length} pageSize={TX_PAGE_SIZE} onChange={setTxPage} />
             )}
@@ -432,109 +387,274 @@ export function FinancePage() {
         )}
       </section>
 
-      {/* ── Modals ────────────────────────────────────────────────────────────── */}
-      {showTxModal && (
-        <TransactionModal tx={editTx} onClose={() => { setShowTxModal(false); setEditTx(undefined) }} />
-      )}
-      {budgetCat && (
-        <BudgetModal category={budgetCat} current={budgetMap.get(budgetCat) ?? 0} onClose={() => setBudgetCat(null)} />
-      )}
-      {showGoalModal && (
-        <SavingsGoalModal goal={editGoal} onClose={() => { setShowGoalModal(false); setEditGoal(undefined) }} />
-      )}
-      {contributeGoal && (
-        <ContributeModal goal={contributeGoal} onClose={() => setContributeGoal(undefined)} />
-      )}
-      {showCsvModal && (
-        <CSVImportModal onClose={() => setShowCsvModal(false)} />
-      )}
-      {showPdfModal && (
-        <PDFImportModal onClose={() => setShowPdfModal(false)} />
-      )}
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
+      {showTxModal && <TransactionModal tx={editTx} onClose={() => { setShowTxModal(false); setEditTx(undefined) }} />}
+      {budgetCat && <BudgetModal category={budgetCat} current={budgetMap.get(budgetCat) ?? 0} onClose={() => setBudgetCat(null)} />}
+      {showGoalModal && <SavingsGoalModal goal={editGoal} onClose={() => { setShowGoalModal(false); setEditGoal(undefined) }} />}
+      {contributeGoal && <ContributeModal goal={contributeGoal} onClose={() => setContributeGoal(undefined)} />}
+      {showCsvModal && <CSVImportModal onClose={() => setShowCsvModal(false)} />}
+      {showPdfModal && <PDFImportModal onClose={() => setShowPdfModal(false)} />}
     </div>
   )
 }
 
-// ─── SummaryCard ──────────────────────────────────────────────────────────────
+// ─── Donut ────────────────────────────────────────────────────────────────────
 
-type Accent = 'emerald' | 'red' | 'teal'
-const ACCENT: Record<Accent, { text: string; bg: string; border: string }> = {
-  emerald: { text: 'text-[var(--positive)]', bg: 'bg-[var(--sage-soft)]', border: 'border-[var(--sage-soft)]' },
-  red:     { text: 'text-[var(--danger)]',     bg: 'bg-[var(--danger)]/10',     border: 'border-[var(--danger)]/20'     },
-  teal:    { text: 'text-[var(--accent)]',    bg: 'bg-[var(--terra-soft)]',    border: 'border-[var(--terra-soft)]' },
-}
+interface DonutSeg { label: string; value: number; color: string; icon?: string }
 
-function SummaryCard({ label, value, sign, accent, sub }: { label: string; value: string; sign: string; accent: Accent; sub?: string }) {
-  const cls = ACCENT[accent]
+function Donut({ data, centerLabel, centerValue, size = 180 }: {
+  data: DonutSeg[]; centerLabel?: string; centerValue?: string; size?: number
+}) {
+  const total = data.reduce((s, d) => s + d.value, 0)
+  const r = 70, stroke = 22, c = 2 * Math.PI * r
+  const cx = size / 2, cy = size / 2
+  let offset = 0
+  const arcs = data.map((d, i) => {
+    const frac = total > 0 ? d.value / total : 0
+    const dash = frac * c
+    const seg = { color: d.color, strokeDasharray: `${dash} ${c - dash}`, strokeDashoffset: -offset, key: i }
+    offset += dash
+    return seg
+  })
   return (
-    <div className={['rounded-2xl border p-6', cls.bg, cls.border].join(' ')}>
-      <div className="mb-3 flex items-center gap-2">
-        <span className={['text-lg font-bold', cls.text].join(' ')}>{sign}</span>
-        <p className="text-xs font-medium uppercase tracking-wider text-[var(--fg-muted)]">{label}</p>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: 'block' }}>
+      <circle cx={cx} cy={cy} r={r} fill="none" stroke="var(--paper-2)" strokeWidth={stroke} />
+      {arcs.map(a => (
+        <circle key={a.key} cx={cx} cy={cy} r={r} fill="none" stroke={a.color} strokeWidth={stroke}
+          strokeDasharray={a.strokeDasharray} strokeDashoffset={a.strokeDashoffset}
+          transform={`rotate(-90 ${cx} ${cy})`} strokeLinecap="butt" />
+      ))}
+      {centerLabel && (
+        <text x={cx} y={cy - 6} textAnchor="middle"
+          style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', fill: 'var(--ink-3)' }}>
+          {centerLabel}
+        </text>
+      )}
+      {centerValue && (
+        <text x={cx} y={cy + 16} textAnchor="middle"
+          style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, fill: 'var(--ink)', letterSpacing: '-0.01em' }}>
+          {centerValue}
+        </text>
+      )}
+    </svg>
+  )
+}
+
+// ─── KpiCard ──────────────────────────────────────────────────────────────────
+
+function KpiCard({ label, value, tone, foot }: {
+  label: string; value: string; tone: 'sauge' | 'terra' | 'neutre'; foot: React.ReactNode
+}) {
+  const tones = {
+    sauge:  { bg: 'var(--sage-soft)',  accent: 'var(--sage-deep)',  border: '#B9C8B4' },
+    terra:  { bg: 'var(--terra-soft)', accent: 'var(--terra-deep)', border: '#DEB89C' },
+    neutre: { bg: 'var(--paper-1)',    accent: 'var(--ink)',        border: 'var(--paper-2)' },
+  }
+  const t = tones[tone]
+  return (
+    <div style={{ background: t.bg, border: `1px solid ${t.border}`, borderRadius: 12, padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 10 }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: tone !== 'neutre' ? t.accent : 'var(--ink-3)' }}>
+          {label}
+        </span>
+        {tone === 'sauge' && <span style={{ color: t.accent, fontSize: 16 }}>↙</span>}
+        {tone === 'terra' && <span style={{ color: t.accent, fontSize: 16 }}>↗</span>}
       </div>
-      <p className={['text-3xl font-bold tabular-nums leading-none', cls.text].join(' ')}>{value}</p>
-      {sub && <p className="mt-2 text-xs tabular-nums text-[var(--fg-subtle)]">{sub}</p>}
+      <span style={{ fontFamily: 'var(--font-serif)', fontSize: 34, fontWeight: 500, color: tone !== 'neutre' ? t.accent : 'var(--ink)', letterSpacing: '-0.01em', lineHeight: 1.1, fontVariantNumeric: 'tabular-nums' }}>
+        {value}
+      </span>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', borderTop: `1px solid ${tone !== 'neutre' ? t.border : 'var(--paper-2)'}`, paddingTop: 10, marginTop: 2 }}>
+        {foot}
+      </div>
     </div>
   )
 }
 
-// ─── PieSection ───────────────────────────────────────────────────────────────
+// ─── DonutSection ─────────────────────────────────────────────────────────────
 
-type PieRow = CatEntry & { value: number }
-
-const PIE_COLORS = {
-  expense: ['#B5532A', '#8E3D1C', '#A08B72', '#C7B59A', '#DFD2B5'],
-  income:  ['#7E9A7A', '#5C7859', '#A08B72', '#C7B59A', '#DFD2B5'],
-}
-
-function PieSection({ title, data, total, empty, colorScheme }: { title: string; data: PieRow[]; total: number; empty: string; colorScheme: 'expense' | 'income' }) {
-  const colors = PIE_COLORS[colorScheme]
+function DonutSection({ title, data, total, empty, centerLabel }: {
+  title: string; data: DonutSeg[]; total: number; empty: string; centerLabel: string
+}) {
+  const centerValue = total > 0 ? fmt(total) : undefined
   if (data.length === 0) {
     return (
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-6">
-        <h3 className="mb-6 text-sm font-semibold text-[var(--fg)]">{title}</h3>
-        <div className="flex h-36 items-center justify-center">
-          <p className="text-sm text-[var(--fg-subtle)]">{empty}</p>
+      <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '22px 24px' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>{title}</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 120, marginTop: 14 }}>
+          <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--ink-3)' }}>{empty}</p>
         </div>
       </div>
     )
   }
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-6">
-      <h3 className="mb-5 text-sm font-semibold text-[var(--fg)]">{title}</h3>
-      <div className="flex items-center gap-6">
-        <div className="h-36 w-36 shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={data} cx="50%" cy="50%" outerRadius={62} innerRadius={38} dataKey="value" paddingAngle={2}>
-                {data.map((_entry, i) => <Cell key={i} fill={colors[i % colors.length]} />)}
-              </Pie>
-              <Tooltip content={({ payload }) => {
-                if (!payload?.length) return null
-                const d = payload[0]?.payload as PieRow
-                return (
-                  <div className="rounded-lg border border-[var(--border-strong)] bg-[var(--bg-elev)] px-3 py-2 text-xs shadow-xl">
-                    <p className="text-[var(--fg-muted)]">{d.icon} {d.label}</p>
-                    <p className="mt-0.5 font-semibold text-[var(--fg)]">{fmtDec(d.value)}</p>
-                  </div>
-                )
-              }} />
-            </PieChart>
-          </ResponsiveContainer>
+    <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '22px 24px' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>{title}</span>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 28, marginTop: 14 }}>
+        <div style={{ flexShrink: 0 }}>
+          <Donut data={data} centerLabel={centerLabel} centerValue={centerValue} size={180} />
         </div>
-        <div className="min-w-0 flex-1 space-y-2">
-          {data.map((item, i) => (
-            <div key={item.key} className="flex items-center gap-2 text-xs">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: colors[i % colors.length] }} />
-              <span className="min-w-0 truncate text-[var(--fg-muted)]">{item.icon} {item.label}</span>
-              <span className="ml-auto shrink-0 font-semibold tabular-nums text-[var(--fg)]">{fmtDec(item.value)}</span>
-            </div>
-          ))}
-          <div className="border-t border-[var(--border)] pt-2 flex justify-between text-xs">
-            <span className="text-[var(--fg-subtle)]">Total</span>
-            <span className="font-semibold text-[var(--fg)]">{fmtDec(total)}</span>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1, minWidth: 0 }}>
+          {data.map((d, i) => {
+            const pct = total > 0 ? Math.round((d.value / total) * 100) : 0
+            return (
+              <div key={i} style={{ display: 'grid', gridTemplateColumns: '10px 1fr auto auto', gap: 10, alignItems: 'center' }}>
+                <span style={{ width: 10, height: 10, borderRadius: 2, background: d.color, display: 'inline-block' }} />
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {d.icon} {d.label}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
+                  {fmtDec(d.value)}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', color: 'var(--ink-3)', minWidth: 32, textAlign: 'right' }}>
+                  {pct}%
+                </span>
+              </div>
+            )
+          })}
+          <div style={{ borderTop: '1px solid var(--paper-2)', paddingTop: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)' }}>Total</span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{fmtDec(total)}</span>
           </div>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── MonthSwitcher ────────────────────────────────────────────────────────────
+
+function MonthSwitcher({ label, onPrev, onNext }: { label: string; onPrev: () => void; onNext: () => void }) {
+  const [hp, setHp] = useState(false)
+  const [hn, setHn] = useState(false)
+  const arrowStyle = (h: boolean): React.CSSProperties => ({
+    width: 32, height: 32, border: 0, background: h ? 'var(--paper-2)' : 'transparent',
+    borderRadius: 8, color: 'var(--ink-2)', cursor: 'pointer',
+    display: 'grid', placeItems: 'center', fontSize: 18, lineHeight: 1,
+    transition: 'background var(--dur) var(--ease)',
+  })
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 2, background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10, padding: 2 }}>
+      <button onClick={onPrev} onMouseEnter={() => setHp(true)} onMouseLeave={() => setHp(false)} style={arrowStyle(hp)}>‹</button>
+      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13.5, fontWeight: 500, color: 'var(--ink)', padding: '0 10px', minWidth: 110, textAlign: 'center', textTransform: 'capitalize' }}>
+        {label}
+      </span>
+      <button onClick={onNext} onMouseEnter={() => setHn(true)} onMouseLeave={() => setHn(false)} style={arrowStyle(hn)}>›</button>
+    </div>
+  )
+}
+
+// ─── SectionHead ──────────────────────────────────────────────────────────────
+
+function SectionHead({ label, meta }: { label: string; meta?: string }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 14 }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>{label}</span>
+      {meta && <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-3)' }}>· {meta}</span>}
+    </div>
+  )
+}
+
+// ─── BudgetCard ───────────────────────────────────────────────────────────────
+
+function BudgetCard({ icon, cat, spent, budget, onEdit }: {
+  icon: string; cat: string; spent: number; budget: number; onEdit: () => void
+}) {
+  const pct      = budget > 0 ? Math.min(100, Math.round((spent / budget) * 100)) : 0
+  const over      = budget > 0 && spent > budget
+  const remaining = budget - spent
+  const fillColor = over ? 'var(--terra-deep)' : 'var(--terra)'
+
+  return (
+    <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div style={{ width: 30, height: 30, borderRadius: 8, background: 'var(--paper)', border: '1px solid var(--paper-2)', display: 'grid', placeItems: 'center', flexShrink: 0, fontSize: 15 }}>
+          {icon}
+        </div>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14.5, fontWeight: 500, color: 'var(--ink)', flex: 1 }}>{cat}</span>
+        {over && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4, background: 'var(--terra-soft)', color: '#6B2F14' }}>dépassé</span>}
+        <button onClick={onEdit} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', fontSize: 14, padding: 2 }} title="Modifier le budget">✎</button>
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 18, fontWeight: 500, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
+          {fmtDec(spent)}
+        </span>
+        {budget > 0 ? (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>/ {fmtDec(budget)}</span>
+        ) : (
+          <button onClick={onEdit} style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--terra)', background: 'transparent', border: 0, cursor: 'pointer' }}>+ Définir</button>
+        )}
+      </div>
+      {budget > 0 && (
+        <>
+          <div style={{ height: 6, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden', position: 'relative' }}>
+            <div style={{ width: `${Math.min(pct, 100)}%`, height: '100%', background: fillColor, borderRadius: 999, transition: 'width 320ms ease' }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>
+            <span>
+              {over
+                ? `↑ ${Math.abs(remaining).toLocaleString('fr-FR')} € au-dessus`
+                : `${remaining.toLocaleString('fr-FR')} € restants`}
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em', color: over ? 'var(--terra-deep)' : 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
+              {pct} %
+            </span>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+// ─── FilterChip ───────────────────────────────────────────────────────────────
+
+function FilterChip({ active, onClick, children }: { active: boolean; onClick: () => void; children: React.ReactNode }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: active ? 500 : 400,
+        padding: '6px 14px', borderRadius: 999,
+        background: active ? 'var(--paper-3)' : (hover ? 'var(--paper-2)' : 'transparent'),
+        border: `1px solid ${active ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+        color: 'var(--ink)', cursor: 'pointer',
+        transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+      }}>
+      {children}
+    </button>
+  )
+}
+
+// ─── TxRow ────────────────────────────────────────────────────────────────────
+
+function TxRow({ date, cat, amount, note, last, onEdit, onDelete }: {
+  date: string; cat: React.ReactNode; amount: number
+  note: string; last: boolean; onEdit: () => void; onDelete: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const positive = amount > 0
+  const formatted = `${positive ? '+ ' : '− '}${Math.abs(amount).toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €`
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'grid', gridTemplateColumns: '88px 160px 1fr auto 52px',
+        gap: 16, padding: '14px 20px',
+        borderBottom: last ? 0 : '1px solid var(--paper-2)',
+        background: hover ? 'var(--paper-2)' : 'transparent',
+        alignItems: 'center',
+        transition: 'background var(--dur) var(--ease)',
+      }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{date}</span>
+      <div style={{ minWidth: 0 }}>{cat}</div>
+      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink-2)', fontStyle: 'italic', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{note}</span>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, fontWeight: 500, textAlign: 'right', color: positive ? 'var(--sage-deep)' : 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{formatted}</span>
+      <div style={{ display: 'flex', gap: 2, opacity: hover ? 1 : 0, transition: 'opacity var(--dur) var(--ease)', justifyContent: 'flex-end' }}>
+        <button onClick={onEdit}   style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', fontSize: 13, padding: '2px 4px' }}>✎</button>
+        <button onClick={onDelete} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', fontSize: 13, padding: '2px 4px' }}>✕</button>
       </div>
     </div>
   )
