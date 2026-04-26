@@ -7,16 +7,16 @@ import type { ShoppingItem, BoughtItem, ShoppingCategory, ShoppingPriority, Shop
 const PRIORITIES: ShoppingPriority[] = ['Envie', 'Besoin', 'Urgent']
 const VERDICTS:   ShoppingVerdict[]  = ['Satisfait', 'Mitigé', 'Déçu']
 
-const priorityStyle: Record<ShoppingPriority, string> = {
-  Envie:   'bg-zinc-700 text-zinc-300',
-  Besoin:  'bg-orange-500/20 text-orange-400',
-  Urgent:  'bg-red-500/20 text-red-400',
+const priorityChipStyle: Record<ShoppingPriority, React.CSSProperties> = {
+  Envie:  { background: 'var(--paper-2)',    color: 'var(--fg-muted)',   border: '1px solid var(--border)' },
+  Besoin: { background: 'var(--terra-soft)', color: 'var(--terra-deep)', border: '1px solid var(--terra)' },
+  Urgent: { background: 'rgba(155,58,28,.12)', color: 'var(--danger)',   border: '1px solid var(--danger)' },
 }
 
-const verdictStyle: Record<ShoppingVerdict, string> = {
-  Satisfait: 'bg-emerald-500/20 text-emerald-400',
-  Mitigé:    'bg-amber-500/20 text-amber-400',
-  Déçu:      'bg-red-500/20 text-red-400',
+const verdictChipStyle: Record<ShoppingVerdict, React.CSSProperties> = {
+  Satisfait: { background: 'var(--sage-soft)', color: 'var(--sage-deep)', border: '1px solid #B9C8B4' },
+  Mitigé:    { background: 'rgba(192,106,47,.12)', color: 'var(--warn)', border: '1px solid var(--warn)' },
+  Déçu:      { background: 'rgba(155,58,28,.12)', color: 'var(--danger)', border: '1px solid var(--danger)' },
 }
 
 const fmt = (n: number) =>
@@ -29,7 +29,7 @@ const fmtDate = (iso: string) =>
 
 function ImagePlaceholder() {
   return (
-    <div className="flex h-full w-full items-center justify-center bg-zinc-800 text-zinc-600">
+    <div className="flex h-full w-full items-center justify-center" style={{ background: 'var(--paper-2)', color: 'var(--fg-subtle)' }}>
       <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
       </svg>
@@ -456,8 +456,8 @@ function ShoppingCard({ item, categories, onEdit, onDelete, onBuy, onCatFilter }
   const cat = categories.find((c) => c.id === item.categoryId)
 
   return (
-    <div className="group flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden hover:border-zinc-700 transition-colors">
-      {/* Image */}
+    <div className="group flex flex-col overflow-hidden transition-colors"
+      style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
       <div className="aspect-square w-full">
         {item.imageUrl
           ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
@@ -465,17 +465,15 @@ function ShoppingCard({ item, categories, onEdit, onDelete, onBuy, onCatFilter }
         }
       </div>
 
-      {/* Content */}
       <div className="flex flex-col gap-2 p-4">
-        {/* Header */}
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-100">{item.name}</p>
-            {item.brand && <p className="text-xs text-zinc-500">{item.brand}</p>}
+            <p className="truncate text-sm font-medium" style={{ color: 'var(--fg)' }}>{item.name}</p>
+            {item.brand && <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>{item.brand}</p>}
           </div>
           {item.link && (
             <a href={item.link} target="_blank" rel="noopener noreferrer"
-              className="shrink-0 text-zinc-600 hover:text-sky-400 transition-colors" title="Voir le lien">
+              className="shrink-0 transition-colors" style={{ color: 'var(--fg-muted)' }} title="Voir le lien">
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
@@ -483,12 +481,12 @@ function ShoppingCard({ item, categories, onEdit, onDelete, onBuy, onCatFilter }
           )}
         </div>
 
-        {/* Prix */}
-        <p className="text-lg font-bold text-sky-400">{fmt(item.price)}</p>
+        <p className="text-lg font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>
+          {fmt(item.price)}
+        </p>
 
-        {/* Tags */}
         <div className="flex flex-wrap gap-1.5">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityStyle[item.priority]}`}>
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={priorityChipStyle[item.priority]}>
             {item.priority}
           </span>
           {cat && (
@@ -500,25 +498,26 @@ function ShoppingCard({ item, categories, onEdit, onDelete, onBuy, onCatFilter }
           )}
         </div>
 
-        {/* Notes */}
         {item.notes && (
-          <p className="text-[11px] text-zinc-600 line-clamp-2">{item.notes}</p>
+          <p className="text-[11px] line-clamp-2" style={{ color: 'var(--fg-subtle)' }}>{item.notes}</p>
         )}
 
-        {/* Actions */}
         <div className="mt-1 flex gap-2">
           <button onClick={onBuy}
-            className="flex-1 rounded-lg bg-sky-500/15 py-1.5 text-xs font-medium text-sky-400 hover:bg-sky-500/25 transition-colors">
+            className="flex-1 py-1.5 text-xs font-medium transition-colors"
+            style={{ background: 'var(--accent)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
             Acheter
           </button>
           <button onClick={onEdit}
-            className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+            className="rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
+            style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
             </svg>
           </button>
           <button onClick={onDelete}
-            className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-red-500/60 hover:text-red-400 transition-colors">
+            className="rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
+            style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -543,7 +542,8 @@ function BoughtCard({ item, categories, onEdit, onDelete, onCatFilter }: BoughtC
   const cat = categories.find((c) => c.id === item.categoryId)
 
   return (
-    <div className="flex flex-col rounded-2xl border border-zinc-800 bg-zinc-900 overflow-hidden hover:border-zinc-700 transition-colors">
+    <div className="flex flex-col overflow-hidden transition-colors"
+      style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
       <div className="aspect-square w-full">
         {item.imageUrl
           ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
@@ -554,12 +554,12 @@ function BoughtCard({ item, categories, onEdit, onDelete, onCatFilter }: BoughtC
       <div className="flex flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="truncate text-sm font-semibold text-zinc-100">{item.name}</p>
-            {item.brand && <p className="text-xs text-zinc-500">{item.brand}</p>}
+            <p className="truncate text-sm font-medium" style={{ color: 'var(--fg)' }}>{item.name}</p>
+            {item.brand && <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>{item.brand}</p>}
           </div>
           {item.link && (
             <a href={item.link} target="_blank" rel="noopener noreferrer"
-              className="shrink-0 text-zinc-600 hover:text-sky-400 transition-colors">
+              className="shrink-0 transition-colors" style={{ color: 'var(--fg-muted)' }}>
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
               </svg>
@@ -568,16 +568,18 @@ function BoughtCard({ item, categories, onEdit, onDelete, onCatFilter }: BoughtC
         </div>
 
         <div className="flex items-center gap-2">
-          <p className="text-lg font-bold text-sky-400">{fmt(item.pricePaid)}</p>
+          <p className="text-lg font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>
+            {fmt(item.pricePaid)}
+          </p>
           {item.pricePaid !== item.price && (
-            <p className="text-xs text-zinc-600 line-through">{fmt(item.price)}</p>
+            <p className="text-xs line-through" style={{ color: 'var(--fg-subtle)' }}>{fmt(item.price)}</p>
           )}
         </div>
 
-        <p className="text-[11px] text-zinc-600">Acheté le {fmtDate(item.boughtDate)}</p>
+        <p className="text-[11px]" style={{ color: 'var(--fg-subtle)' }}>Acheté le {fmtDate(item.boughtDate)}</p>
 
         <div className="flex flex-wrap gap-1.5">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${verdictStyle[item.verdict]}`}>
+          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={verdictChipStyle[item.verdict]}>
             {item.verdict}
           </span>
           {cat && (
@@ -589,15 +591,17 @@ function BoughtCard({ item, categories, onEdit, onDelete, onCatFilter }: BoughtC
           )}
         </div>
 
-        {item.notes && <p className="text-[11px] text-zinc-600 line-clamp-2">{item.notes}</p>}
+        {item.notes && <p className="text-[11px] line-clamp-2" style={{ color: 'var(--fg-subtle)' }}>{item.notes}</p>}
 
         <div className="mt-1 flex gap-2">
           <button onClick={onEdit}
-            className="flex-1 rounded-lg bg-zinc-800 py-1.5 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+            className="flex-1 rounded-lg py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
+            style={{ color: 'var(--fg-muted)', background: 'var(--paper-2)', border: '1px solid var(--border)', cursor: 'pointer' }}>
             Éditer verdict
           </button>
           <button onClick={onDelete}
-            className="rounded-lg bg-zinc-800 px-3 py-1.5 text-xs text-red-500/60 hover:text-red-400 transition-colors">
+            className="rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
+            style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
             </svg>
@@ -769,19 +773,21 @@ export function ShoppingPage() {
       {/* ── Header ──────────────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-semibold text-zinc-100">Achats</h1>
-          <p className="text-sm text-zinc-500">Wishlist & historique</p>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>Achats</h1>
+          <p className="text-sm mt-0.5" style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>Wishlist & historique</p>
         </div>
         <div className="flex gap-2">
           <button onClick={() => setShowCatModal(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-zinc-700 px-3 py-2 text-xs text-zinc-400 hover:text-zinc-200 transition-colors">
+            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition-colors"
+            style={{ border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'transparent' }}>
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
             Catégories
           </button>
           <button onClick={() => { setEditItem(undefined); setShowAddModal(true) }}
-            className="flex items-center gap-1.5 rounded-lg bg-sky-500 px-3 py-2 text-xs font-medium text-white hover:bg-sky-400 transition-colors">
+            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors"
+            style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
             </svg>
@@ -792,32 +798,28 @@ export function ShoppingPage() {
 
       {/* ── Stats ───────────────────────────────────────────────────────────── */}
       <div className="grid grid-cols-3 gap-4">
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 mb-1">Wishlist</p>
-          <p className="text-2xl font-bold text-zinc-100">{wishlist.length}</p>
-          <p className="text-xs text-zinc-600 mt-1">Valeur totale <span className="text-sky-400 font-medium">{fmt(totalWishlistValue)}</span></p>
-        </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 mb-1">Achetés ce mois</p>
-          <p className="text-2xl font-bold text-zinc-100">{thisMonth}</p>
-          <p className="text-xs text-zinc-600 mt-1">{bought.length} au total</p>
-        </div>
-        <div className="rounded-2xl border border-zinc-800 bg-zinc-900 p-4">
-          <p className="text-xs text-zinc-500 mb-1">Total dépensé</p>
-          <p className="text-2xl font-bold text-zinc-100">{fmt(totalBoughtValue)}</p>
-          <p className="text-xs text-zinc-600 mt-1">Tous les achats</p>
-        </div>
+        {[
+          { label: 'Wishlist',        value: String(wishlist.length), sub: <span>Valeur totale <span style={{ color: 'var(--terra)', fontWeight: 500 }}>{fmt(totalWishlistValue)}</span></span> },
+          { label: 'Achetés ce mois', value: String(thisMonth),       sub: `${bought.length} au total` },
+          { label: 'Total dépensé',   value: fmt(totalBoughtValue),   sub: 'Tous les achats', mono: true },
+        ].map(({ label, value, sub, mono }) => (
+          <div key={label} className="p-4" style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
+            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 6 }}>{label}</p>
+            <p style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-serif)', fontSize: 26, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>{value}</p>
+            <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>{sub}</p>
+          </div>
+        ))}
       </div>
 
       {/* ── Tabs ────────────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 rounded-xl bg-zinc-900 border border-zinc-800 p-1 w-fit">
+      <div className="flex gap-1 p-1 w-fit rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
         {(['wishlist', 'bought'] as const).map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`rounded-lg px-4 py-1.5 text-sm font-medium transition-colors ${
-              activeTab === tab
-                ? 'bg-zinc-800 text-zinc-100'
-                : 'text-zinc-500 hover:text-zinc-300'
-            }`}>
+            className="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
+            style={activeTab === tab
+              ? { background: 'var(--paper-3)', color: 'var(--fg)', border: '1px solid var(--border-strong)' }
+              : { background: 'transparent', color: 'var(--fg-muted)', border: '1px solid transparent' }
+            }>
             {tab === 'wishlist' ? `Wishlist (${wishlist.length})` : `Achetés (${bought.length})`}
           </button>
         ))}
@@ -825,9 +827,9 @@ export function ShoppingPage() {
 
       {/* ── Controls ────────────────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-center gap-3">
-        {/* Sort */}
         <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-xs text-zinc-300 outline-none focus:border-sky-500/60">
+          className="rounded-lg px-3 py-1.5 text-xs outline-none transition-colors"
+          style={{ border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--fg-muted)' }}>
           <option value="priority">Par priorité</option>
           <option value="price_asc">Prix croissant</option>
           <option value="price_desc">Prix décroissant</option>
@@ -835,32 +837,31 @@ export function ShoppingPage() {
           <option value="date_desc">Plus récent</option>
         </select>
 
-        {/* Filter by priority (wishlist only) */}
         {activeTab === 'wishlist' && (
           <div className="flex gap-1.5">
             {PRIORITIES.map((p) => (
               <button key={p} onClick={() => togglePriorityFilter(p)}
-                className={`rounded-full px-3 py-1 text-[11px] font-medium transition-colors border ${
-                  filterPriorities.includes(p)
-                    ? priorityStyle[p] + ' border-current'
-                    : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                }`}>
+                className="rounded-full px-3 py-1 text-[11px] font-medium transition-colors"
+                style={filterPriorities.includes(p)
+                  ? priorityChipStyle[p]
+                  : { background: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }
+                }>
                 {p}
               </button>
             ))}
           </div>
         )}
 
-        {/* Filter by category */}
         {categories.length > 0 && (
           <div className="flex flex-wrap gap-1.5">
             {categories.map((c) => (
               <button key={c.id} onClick={() => toggleCatFilter(c.id)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11px] font-medium transition-colors ${
-                  filterCatIds.includes(c.id) ? 'border-current' : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                }`}
-                style={filterCatIds.includes(c.id) ? { color: c.color, borderColor: c.color + '60', backgroundColor: c.color + '15' } : {}}>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: filterCatIds.includes(c.id) ? c.color : '#52525b' }} />
+                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition-colors"
+                style={filterCatIds.includes(c.id)
+                  ? { color: c.color, borderColor: c.color + '60', backgroundColor: c.color + '15', border: `1px solid ${c.color}60` }
+                  : { border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'var(--bg-elev)' }
+                }>
+                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: filterCatIds.includes(c.id) ? c.color : 'var(--fg-subtle)' }} />
                 {c.name}
               </button>
             ))}
@@ -869,7 +870,7 @@ export function ShoppingPage() {
 
         {(filterCatIds.length > 0 || filterPriorities.length > 0) && (
           <button onClick={() => { setFilterCatIds([]); setFilterPriorities([]) }}
-            className="text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+            className="text-xs transition-colors" style={{ color: 'var(--fg-subtle)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
             Effacer filtres
           </button>
         )}
@@ -879,14 +880,15 @@ export function ShoppingPage() {
       {activeTab === 'wishlist' && (
         <>
           {filteredWishlist.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
+            <div className="flex flex-col items-center justify-center py-20" style={{ color: 'var(--fg-subtle)' }}>
               <span className="text-4xl mb-3">🛍️</span>
-              <p className="text-sm">
+              <p className="text-sm" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
                 {wishlist.length === 0 ? 'Ta wishlist est vide' : 'Aucun article pour ces filtres'}
               </p>
               {wishlist.length === 0 && (
                 <button onClick={() => setShowAddModal(true)}
-                  className="mt-4 rounded-lg bg-sky-500/15 px-4 py-2 text-xs text-sky-400 hover:bg-sky-500/25 transition-colors">
+                  className="mt-4 px-4 py-2 text-xs transition-colors"
+                  style={{ background: 'var(--terra-soft)', color: 'var(--terra-deep)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
                   + Ajouter un article
                 </button>
               )}
@@ -895,9 +897,7 @@ export function ShoppingPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredWishlist.map((item) => (
                 <ShoppingCard
-                  key={item.id}
-                  item={item}
-                  categories={categories}
+                  key={item.id} item={item} categories={categories}
                   onEdit={() => { setEditItem(item); setShowAddModal(true) }}
                   onDelete={() => removeWishlistItem(item.id)}
                   onBuy={() => setBuyTarget(item)}
@@ -913,9 +913,9 @@ export function ShoppingPage() {
       {activeTab === 'bought' && (
         <>
           {filteredBought.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-zinc-600">
+            <div className="flex flex-col items-center justify-center py-20" style={{ color: 'var(--fg-subtle)' }}>
               <span className="text-4xl mb-3">✓</span>
-              <p className="text-sm">
+              <p className="text-sm" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
                 {bought.length === 0 ? 'Aucun achat enregistré' : 'Aucun article pour ces filtres'}
               </p>
             </div>
@@ -923,9 +923,7 @@ export function ShoppingPage() {
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {filteredBought.map((item) => (
                 <BoughtCard
-                  key={item.id}
-                  item={item}
-                  categories={categories}
+                  key={item.id} item={item} categories={categories}
                   onEdit={() => setEditBought(item)}
                   onDelete={() => removeBoughtItem(item.id)}
                   onCatFilter={toggleCatFilter}
