@@ -117,6 +117,60 @@ export const supabaseStorage: StateStorage = {
   },
 }
 
+// ─── supabaseOnlyStorage — Zustand persist adapter sans localStorage ─────────
+// Utilisé pour les stores dont les données peuvent dépasser le quota localStorage
+// (ex: images base64). Les lectures et écritures passent uniquement par Supabase.
+
+export const supabaseOnlyStorage: StateStorage = {
+  getItem: async (name: string): Promise<string | null> => {
+    await waitForUserId()
+    const key = scopedKey(name)
+    if (!supabase) return null
+    try {
+      const { data, error } = await supabase
+        .from('stores')
+        .select('value')
+        .eq('key', key)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+      if (error) {
+        console.error(`[Supabase/cloud-only] ❌ getItem(${key}):`, error.message)
+        return null
+      }
+      const value = Array.isArray(data) ? (data[0] as { value?: string })?.value : null
+      console.log(`[Supabase/cloud-only] 📥 getItem("${key}") — ${value ? `✅ ${Math.round(value.length / 1024)}kb` : '❌ absent'}`)
+      return value ?? null
+    } catch (err) {
+      console.error(`[Supabase/cloud-only] ❌ getItem(${key}) exception:`, err)
+      return null
+    }
+  },
+
+  setItem: async (name: string, value: string): Promise<void> => {
+    const key = scopedKey(name)
+    if (!supabase) {
+      console.warn(`[Supabase/cloud-only] setItem(${name}) — client null, données perdues`)
+      return
+    }
+    console.log(`[Supabase/cloud-only] 📤 setItem("${key}") — ${Math.round(value.length / 1024)}kb`)
+    try {
+      const { error } = await supabase
+        .from('stores')
+        .upsert({ key, value, updated_at: new Date().toISOString() }, { onConflict: 'key' })
+      if (error) console.error(`[Supabase/cloud-only] ❌ setItem(${key}):`, error.message)
+      else console.log(`[Supabase/cloud-only] ✅ setItem("${key}") — cloud OK`)
+    } catch (err) {
+      console.error(`[Supabase/cloud-only] ❌ setItem(${key}) exception:`, err)
+    }
+  },
+
+  removeItem: async (name: string): Promise<void> => {
+    const key = scopedKey(name)
+    if (!supabase) return
+    await supabase.from('stores').delete().eq('key', key)
+  },
+}
+
 // ─── Store registry ───────────────────────────────────────────────────────────
 // Chaque store créé via createPersistedStore s'enregistre ici automatiquement.
 // Le main store (aetheris-app) est pré-enregistré car il n'utilise pas la factory.

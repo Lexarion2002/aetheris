@@ -1,5 +1,7 @@
+import { create } from 'zustand'
+import { persist, createJSONStorage } from 'zustand/middleware'
+import { supabaseOnlyStorage, registerStoreKey } from '../lib/supabaseSync'
 import type { ShoppingItem, BoughtItem, ShoppingCategory, ShoppingVerdict } from '../types'
-import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── State ────────────────────────────────────────────────────────────────────
 
@@ -21,11 +23,23 @@ interface ShoppingState {
   deleteCategory: (id: string) => void
 }
 
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+// Les imageUrl base64 (data:image/...) peuvent peser plusieurs Mo.
+// On les strip avant la persistance pour éviter la QuotaExceededError.
+// Les URLs externes (https://...) sont conservées.
+function stripBase64(url: string | undefined): string | undefined {
+  return url?.startsWith('data:') ? undefined : url
+}
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
-export const useShoppingStore = createPersistedStore<ShoppingState>(
-  'aetheris-shopping-v1',
-  (set, get) => ({
+const STORE_KEY = 'aetheris-shopping-v1'
+registerStoreKey(STORE_KEY)
+
+export const useShoppingStore = create<ShoppingState>()(
+  persist(
+    (set, get) => ({
       wishlist:   [],
       bought:     [],
       categories: [],
@@ -83,5 +97,18 @@ export const useShoppingStore = createPersistedStore<ShoppingState>(
           wishlist:   s.wishlist.map((i) => i.categoryId === id ? { ...i, categoryId: undefined } : i),
           bought:     s.bought.map((i)   => i.categoryId === id ? { ...i, categoryId: undefined } : i),
         })),
-  }),
+    }),
+    {
+      name:    STORE_KEY,
+      storage: createJSONStorage(() => supabaseOnlyStorage),
+      // Exclut les base64 de la persistance (trop volumineuses pour un blob cloud).
+      // Les URLs externes sont conservées. Les images uploadées localement
+      // (data:) sont affichées en session mais ne sont pas sauvegardées.
+      partialize: (state) => ({
+        categories: state.categories,
+        wishlist:   state.wishlist.map((i) => ({ ...i, imageUrl: stripBase64(i.imageUrl) })),
+        bought:     state.bought.map((i)   => ({ ...i, imageUrl: stripBase64(i.imageUrl) })),
+      }),
+    },
+  ),
 )
