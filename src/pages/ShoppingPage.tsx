@@ -490,9 +490,9 @@ function ShoppingCard({ item, categories, onEdit, onDelete, onBuy, onCatFilter }
   return (
     <div className="group flex flex-col overflow-hidden transition-colors"
       style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
-      <div className="aspect-square w-full">
+      <div style={{ height: 240, width: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', flexShrink: 0 }}>
         {item.imageUrl
-          ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+          ? <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
           : <ImagePlaceholder />
         }
       </div>
@@ -576,9 +576,9 @@ function BoughtCard({ item, categories, onEdit, onDelete, onCatFilter }: BoughtC
   return (
     <div className="flex flex-col overflow-hidden transition-colors"
       style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
-      <div className="aspect-square w-full">
+      <div style={{ height: 240, width: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', flexShrink: 0 }}>
         {item.imageUrl
-          ? <img src={item.imageUrl} alt={item.name} className="h-full w-full object-cover" />
+          ? <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
           : <ImagePlaceholder />
         }
       </div>
