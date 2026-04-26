@@ -5,6 +5,11 @@ import type { ShoppingItem, BoughtItem, ShoppingCategory, ShoppingPriority, Shop
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const PRIORITIES: ShoppingPriority[] = ['Envie', 'Besoin', 'Urgent']
+
+const CAT_SWATCHES = [
+  '#B5532A', '#EAD1BE', '#7E9A7A', '#D5DFD0',
+  '#6B5B48', '#DFD2B5', '#A08B72', '#3A2E22',
+]
 const VERDICTS:   ShoppingVerdict[]  = ['Satisfait', 'Mitigé', 'Déçu']
 
 const priorityChipStyle: Record<ShoppingPriority, React.CSSProperties> = {
@@ -57,7 +62,7 @@ function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalA
   const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '')
   const [priority,   setPriority]   = useState<ShoppingPriority>(initial?.priority ?? 'Envie')
   const [newCatName,  setNewCatName]  = useState('')
-  const [newCatColor, setNewCatColor] = useState('#0EA5E9')
+  const [newCatColor, setNewCatColor] = useState(CAT_SWATCHES[0])
   const [showNewCat,  setShowNewCat]  = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
@@ -91,28 +96,36 @@ function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalA
     onClose()
   }
 
+  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-2 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
+  const labelCls = 'mb-1.5 block text-[var(--fs-sm)] text-[var(--fg-muted)]'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(58,46,34,0.4)' }}
+      onClick={onClose}
+    >
       <form
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        className="relative w-full max-w-lg p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)' }}
       >
-        <h2 className="text-base font-semibold text-zinc-100">
-          {initial ? 'Modifier l\'article' : 'Nouvel article'}
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
+          {initial ? "Modifier l'article" : 'Nouvel article'}
         </h2>
 
         {/* Image upload */}
         <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Image</label>
+          <label className={labelCls}>Image</label>
           <input ref={fileRef} type="file" accept="image/*" className="hidden"
             onChange={(e) => e.target.files?.[0] && handleImage(e.target.files[0])} />
           {imageUrl ? (
             <div className="relative w-full aspect-[3/1] rounded-xl overflow-hidden">
               <img src={imageUrl} alt="" className="w-full h-full object-cover" />
               <button type="button" onClick={() => setImageUrl('')}
-                className="absolute top-2 right-2 rounded-full bg-zinc-950/70 p-1 text-zinc-400 hover:text-red-400">
+                className="absolute top-2 right-2 rounded-full p-1 transition-colors"
+                style={{ background: 'rgba(58,46,34,0.7)', color: 'var(--paper-1)' }}>
                 <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                 </svg>
@@ -120,7 +133,8 @@ function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalA
             </div>
           ) : (
             <button type="button" onClick={() => fileRef.current?.click()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-zinc-700 py-6 text-sm text-zinc-500 hover:border-sky-500/50 hover:text-sky-400 transition-colors">
+              className="flex w-full items-center justify-center gap-2 rounded-xl py-6 text-sm transition-colors"
+              style={{ border: '1px dashed var(--border)', color: 'var(--fg-muted)', background: 'transparent' }}>
               <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
               </svg>
@@ -129,82 +143,98 @@ function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalA
           )}
         </div>
 
-        {/* Nom + Brand */}
+        {/* Nom + Marque */}
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="mb-1.5 block text-xs text-zinc-500">Nom *</label>
+            <label className={labelCls}>Nom *</label>
             <input value={name} onChange={(e) => setName(e.target.value)} required
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
-              placeholder="Ex : Air Jordan 1" />
+              className={inputCls} placeholder="Ex : Air Jordan 1" />
           </div>
           <div>
-            <label className="mb-1.5 block text-xs text-zinc-500">Marque</label>
+            <label className={labelCls}>Marque</label>
             <input value={brand} onChange={(e) => setBrand(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
-              placeholder="Ex : Nike" />
+              className={inputCls} placeholder="Ex : Nike" />
           </div>
         </div>
 
         {/* Prix */}
         <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Prix (€) *</label>
-          <input type="number" min="0" step="0.01" value={price} onChange={(e) => setPrice(e.target.value)} required
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
-            placeholder="0" />
+          <label className={labelCls}>Prix (€) *</label>
+          <input type="number" min="0" step="0.01" value={price}
+            onChange={(e) => setPrice(e.target.value)} required
+            className={inputCls} placeholder="0" />
         </div>
 
         {/* Lien */}
         <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Lien</label>
+          <label className={labelCls}>Lien</label>
           <input value={link} onChange={(e) => setLink(e.target.value)}
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
-            placeholder="https://..." />
+            className={inputCls} placeholder="https://..." />
         </div>
 
         {/* Catégorie */}
         <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Catégorie</label>
+          <label className={labelCls}>Catégorie</label>
           <div className="flex gap-2">
             <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60">
+              className={inputCls + ' flex-1'}>
               <option value="">Aucune</option>
               {categories.map((c) => (
                 <option key={c.id} value={c.id}>{c.name}</option>
               ))}
             </select>
             <button type="button" onClick={() => setShowNewCat((v) => !v)}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-xs text-zinc-400 hover:text-sky-400 transition-colors">
+              className="rounded-[var(--r-md)] px-3 py-2 text-xs transition-colors"
+              style={{ border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'transparent', cursor: 'pointer' }}>
               + Créer
             </button>
           </div>
           {showNewCat && (
-            <div className="mt-2 flex gap-2 items-center">
+            <div className="mt-3 space-y-2">
               <input value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-                className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
-                placeholder="Nom de la catégorie" />
-              <input type="color" value={newCatColor} onChange={(e) => setNewCatColor(e.target.value)}
-                className="h-9 w-9 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-1" />
-              <button type="button" onClick={handleCreateCat}
-                className="rounded-lg bg-sky-500/15 px-3 py-2 text-xs text-sky-400 hover:bg-sky-500/25 transition-colors">
-                OK
-              </button>
+                className={inputCls} placeholder="Nom de la catégorie" />
+              {/* Swatches design system */}
+              <div>
+                <p className="text-[11px] mb-1.5" style={{ color: 'var(--fg-muted)' }}>Couleur</p>
+                <div className="grid grid-cols-4 gap-2" style={{ width: 'fit-content' }}>
+                  {CAT_SWATCHES.map((color) => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setNewCatColor(color)}
+                      className="h-7 w-7 rounded-full transition-all"
+                      style={{
+                        backgroundColor: color,
+                        outline: newCatColor === color ? `2px solid var(--terra)` : '2px solid transparent',
+                        outlineOffset: 2,
+                        transform: newCatColor === color ? 'scale(1.15)' : 'scale(1)',
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <div className="flex justify-end">
+                <button type="button" onClick={handleCreateCat}
+                  className="px-4 py-1.5 text-xs font-medium transition-colors"
+                  style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
+                  OK
+                </button>
+              </div>
             </div>
           )}
         </div>
 
         {/* Priorité */}
         <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Priorité</label>
+          <label className={labelCls}>Priorité</label>
           <div className="flex gap-2">
             {PRIORITIES.map((p) => (
               <button key={p} type="button" onClick={() => setPriority(p)}
-                className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
-                  priority === p
-                    ? p === 'Envie' ? 'border-zinc-500 bg-zinc-700 text-zinc-200'
-                    : p === 'Besoin' ? 'border-orange-500/50 bg-orange-500/20 text-orange-400'
-                    : 'border-red-500/50 bg-red-500/20 text-red-400'
-                    : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                }`}>
+                className="flex-1 rounded-[var(--r-md)] py-2 text-xs font-medium transition-colors"
+                style={priority === p
+                  ? { background: 'var(--terra-soft)', border: '1px solid var(--terra)', color: 'var(--terra-deep)', cursor: 'pointer' }
+                  : { background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--fg-muted)', cursor: 'pointer' }
+                }>
                 {p}
               </button>
             ))}
@@ -213,19 +243,21 @@ function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalA
 
         {/* Notes */}
         <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Note personnelle</label>
+          <label className={labelCls}>Note personnelle</label>
           <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
+            className={inputCls + ' resize-none'}
             placeholder="Pourquoi tu veux ça…" />
         </div>
 
         <div className="flex gap-3 pt-2">
           <button type="button" onClick={onClose}
-            className="flex-1 rounded-lg border border-zinc-700 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
+            className="flex-1 py-2 text-sm transition-colors"
+            style={{ border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'transparent', borderRadius: 'var(--r-md)', cursor: 'pointer' }}>
             Annuler
           </button>
           <button type="submit"
-            className="flex-1 rounded-lg bg-sky-500 py-2 text-sm font-medium text-white hover:bg-sky-400 transition-colors">
+            className="flex-1 py-2 text-sm font-medium transition-colors"
+            style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
             {initial ? 'Mettre à jour' : 'Ajouter'}
           </button>
         </div>
