@@ -803,34 +803,41 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
     onClose()
   }
 
+  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-2 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
+  const labelCls = 'block mb-1 text-[11px] text-[var(--fg-muted)]'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(58,46,34,0.4)' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-lg bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl overflow-y-auto max-h-[90vh]"
+        className="w-full max-w-lg rounded-2xl shadow-2xl overflow-y-auto max-h-[90vh]"
+        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-zinc-200">
+        <div className="p-6 space-y-4">
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
             {initial ? 'Modifier la critique' : 'Nouvelle critique'}
           </h2>
 
           {/* Titre / Artiste */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Titre *</label>
-              <input
-                value={titre} onChange={(e) => setTitre(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
-                placeholder="Album"
-              />
+              <label className={labelCls}>Titre *</label>
+              <input value={titre} onChange={(e) => setTitre(e.target.value)} className={inputCls} placeholder="Album" />
             </div>
             <div>
-              <label className="text-[11px] text-zinc-500 mb-1 block">Artiste *</label>
-              <div className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-2 py-1.5 flex flex-wrap gap-1 focus-within:border-teal-500/50">
+              <label className={labelCls}>Artiste *</label>
+              <div
+                className="w-full flex flex-wrap gap-1 px-2 py-1.5 rounded-[var(--r-md)] transition-colors"
+                style={{ background: 'var(--bg)', border: '1px solid var(--border)', minHeight: 38 }}
+              >
                 {artistes.map((a) => (
-                  <span key={a} className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-zinc-700 text-xs text-zinc-200">
+                  <span key={a} className="flex items-center gap-1 px-2 py-0.5 rounded text-xs" style={{ background: 'var(--paper-3)', color: 'var(--fg)' }}>
                     {a}
-                    <button type="button" onClick={() => setArtistes((p) => p.filter((x) => x !== a))} className="text-zinc-500 hover:text-zinc-300">×</button>
+                    <button type="button" onClick={() => setArtistes((p) => p.filter((x) => x !== a))} style={{ color: 'var(--fg-muted)' }}>×</button>
                   </span>
                 ))}
                 <input
@@ -838,7 +845,8 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
                   onChange={(e) => setArtisteInput(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addArtiste(artisteInput) } }}
                   onBlur={() => { if (artisteInput.trim()) addArtiste(artisteInput) }}
-                  className="flex-1 min-w-[80px] bg-transparent text-sm text-zinc-200 outline-none placeholder:text-zinc-600"
+                  className="flex-1 min-w-[80px] bg-transparent text-sm outline-none"
+                  style={{ color: 'var(--fg)' }}
                   placeholder={artistes.length === 0 ? 'Artiste, Entrée' : '+'}
                 />
               </div>
@@ -847,30 +855,23 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
 
           {/* Date de sortie */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Date de sortie</label>
-            <input
-              type="date"
-              value={dateSortie}
-              onChange={(e) => setDateSortie(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50 [color-scheme:dark]"
-            />
+            <label className={labelCls}>Date de sortie</label>
+            <input type="date" value={dateSortie} onChange={(e) => setDateSortie(e.target.value)} className={inputCls} />
             {dateSortie && (
-              <p className="text-[11px] text-zinc-600 mt-0.5">
-                {fmtDate(dateSortie)}
-              </p>
+              <p className="text-[11px] mt-0.5" style={{ color: 'var(--fg-subtle)' }}>{fmtDate(dateSortie)}</p>
             )}
           </div>
 
           {/* Pochette — upload / drag & drop */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Pochette</label>
+            <label className={labelCls}>Pochette</label>
             <div className="flex gap-3 items-start">
               <div
-                className={`relative flex-1 flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors cursor-pointer min-h-[80px] ${
-                  dragOver
-                    ? 'border-teal-500/60 bg-teal-500/5'
-                    : 'border-zinc-700/60 bg-zinc-800/40 hover:border-zinc-600 hover:bg-zinc-800/60'
-                }`}
+                className="relative flex-1 flex flex-col items-center justify-center rounded-xl border-2 border-dashed transition-colors cursor-pointer min-h-[80px]"
+                style={{
+                  borderColor: dragOver ? 'var(--terra)' : 'var(--border)',
+                  background: dragOver ? 'var(--terra-soft)' : 'var(--bg)',
+                }}
                 onClick={() => fileInputRef.current?.click()}
                 onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
                 onDragLeave={() => setDragOver(false)}
@@ -895,16 +896,16 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
                   <img src={pochette} alt="pochette" className="w-full h-full object-cover rounded-xl max-h-48" />
                 ) : (
                   <div className="py-4 text-center">
-                    <p className="text-xs text-zinc-500">Glisse une image ici</p>
-                    <p className="text-[10px] text-zinc-700 mt-0.5">ou clique pour choisir</p>
-                    <p className="text-[10px] text-zinc-700">JPG · PNG · WEBP</p>
+                    <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>Glisse une image ici</p>
+                    <p className="text-[10px] mt-0.5" style={{ color: 'var(--fg-subtle)' }}>ou clique pour choisir · JPG PNG WEBP</p>
                   </div>
                 )}
               </div>
               {pochette && (
                 <button
                   onClick={() => setPochette('')}
-                  className="px-2.5 py-1.5 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-500 text-xs transition-colors shrink-0"
+                  className="px-2.5 py-1.5 rounded-lg text-xs transition-colors shrink-0"
+                  style={{ background: 'var(--paper-2)', color: 'var(--fg-muted)', border: '1px solid var(--border)' }}
                 >
                   ✕ Retirer
                 </button>
@@ -914,32 +915,33 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
 
           {/* Note */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-2 block">
-              Note : <span className="font-bold" style={{ color: noteColor(note) }}>{note % 1 === 0 ? note : note.toFixed(1)}/10</span>
+            <label className={labelCls}>
+              Note : <span className="font-semibold" style={{ color: noteColor(note) }}>{note % 1 === 0 ? note : note.toFixed(1)}/10</span>
             </label>
             <input
               type="range" min={1} max={10} step={0.5} value={note}
               onChange={(e) => setNote(parseFloat(e.target.value))}
-              className="w-full accent-teal-500"
+              className="w-full"
+              style={{ accentColor: 'var(--terra)' }}
             />
-            <div className="flex justify-between text-[10px] text-zinc-700 mt-0.5">
+            <div className="flex justify-between text-[10px] mt-0.5" style={{ color: 'var(--fg-subtle)' }}>
               <span>1</span><span>5</span><span>10</span>
             </div>
           </div>
 
           {/* Tags */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-2 block">Tags (max 3)</label>
+            <label className={labelCls}>Tags (max 3)</label>
             <div className="flex flex-wrap gap-1.5">
               {ALL_TAGS.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => toggleTag(tag)}
-                  className={`px-2 py-0.5 rounded text-[11px] border transition-colors ${
-                    tags.includes(tag)
-                      ? 'bg-teal-500/20 text-teal-300 border-teal-500/40'
-                      : 'bg-zinc-800 text-zinc-500 border-zinc-700/50 hover:border-zinc-600'
-                  }`}
+                  className="px-2 py-0.5 rounded text-[11px] border transition-colors"
+                  style={tags.includes(tag)
+                    ? { background: 'var(--terra-soft)', borderColor: 'var(--terra)', color: 'var(--terra-deep)' }
+                    : { background: 'var(--paper-2)', borderColor: 'var(--border)', color: 'var(--fg)' }
+                  }
                 >
                   {tag}
                 </button>
@@ -949,32 +951,32 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
 
           {/* Critique */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Critique</label>
+            <label className={labelCls}>Critique</label>
             <textarea
               value={critique} onChange={(e) => setCritique(e.target.value)}
               rows={3}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50 resize-none"
+              className={inputCls + ' resize-none'}
               placeholder="Ce que j'en pense..."
             />
           </div>
 
           {/* Tracks */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Tracks favorites (une par ligne)</label>
+            <label className={labelCls}>Tracks favorites (une par ligne)</label>
             <textarea
               value={tracks} onChange={(e) => setTracks(e.target.value)}
               rows={2}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50 resize-none"
-              placeholder="Track 1&#10;Track 2"
+              className={inputCls + ' resize-none'}
+              placeholder={"Track 1\nTrack 2"}
             />
           </div>
 
           {/* Contexte */}
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Contexte personnel</label>
+            <label className={labelCls}>Contexte personnel</label>
             <input
               value={contexte} onChange={(e) => setContexte(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
+              className={inputCls}
               placeholder="Première impression, moment particulier..."
             />
           </div>
@@ -983,7 +985,8 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
             <button
               onClick={handleSubmit}
               disabled={!titre.trim() || artistes.length === 0}
-              className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              className="flex-1 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}
             >
               {!!initial ? 'Enregistrer' : 'Ajouter à la bibliothèque'}
             </button>
@@ -995,12 +998,17 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
                     onClose()
                   }
                 }}
-                className="px-4 py-2 rounded-lg bg-red-500/20 hover:bg-red-500/30 text-red-400 text-sm transition-colors"
+                className="px-4 py-2 text-sm transition-colors"
+                style={{ background: 'transparent', border: '1px solid var(--danger)', color: 'var(--danger)', borderRadius: 'var(--r-md)', cursor: 'pointer' }}
               >
                 Supprimer
               </button>
             )}
-            <button onClick={onClose} className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm transition-colors"
+              style={{ background: 'var(--paper-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', cursor: 'pointer' }}
+            >
               Annuler
             </button>
           </div>
@@ -1025,39 +1033,49 @@ function FileModal({ onClose }: { onClose: () => void }) {
     onClose()
   }
 
+  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-2 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
+  const labelCls = 'block mb-1 text-[11px] text-[var(--fg-muted)]'
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(58,46,34,0.4)' }}
+      onClick={onClose}
+    >
       <div
-        className="w-full max-w-sm bg-zinc-900 border border-zinc-700/60 rounded-xl shadow-2xl"
+        className="w-full max-w-sm rounded-2xl shadow-2xl"
+        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-5 space-y-3">
-          <h2 className="text-sm font-semibold text-zinc-200">Ajouter à la file</h2>
+        <div className="p-6 space-y-3">
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
+            Ajouter à la file
+          </h2>
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Titre *</label>
+            <label className={labelCls}>Titre *</label>
             <input value={titre} onChange={(e) => setTitre(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
+              className={inputCls}
               placeholder="Album"
             />
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Artiste *</label>
+            <label className={labelCls}>Artiste *</label>
             <input value={artiste} onChange={(e) => setArtiste(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
+              className={inputCls}
               placeholder="Artiste"
             />
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Source</label>
+            <label className={labelCls}>Source</label>
             <input value={source} onChange={(e) => setSource(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
+              className={inputCls}
               placeholder="Conseil de X, vu dans Y..."
             />
           </div>
           <div>
-            <label className="text-[11px] text-zinc-500 mb-1 block">Pourquoi</label>
+            <label className={labelCls}>Pourquoi</label>
             <input value={pourquoi} onChange={(e) => setPourquoi(e.target.value)}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-teal-500/50"
+              className={inputCls}
               placeholder="Raison de l'intérêt..."
             />
           </div>
@@ -1065,11 +1083,16 @@ function FileModal({ onClose }: { onClose: () => void }) {
             <button
               onClick={handleSubmit}
               disabled={!titre.trim() || !artiste.trim()}
-              className="flex-1 py-2 rounded-lg bg-teal-600 hover:bg-teal-500 text-white text-sm font-medium transition-colors disabled:opacity-40"
+              className="flex-1 py-2 text-sm font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}
             >
               Ajouter
             </button>
-            <button onClick={onClose} className="px-4 py-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-sm transition-colors">
+            <button
+              onClick={onClose}
+              className="px-4 py-2 text-sm transition-colors"
+              style={{ background: 'var(--paper-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', cursor: 'pointer' }}
+            >
               Annuler
             </button>
           </div>
