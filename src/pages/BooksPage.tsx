@@ -19,13 +19,12 @@ const SOURCE_LABELS: Record<BookSource, string> = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function noteColor(note: number) {
-  if (note >= 9) return 'text-amber-400'
-  if (note >= 7) return 'text-emerald-400'
-  if (note >= 5) return 'text-zinc-300'
-  return 'text-zinc-500'
+function noteColor(note: number): string {
+  if (note >= 9) return 'var(--terra)'
+  if (note >= 7) return 'var(--sage-deep)'
+  if (note >= 5) return 'var(--fg)'
+  return 'var(--fg-muted)'
 }
-
 
 function fmtDate(iso: string | undefined) {
   if (!iso) return ''
@@ -34,15 +33,12 @@ function fmtDate(iso: string | undefined) {
   return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
-function getCurrentYear() {
-  return new Date().getFullYear()
-}
+function getCurrentYear() { return new Date().getFullYear() }
 
 function getWeeksElapsed(): number {
-  const now = new Date()
-  const startOfYear = new Date(now.getFullYear(), 0, 1)
-  const ms = now.getTime() - startOfYear.getTime()
-  return Math.max(1, ms / (7 * 24 * 60 * 60 * 1000))
+  const now  = new Date()
+  const jan1 = new Date(now.getFullYear(), 0, 1)
+  return Math.max(1, Math.ceil((now.getTime() - jan1.getTime()) / (7 * 86400000)))
 }
 
 function compressImage(file: File, maxSize = 300): Promise<string> {
@@ -53,183 +49,136 @@ function compressImage(file: File, maxSize = 300): Promise<string> {
       img.onload = () => {
         const canvas = document.createElement('canvas')
         let { width, height } = img
-        if (width > height && width > maxSize) {
-          height = Math.round(height * maxSize / width)
-          width = maxSize
-        } else if (height > maxSize) {
-          width = Math.round(width * maxSize / height)
-          height = maxSize
-        }
-        canvas.width  = width
-        canvas.height = height
+        if (width > height && width > maxSize) { height *= maxSize / width; width = maxSize }
+        else if (height > maxSize) { width *= maxSize / height; height = maxSize }
+        canvas.width = width; canvas.height = height
         canvas.getContext('2d')?.drawImage(img, 0, 0, width, height)
         resolve(canvas.toDataURL('image/jpeg', 0.82))
       }
-      img.src = e.target?.result as string
+      img.src = (e.target?.result as string) ?? ''
     }
     reader.readAsDataURL(file)
   })
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
-
-function CouvertureImg({ src, alt, size = 52 }: { src: string; alt: string; size?: number }) {
-  if (!src) return (
-    <div
-      className="shrink-0 rounded bg-zinc-800 border border-zinc-700/50 flex items-center justify-center text-zinc-600 font-serif select-none"
-      style={{ width: size, height: Math.round(size * 1.5) }}
-    >
-      <span style={{ fontSize: Math.round(size * 0.35) }}>◉</span>
-    </div>
-  )
-  return (
-    <img
-      src={src} alt={alt}
-      className="shrink-0 rounded object-cover border border-zinc-700/50"
-      style={{ width: size, height: Math.round(size * 1.5) }}
-    />
-  )
+function hashIdx(str: string, mod: number): number {
+  let h = 0
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0
+  return Math.abs(h) % mod
 }
 
+// ─── BookCover — couverture SVG générative ────────────────────────────────────
 
-// ─── Book Card (grille) ───────────────────────────────────────────────────────
+const COVER_PALETTES = [
+  { bg: '#3A2E22', ink: '#F4ECDC', accent: '#B5532A' },
+  { bg: '#B5532A', ink: '#FBF6EA', accent: '#3A2E22' },
+  { bg: '#7E9A7A', ink: '#FBF6EA', accent: '#3A2E22' },
+  { bg: '#EAD1BE', ink: '#3A2E22', accent: '#8E3D1C' },
+  { bg: '#5C7859', ink: '#FBF6EA', accent: '#EAD1BE' },
+  { bg: '#FBF6EA', ink: '#3A2E22', accent: '#B5532A' },
+  { bg: '#8E3D1C', ink: '#F4ECDC', accent: '#7E9A7A' },
+  { bg: '#3A2E22', ink: '#EAD1BE', accent: '#7E9A7A' },
+  { bg: '#EADFC8', ink: '#3A2E22', accent: '#5C7859' },
+  { bg: '#6B5B48', ink: '#FBF6EA', accent: '#B5532A' },
+]
+const TEMPLATES = ['plain', 'bandTop', 'bandBottom', 'frame', 'stripe', 'split'] as const
 
-interface BookCardProps {
-  livre:  BookCritique
-  onEdit: () => void
-}
+function BookCover({ title, author, width = 120, height = 180, style }: {
+  title: string; author: string; width?: number; height?: number; style?: React.CSSProperties
+}) {
+  const key  = (title || '') + '·' + (author || '')
+  const pal  = COVER_PALETTES[hashIdx(key, COVER_PALETTES.length)]
+  const tpl  = TEMPLATES[hashIdx(key + '!', TEMPLATES.length)]
+  const tSize = Math.max(11, Math.round(width * 0.105))
+  const aSize = Math.max(8,  Math.round(width * 0.065))
+  const pad   = Math.round(width * 0.09)
+  const initial = (title || 'A').trim().charAt(0).toUpperCase()
 
-function BookCard({ livre, onEdit }: BookCardProps) {
-  return (
-    <div
-      className="bg-zinc-900 border border-zinc-800/40 rounded-xl overflow-hidden flex flex-col cursor-pointer group shadow-sm hover:border-zinc-700/60 transition-all"
-      onClick={onEdit}
-    >
-      {/* Couverture */}
-      <div className="relative w-full aspect-[2/3] overflow-hidden">
-        {livre.couverture ? (
-          <img
-            src={livre.couverture}
-            alt={livre.titre}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          />
-        ) : (
-          <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-600 text-4xl font-serif select-none">
-            ◉
-          </div>
-        )}
-        {/* Badge type */}
-        <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] font-medium backdrop-blur-sm border ${
-          livre.type === 'fiction'
-            ? 'bg-emerald-500/20 border-emerald-500/30 text-emerald-300'
-            : 'bg-sky-500/20 border-sky-500/30 text-sky-300'
-        }`}>
-          {livre.type === 'fiction' ? 'Fiction' : 'Non-fic.'}
-        </span>
-        {/* Badge note */}
-        <span className={`absolute top-2 right-2 text-xs font-bold tabular-nums bg-zinc-900/85 backdrop-blur-sm px-1.5 py-0.5 rounded font-serif ${noteColor(livre.note)}`}>
-          {livre.note % 1 === 0 ? livre.note : livre.note.toFixed(1)}/10
-        </span>
-        {/* Overlay critique au survol */}
-        {livre.critique && (
-          <div className="absolute inset-0 bg-black/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-end p-3">
-            <p className="text-[10px] text-zinc-200 font-serif italic line-clamp-5 leading-relaxed">
-              {livre.critique}
-            </p>
-          </div>
-        )}
-        {/* Badge référence roman */}
-        {livre.referenceRoman && (
-          <span className="absolute bottom-2 left-2 px-1.5 py-0.5 rounded text-[9px] bg-violet-500/20 border border-violet-500/30 text-violet-300 backdrop-blur-sm">
-            réf. roman
-          </span>
-        )}
-      </div>
-
-      {/* Corps */}
-      <div className="flex flex-col gap-1 p-2.5 flex-1">
-        <h3 className="text-xs font-semibold text-zinc-100 line-clamp-2 font-serif leading-snug">{livre.titre}</h3>
-        <p className="text-[10px] text-zinc-500 truncate">{livre.auteur}{livre.anneePublication ? ` · ${livre.anneePublication}` : ''}</p>
-        {livre.troismots.length > 0 && (
-          <p className="text-[9px] text-zinc-500 italic font-serif truncate">
-            {livre.troismots.join(' · ')}
-          </p>
-        )}
-        {livre.genres.length > 0 && (
-          <div className="flex flex-wrap gap-0.5 mt-0.5">
-            {livre.genres.slice(0, 2).map((g) => (
-              <span key={g} className="px-1 py-0.5 rounded text-[9px] bg-zinc-800 text-zinc-500 border border-zinc-700/40">{g}</span>
-            ))}
-          </div>
-        )}
-        <div className="flex-1" />
-        <p className="text-[9px] text-zinc-700 mt-1">{fmtDate(livre.dateLecture)}</p>
-      </div>
-    </div>
-  )
-}
-
-// ─── Waitlist Card (grille) ───────────────────────────────────────────────────
-
-interface WaitlistCardProps {
-  livre:     BookAttente
-  onStart:   () => void
-  onRemove:  () => void
-}
-
-function WaitlistCard({ livre, onStart, onRemove }: WaitlistCardProps) {
-  const sourceCls: Record<BookSource, string> = {
-    recommandation:    'bg-zinc-700/50 border-zinc-600/30 text-zinc-400',
-    'prix-litteraire': 'bg-amber-500/10 border-amber-500/20 text-amber-400',
-    recherche:         'bg-zinc-700/50 border-zinc-600/30 text-zinc-400',
-    'reference-roman': 'bg-violet-500/10 border-violet-500/20 text-violet-400',
+  const base: React.CSSProperties = {
+    width, height, flexShrink: 0,
+    background: pal.bg, color: pal.ink,
+    borderRadius: 3,
+    boxShadow: '0 1px 2px rgba(58,46,34,0.18), inset 1px 0 0 rgba(0,0,0,0.08)',
+    position: 'relative', overflow: 'hidden',
+    display: 'flex', flexDirection: 'column',
+    fontFamily: 'var(--font-serif)',
+    ...style,
   }
 
-  return (
-    <div className="bg-zinc-900 border border-zinc-800/40 rounded-xl overflow-hidden flex flex-col shadow-sm hover:border-zinc-700/60 transition-all">
-      {/* Couverture placeholder */}
-      <div className="relative w-full aspect-[2/3] bg-zinc-800/80 flex items-center justify-center text-zinc-700 text-4xl font-serif select-none">
-        ◉
-        {/* Source badge */}
-        <span className={`absolute top-2 left-2 px-1.5 py-0.5 rounded text-[9px] border ${sourceCls[livre.source]}`}>
-          {SOURCE_LABELS[livre.source]}
-        </span>
-      </div>
+  const Title = (
+    <div style={{ fontFamily: 'var(--font-serif)', fontSize: tSize, fontWeight: 500, lineHeight: 1.1, letterSpacing: '-0.01em', color: pal.ink, wordBreak: 'break-word' }}>
+      {title}
+    </div>
+  )
+  const Author = (
+    <div style={{ fontFamily: 'var(--font-mono)', fontSize: aSize, letterSpacing: '0.08em', textTransform: 'uppercase', color: pal.ink, opacity: 0.78, marginTop: 6 }}>
+      {author}
+    </div>
+  )
+  const Spine = <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 3, background: 'linear-gradient(to right, rgba(0,0,0,0.18), rgba(0,0,0,0))', pointerEvents: 'none' }} />
+  const initText = <text x="18" y="168" fill={pal.fg ?? pal.ink} style={{ fontFamily: 'var(--font-serif)', fontSize: 13, fontStyle: 'italic', fontWeight: 500 }}>{initial}</text>
 
-      {/* Corps */}
-      <div className="flex flex-col gap-1 p-2.5 flex-1">
-        <h3 className="text-xs font-semibold text-zinc-100 line-clamp-2 font-serif leading-snug">{livre.titre}</h3>
-        {livre.auteur && <p className="text-[10px] text-zinc-500 truncate">{livre.auteur}</p>}
-        {livre.pourquoi && (
-          <p className="text-[10px] text-zinc-600 italic line-clamp-2">{livre.pourquoi}</p>
-        )}
-        <div className="flex-1" />
-        <div className="flex gap-1.5 mt-1.5">
-          <button
-            onClick={(e) => { e.stopPropagation(); onStart() }}
-            className="flex-1 text-[10px] py-1.5 rounded-lg bg-zinc-800 text-zinc-400 hover:bg-emerald-500/15 hover:text-emerald-400 border border-zinc-700/50 transition-colors"
-          >
-            ▶ Lire
-          </button>
-          <button
-            onClick={(e) => { e.stopPropagation(); onRemove() }}
-            className="px-2.5 py-1.5 rounded-lg text-zinc-600 hover:text-red-400 hover:bg-zinc-800 transition-colors text-xs"
-          >
-            ×
-          </button>
-        </div>
+  if (tpl === 'plain') return (
+    <div style={base}>{Spine}
+      <div style={{ padding: pad, marginTop: 'auto' }}>{Title}{Author}</div>
+    </div>
+  )
+  if (tpl === 'bandTop') return (
+    <div style={base}>{Spine}
+      <div style={{ height: height * 0.34, background: pal.accent }} />
+      <div style={{ padding: pad, marginTop: 'auto' }}>{Title}{Author}</div>
+    </div>
+  )
+  if (tpl === 'bandBottom') return (
+    <div style={base}>{Spine}
+      <div style={{ padding: pad, paddingTop: pad * 1.4 }}>{Title}</div>
+      <div style={{ marginTop: 'auto', background: pal.accent, padding: `${pad * 0.7}px ${pad}px` }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: aSize, letterSpacing: '0.08em', textTransform: 'uppercase', color: pal.bg }}>{author}</div>
       </div>
     </div>
   )
+  if (tpl === 'frame') return (
+    <div style={base}>{Spine}
+      <div style={{ position: 'absolute', inset: pad * 0.7, border: `1px solid ${pal.accent}` }} />
+      <div style={{ padding: pad * 1.4, marginTop: 'auto', position: 'relative' }}>{Title}{Author}</div>
+    </div>
+  )
+  if (tpl === 'stripe') return (
+    <div style={base}>{Spine}
+      <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+        <div style={{ padding: pad, paddingBottom: 4 }}>{Title}</div>
+        <div style={{ height: 4, background: pal.accent, margin: `${pad * 0.5}px ${pad}px` }} />
+        <div style={{ padding: `0 ${pad}px ${pad}px`, marginTop: 'auto' }}>{Author}</div>
+      </div>
+    </div>
+  )
+  return (
+    <div style={base}>{Spine}
+      <div style={{ display: 'grid', gridTemplateRows: '1fr 1fr', height: '100%' }}>
+        <div style={{ background: pal.accent, padding: pad, display: 'flex', alignItems: 'flex-end' }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: tSize, color: pal.bg, lineHeight: 1.1 }}>{title}</div>
+        </div>
+        <div style={{ padding: pad, display: 'flex', alignItems: 'flex-end' }}>{Author}</div>
+      </div>
+    </div>
+  )
+}
+
+// ─── CoverDisplay — image ou BookCover ────────────────────────────────────────
+
+function CoverDisplay({ src, title, author, width, height, style }: {
+  src?: string; title: string; author: string; width: number; height: number; style?: React.CSSProperties
+}) {
+  if (src) return (
+    <img src={src} alt={title}
+      style={{ width, height, objectFit: 'cover', objectPosition: 'center top', borderRadius: 3, display: 'block', flexShrink: 0, ...style }} />
+  )
+  return <BookCover title={title} author={author} width={width} height={height} style={style} />
 }
 
 // ─── Image Drop Zone ──────────────────────────────────────────────────────────
 
-interface ImageDropZoneProps {
-  value: string
-  onChange: (url: string) => void
-  height?: number
-}
+interface ImageDropZoneProps { value: string; onChange: (url: string) => void; height?: number }
 
 function ImageDropZone({ value, onChange, height = 120 }: ImageDropZoneProps) {
   const [dragOver, setDragOver] = useState(false)
@@ -237,47 +186,35 @@ function ImageDropZone({ value, onChange, height = 120 }: ImageDropZoneProps) {
 
   async function handleFile(file: File) {
     if (!file.type.startsWith('image/')) return
-    const url = await compressImage(file)
-    onChange(url)
+    onChange(await compressImage(file))
   }
 
   return (
     <div
-      className={`relative rounded-lg border-2 border-dashed transition-colors cursor-pointer overflow-hidden ${
-        dragOver ? 'border-emerald-500/60 bg-emerald-500/5' : 'border-zinc-700/60 hover:border-zinc-600'
-      }`}
-      style={{ height }}
+      style={{
+        position: 'relative', height, borderRadius: 'var(--r-md)', cursor: 'pointer', overflow: 'hidden',
+        border: `2px dashed ${dragOver ? 'var(--terra)' : 'var(--border)'}`,
+        background: dragOver ? 'var(--terra-soft)' : 'var(--bg)',
+        transition: 'border-color var(--dur) var(--ease), background var(--dur) var(--ease)',
+      }}
       onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
       onDragLeave={() => setDragOver(false)}
-      onDrop={async (e) => {
-        e.preventDefault()
-        setDragOver(false)
-        const file = e.dataTransfer.files[0]
-        if (file) handleFile(file)
-      }}
+      onDrop={async (e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
       onClick={() => inputRef.current?.click()}
     >
       {value ? (
         <div className="flex h-full items-center justify-center gap-3">
           <img src={value} alt="" className="h-full w-auto max-w-[40%] object-cover rounded" />
-          <span className="text-xs text-zinc-500">Cliquer pour changer</span>
+          <span className="text-xs" style={{ color: 'var(--fg-muted)' }}>Cliquer pour changer</span>
         </div>
       ) : (
         <div className="flex h-full flex-col items-center justify-center gap-1">
-          <span className="text-zinc-600 text-lg">↑</span>
-          <span className="text-xs text-zinc-600">Couverture — glisser ou cliquer</span>
+          <span style={{ color: 'var(--fg-subtle)', fontSize: 20 }}>↑</span>
+          <span className="text-xs" style={{ color: 'var(--fg-subtle)' }}>Couverture — glisser ou cliquer</span>
         </div>
       )}
-      <input
-        ref={inputRef}
-        type="file"
-        accept=".jpg,.jpeg,.png,.webp"
-        className="hidden"
-        onChange={async (e) => {
-          const file = e.target.files?.[0]
-          if (file) handleFile(file)
-        }}
-      />
+      <input ref={inputRef} type="file" accept=".jpg,.jpeg,.png,.webp" className="hidden"
+        onChange={async (e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
     </div>
   )
 }
@@ -285,63 +222,40 @@ function ImageDropZone({ value, onChange, height = 120 }: ImageDropZoneProps) {
 // ─── Genre Picker ─────────────────────────────────────────────────────────────
 
 interface GenrePickerProps {
-  selected:  string[]
-  allGenres: string[]
-  onChange:  (genres: string[]) => void
-  onCreateGenre: (genre: string) => void
+  selected: string[]; allGenres: string[]
+  onChange: (g: string[]) => void; onCreateGenre: (g: string) => void
 }
 
 function GenrePicker({ selected, allGenres, onChange, onCreateGenre }: GenrePickerProps) {
   const [input, setInput] = useState('')
-
-  function toggle(genre: string) {
-    if (selected.includes(genre)) {
-      onChange(selected.filter((g) => g !== genre))
-    } else {
-      onChange([...selected, genre])
-    }
-  }
-
+  function toggle(g: string) { onChange(selected.includes(g) ? selected.filter((x) => x !== g) : [...selected, g]) }
   function create() {
     const g = input.trim()
     if (!g || allGenres.includes(g)) return
-    onCreateGenre(g)
-    onChange([...selected, g])
-    setInput('')
+    onCreateGenre(g); onChange([...selected, g]); setInput('')
   }
-
+  const inputCls = 'rounded-[var(--r-md)] px-2.5 py-1 text-xs outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
   return (
     <div className="space-y-2">
       <div className="flex flex-wrap gap-1.5">
         {allGenres.map((g) => (
-          <button
-            key={g}
-            type="button"
-            onClick={() => toggle(g)}
-            className={`px-2 py-0.5 rounded text-xs border transition-colors ${
-              selected.includes(g)
-                ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                : 'bg-zinc-800 border-zinc-700/50 text-zinc-500 hover:border-zinc-600'
-            }`}
-          >
+          <button key={g} type="button" onClick={() => toggle(g)}
+            className="px-2 py-0.5 rounded text-xs border transition-colors"
+            style={selected.includes(g)
+              ? { background: 'var(--terra-soft)', borderColor: 'var(--terra)', color: 'var(--terra-deep)' }
+              : { background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--fg-muted)' }
+            }>
             {g}
           </button>
         ))}
       </div>
       <div className="flex gap-2">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
+        <input value={input} onChange={(e) => setInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); create() } }}
-          placeholder="Nouveau genre…"
-          className="flex-1 bg-zinc-800 border border-zinc-700/60 rounded px-2 py-1 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50"
-        />
-        <button
-          type="button"
-          onClick={create}
-          disabled={!input.trim()}
-          className="px-2 py-1 text-xs rounded bg-zinc-700 text-zinc-300 hover:bg-zinc-600 disabled:opacity-40 transition-colors"
-        >
+          placeholder="Nouveau genre…" className={`flex-1 ${inputCls}`} />
+        <button type="button" onClick={create} disabled={!input.trim()}
+          className="px-2 py-1 text-xs rounded transition-colors disabled:opacity-40"
+          style={{ background: 'var(--paper-2)', border: '1px solid var(--border)', color: 'var(--fg-muted)', cursor: 'pointer' }}>
           Ajouter
         </button>
       </div>
@@ -368,13 +282,12 @@ function CritiqueModal({ initial, fromFile, onClose }: CritiqueModalProps) {
 
   const allGenres = [...GENRES_DEFAUT, ...genresPerso]
   const isEdit    = !!initial?.id
-
-  const prefill = initial ?? livreEnCours ?? fromFile ?? {}
+  const prefill   = initial ?? livreEnCours ?? fromFile ?? {}
 
   const [titre,     setTitre]     = useState(prefill.titre ?? '')
   const [auteur,    setAuteur]    = useState((prefill as BookCritique).auteur ?? (prefill as BookEnCours)?.auteur ?? '')
   const [annee,     setAnnee]     = useState((initial as BookCritique)?.anneePublication ?? '')
-  const [couv,      setCouv]      = useState((initial as BookCritique)?.couverture ?? (livreEnCours?.couverture) ?? '')
+  const [couv,      setCouv]      = useState((initial as BookCritique)?.couverture ?? livreEnCours?.couverture ?? '')
   const [note,      setNote]      = useState<number>((initial as BookCritique)?.note ?? 7)
   const [genres,    setGenres]    = useState<string[]>((initial as BookCritique)?.genres ?? [])
   const [troismots, setTroismots] = useState<string[]>((initial as BookCritique)?.troismots ?? ['', '', ''])
@@ -385,230 +298,136 @@ function CritiqueModal({ initial, fromFile, onClose }: CritiqueModalProps) {
   const [refRoman,  setRefRoman]  = useState((initial as BookCritique)?.referenceRoman ?? false)
 
   const canSave = titre.trim() !== '' && auteur.trim() !== ''
+  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-1.5 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
+  const labelCls = 'block text-[11px] uppercase tracking-wide mb-1' + ' text-[var(--fg-muted)]'
 
   function handleSave() {
     if (!canSave) return
     const data: Omit<BookCritique, 'id'> = {
-      titre:            titre.trim(),
-      auteur:           auteur.trim(),
-      anneePublication: annee.trim(),
-      couverture:       couv,
-      note,
-      genres,
-      troismots:        troismots.map((m) => m.trim()).filter(Boolean),
-      critique:         critique.trim(),
-      citationFavorite: citation.trim(),
-      type,
-      dateLecture:      dateLect,
-      referenceRoman:   refRoman,
+      titre: titre.trim(), auteur: auteur.trim(), anneePublication: annee.trim(),
+      couverture: couv, note, genres,
+      troismots: troismots.map((m) => m.trim()).filter(Boolean),
+      critique: critique.trim(), citationFavorite: citation.trim(),
+      type, dateLecture: dateLect, referenceRoman: refRoman,
     }
-    if (isEdit && initial?.id) {
-      updateCritique(initial.id, data)
-    } else {
-      addCritique(data)
-      // Vider "en cours" si c'était ce livre
-      if (livreEnCours) clearEnCours()
-    }
+    if (isEdit && initial?.id) updateCritique(initial.id, data)
+    else { addCritique(data); if (livreEnCours) clearEnCours() }
     onClose()
   }
 
   function handleDelete() {
     if (!initial?.id) return
-    if (!window.confirm('Supprimer ce livre de la bibliothèque ?')) return
-    deleteCritique(initial.id)
-    onClose()
+    if (!window.confirm('Supprimer ce livre ?')) return
+    deleteCritique(initial.id); onClose()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-2xl">
-        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 border-b border-zinc-800/60 bg-zinc-900 rounded-t-2xl">
-          <h2 className="text-sm font-semibold text-zinc-100 font-serif">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(58,46,34,0.4)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
+        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)' }}>
+        {/* Header */}
+        <div className="sticky top-0 z-10 flex items-center justify-between px-6 py-4 rounded-t-2xl"
+          style={{ borderBottom: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
             {isEdit ? 'Modifier la critique' : 'Ajouter un livre lu'}
           </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 transition-colors text-lg leading-none">×</button>
+          <button onClick={onClose} className="text-lg leading-none" style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>×</button>
         </div>
 
         <div className="p-6 space-y-5">
-          {/* Couverture */}
           <ImageDropZone value={couv} onChange={setCouv} height={110} />
 
-          {/* Titre + Auteur */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Titre *</label>
-              <input
-                value={titre}
-                onChange={(e) => setTitre(e.target.value)}
-                placeholder="Titre du livre"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 font-serif"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Auteur *</label>
-              <input
-                value={auteur}
-                onChange={(e) => setAuteur(e.target.value)}
-                placeholder="Nom de l'auteur"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50"
-              />
-            </div>
+            <div><label className={labelCls}>Titre *</label>
+              <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre du livre" className={inputCls} style={{ fontFamily: 'var(--font-serif)' }} /></div>
+            <div><label className={labelCls}>Auteur *</label>
+              <input value={auteur} onChange={(e) => setAuteur(e.target.value)} placeholder="Nom de l'auteur" className={inputCls} /></div>
           </div>
 
-          {/* Année + Type + Date de lecture */}
           <div className="grid grid-cols-3 gap-3">
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Année publi.</label>
-              <input
-                value={annee}
-                onChange={(e) => setAnnee(e.target.value)}
-                placeholder="2003"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Type</label>
+            <div><label className={labelCls}>Année publi.</label>
+              <input value={annee} onChange={(e) => setAnnee(e.target.value)} placeholder="2003" className={inputCls} /></div>
+            <div><label className={labelCls}>Type</label>
               <div className="flex gap-1">
                 {(['fiction', 'non-fiction'] as BookType[]).map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setType(t)}
-                    className={`flex-1 py-1.5 text-xs rounded-lg border transition-colors ${
-                      type === t
-                        ? t === 'fiction'
-                          ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                          : 'bg-sky-500/15 border-sky-500/30 text-sky-400'
-                        : 'bg-zinc-800 border-zinc-700/50 text-zinc-500 hover:border-zinc-600'
-                    }`}
-                  >
+                  <button key={t} type="button" onClick={() => setType(t)}
+                    className="flex-1 py-1.5 text-xs rounded-lg border transition-colors"
+                    style={type === t
+                      ? { background: 'var(--terra-soft)', borderColor: 'var(--terra)', color: 'var(--terra-deep)', cursor: 'pointer' }
+                      : { background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--fg-muted)', cursor: 'pointer' }
+                    }>
                     {t === 'fiction' ? 'Fiction' : 'Non-fic.'}
                   </button>
                 ))}
               </div>
             </div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Date de lecture</label>
-              <input
-                type="date"
-                value={dateLect}
-                onChange={(e) => setDateLect(e.target.value)}
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none focus:border-emerald-500/50"
-              />
-            </div>
+            <div><label className={labelCls}>Date de lecture</label>
+              <input type="date" value={dateLect} onChange={(e) => setDateLect(e.target.value)} className={inputCls} /></div>
           </div>
 
-          {/* Note */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Note</label>
-              <span className={`text-2xl font-bold tabular-nums font-serif ${noteColor(note)}`}>
-                {note % 1 === 0 ? note : note.toFixed(1)}<span className="text-sm font-normal text-zinc-600">/10</span>
+              <label className={labelCls}>Note</label>
+              <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: noteColor(note), fontVariantNumeric: 'tabular-nums' }}>
+                {note % 1 === 0 ? note : note.toFixed(1)}<span style={{ fontSize: 14, fontWeight: 400, color: 'var(--fg-subtle)' }}>/10</span>
               </span>
             </div>
-            <input
-              type="range" min={1} max={10} step={0.5}
-              value={note}
+            <input type="range" min={1} max={10} step={0.5} value={note}
               onChange={(e) => setNote(parseFloat(e.target.value))}
-              className="w-full accent-emerald-500"
-            />
-            <div className="flex justify-between text-[10px] text-zinc-700 font-mono">
-              {[1,2,3,4,5,6,7,8,9,10].map((n) => (
-                <span key={n}>{n}</span>
-              ))}
+              className="w-full" style={{ accentColor: 'var(--terra)' }} />
+            <div className="flex justify-between text-[10px] font-mono" style={{ color: 'var(--fg-subtle)' }}>
+              {[1,2,3,4,5,6,7,8,9,10].map((n) => <span key={n}>{n}</span>)}
             </div>
           </div>
 
-          {/* Genres */}
-          <div className="space-y-2">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Genres</label>
-            <GenrePicker
-              selected={genres}
-              allGenres={allGenres}
-              onChange={setGenres}
-              onCreateGenre={addGenrePerso}
-            />
-          </div>
+          <div><label className={labelCls}>Genres</label>
+            <GenrePicker selected={genres} allGenres={allGenres} onChange={setGenres} onCreateGenre={addGenrePerso} /></div>
 
-          {/* 3 mots */}
-          <div className="space-y-2">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">3 mots qui définissent ce livre</label>
+          <div><label className={labelCls}>3 mots qui définissent ce livre</label>
             <div className="grid grid-cols-3 gap-2">
               {[0, 1, 2].map((i) => (
-                <input
-                  key={i}
-                  value={troismots[i] ?? ''}
-                  onChange={(e) => {
-                    const next = [...troismots]
-                    next[i] = e.target.value
-                    setTroismots(next)
-                  }}
+                <input key={i} value={troismots[i] ?? ''}
+                  onChange={(e) => { const n = [...troismots]; n[i] = e.target.value; setTroismots(n) }}
                   placeholder={['Premier', 'Deuxième', 'Troisième'][i]}
-                  className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 font-serif italic"
-                />
+                  className={inputCls} style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }} />
               ))}
             </div>
           </div>
 
-          {/* Critique */}
-          <div className="space-y-1">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Critique</label>
-            <textarea
-              value={critique}
-              onChange={(e) => setCritique(e.target.value)}
-              placeholder="Ta critique, sans longueur imposée…"
-              rows={5}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 resize-none leading-relaxed font-serif"
-            />
-          </div>
+          <div><label className={labelCls}>Critique</label>
+            <textarea value={critique} onChange={(e) => setCritique(e.target.value)}
+              placeholder="Ta critique, sans longueur imposée…" rows={5}
+              className={inputCls + ' resize-none leading-relaxed'} style={{ fontFamily: 'var(--font-serif)' }} /></div>
 
-          {/* Citation */}
-          <div className="space-y-1">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Citation favorite</label>
-            <textarea
-              value={citation}
-              onChange={(e) => setCitation(e.target.value)}
-              placeholder="La phrase qui t'a marqué…"
-              rows={3}
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-2 text-sm text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 resize-none leading-relaxed font-serif italic"
-            />
-          </div>
+          <div><label className={labelCls}>Citation favorite</label>
+            <textarea value={citation} onChange={(e) => setCitation(e.target.value)}
+              placeholder="La phrase qui t'a marqué…" rows={3}
+              className={inputCls + ' resize-none leading-relaxed'} style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }} /></div>
 
-          {/* Référence roman */}
-          <label className="flex items-center gap-3 cursor-pointer group">
-            <div
-              onClick={() => setRefRoman(!refRoman)}
-              className={`relative h-4 w-7 rounded-full transition-colors ${refRoman ? 'bg-emerald-500' : 'bg-zinc-700'}`}
-            >
+          <label className="flex items-center gap-3 cursor-pointer">
+            <div onClick={() => setRefRoman(!refRoman)}
+              className="relative h-4 w-7 rounded-full transition-colors"
+              style={{ background: refRoman ? 'var(--terra)' : 'var(--border-strong)' }}>
               <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-white transition-transform ${refRoman ? 'translate-x-3' : 'translate-x-0.5'}`} />
             </div>
-            <span className="text-sm text-zinc-400 group-hover:text-zinc-300 transition-colors">
-              Référence roman — alimente ta bibliothèque d'écriture
-            </span>
+            <span className="text-sm" style={{ color: 'var(--fg-muted)' }}>Référence roman — alimente ta bibliothèque d'écriture</span>
           </label>
         </div>
 
-        <div className="sticky bottom-0 flex items-center justify-between px-6 py-4 border-t border-zinc-800/60 bg-zinc-900 rounded-b-2xl">
-          {isEdit ? (
-            <button
-              onClick={handleDelete}
-              className="text-xs text-red-400 hover:text-red-300 transition-colors"
-            >
-              Supprimer
-            </button>
-          ) : <div />}
+        <div className="sticky bottom-0 flex items-center justify-between px-6 py-4 rounded-b-2xl"
+          style={{ borderTop: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
+          {isEdit
+            ? <button onClick={handleDelete} className="text-xs" style={{ color: 'var(--danger)', background: 'none', border: 'none', cursor: 'pointer' }}>Supprimer</button>
+            : <div />
+          }
           <div className="flex gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 text-sm rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!canSave}
-              className="px-4 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors font-medium"
-            >
+            <button onClick={onClose} className="px-4 py-1.5 text-sm rounded-lg transition-colors"
+              style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Annuler</button>
+            <button onClick={handleSave} disabled={!canSave}
+              className="px-4 py-1.5 text-sm rounded-full font-medium transition-colors disabled:opacity-40"
+              style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>
               {isEdit ? 'Enregistrer' : 'Ajouter'}
             </button>
           </div>
@@ -620,95 +439,58 @@ function CritiqueModal({ initial, fromFile, onClose }: CritiqueModalProps) {
 
 // ─── File Modal ───────────────────────────────────────────────────────────────
 
-interface FileModalProps {
-  onClose: () => void
-}
-
-function FileModal({ onClose }: FileModalProps) {
+function FileModal({ onClose }: { onClose: () => void }) {
   const addFileAttente = useBookStore((s) => s.addFileAttente)
-
-  const [titre,   setTitre]   = useState('')
-  const [auteur,  setAuteur]  = useState('')
-  const [source,  setSource]  = useState<BookSource>('recommandation')
+  const [titre,    setTitre]    = useState('')
+  const [auteur,   setAuteur]   = useState('')
+  const [source,   setSource]   = useState<BookSource>('recommandation')
   const [pourquoi, setPourquoi] = useState('')
-
   const canSave = titre.trim() !== ''
+  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-1.5 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
+  const labelCls = 'block text-[11px] uppercase tracking-wide mb-1 text-[var(--fg-muted)]'
 
   function handleSave() {
     if (!canSave) return
-    addFileAttente({ titre: titre.trim(), auteur: auteur.trim(), source, pourquoi: pourquoi.trim() })
-    onClose()
+    addFileAttente({ titre: titre.trim(), auteur: auteur.trim(), source, pourquoi: pourquoi.trim() }); onClose()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/60">
-          <h2 className="text-sm font-semibold text-zinc-100 font-serif">Ajouter à la file</h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">×</button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(58,46,34,0.4)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl"
+        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>Ajouter à la file</h2>
+          <button onClick={onClose} style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
-
         <div className="p-5 space-y-4">
-          <div className="space-y-1">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Titre *</label>
-            <input
-              value={titre}
-              onChange={(e) => setTitre(e.target.value)}
-              placeholder="Titre du livre"
-              autoFocus
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 font-serif"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Auteur</label>
-            <input
-              value={auteur}
-              onChange={(e) => setAuteur(e.target.value)}
-              placeholder="Nom de l'auteur"
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50"
-            />
-          </div>
-          <div className="space-y-1">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Source</label>
+          <div><label className={labelCls}>Titre *</label>
+            <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre du livre" autoFocus
+              className={inputCls} style={{ fontFamily: 'var(--font-serif)' }} /></div>
+          <div><label className={labelCls}>Auteur</label>
+            <input value={auteur} onChange={(e) => setAuteur(e.target.value)} placeholder="Nom de l'auteur" className={inputCls} /></div>
+          <div><label className={labelCls}>Source</label>
             <div className="grid grid-cols-2 gap-1.5">
               {(Object.entries(SOURCE_LABELS) as [BookSource, string][]).map(([k, v]) => (
-                <button
-                  key={k}
-                  type="button"
-                  onClick={() => setSource(k)}
-                  className={`py-1.5 px-2 text-xs rounded-lg border transition-colors text-left ${
-                    source === k
-                      ? 'bg-emerald-500/15 border-emerald-500/30 text-emerald-400'
-                      : 'bg-zinc-800 border-zinc-700/50 text-zinc-500 hover:border-zinc-600'
-                  }`}
-                >
-                  {v}
-                </button>
+                <button key={k} type="button" onClick={() => setSource(k)}
+                  className="py-1.5 px-2 text-xs rounded-lg border transition-colors text-left"
+                  style={source === k
+                    ? { background: 'var(--terra-soft)', borderColor: 'var(--terra)', color: 'var(--terra-deep)', cursor: 'pointer' }
+                    : { background: 'var(--bg)', borderColor: 'var(--border)', color: 'var(--fg-muted)', cursor: 'pointer' }
+                  }>{v}</button>
               ))}
             </div>
           </div>
-          <div className="space-y-1">
-            <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Pourquoi ce livre</label>
-            <input
-              value={pourquoi}
-              onChange={(e) => setPourquoi(e.target.value)}
-              placeholder="Une ligne de contexte…"
-              className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50"
-            />
-          </div>
+          <div><label className={labelCls}>Pourquoi ce livre</label>
+            <input value={pourquoi} onChange={(e) => setPourquoi(e.target.value)} placeholder="Une ligne de contexte…" className={inputCls} /></div>
         </div>
-
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-zinc-800/60">
-          <button onClick={onClose} className="px-4 py-1.5 text-sm rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">
-            Annuler
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            className="px-4 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors font-medium"
-          >
-            Ajouter
-          </button>
+        <div className="flex justify-end gap-2 px-5 py-4" style={{ borderTop: '1px solid var(--border)' }}>
+          <button onClick={onClose} className="px-4 py-1.5 text-sm rounded-lg"
+            style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Annuler</button>
+          <button onClick={handleSave} disabled={!canSave}
+            className="px-4 py-1.5 text-sm rounded-full font-medium disabled:opacity-40"
+            style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>Ajouter</button>
         </div>
       </div>
     </div>
@@ -717,108 +499,66 @@ function FileModal({ onClose }: FileModalProps) {
 
 // ─── En Cours Modal ───────────────────────────────────────────────────────────
 
-interface EnCoursModalProps {
-  onClose: () => void
-}
-
-function EnCoursModal({ onClose }: EnCoursModalProps) {
-  const livreEnCours      = useBookStore((s) => s.livreEnCours)
-  const setLivreEnCours   = useBookStore((s) => s.setLivreEnCours)
+function EnCoursModal({ onClose }: { onClose: () => void }) {
+  const livreEnCours       = useBookStore((s) => s.livreEnCours)
+  const setLivreEnCours    = useBookStore((s) => s.setLivreEnCours)
   const updateLivreEnCours = useBookStore((s) => s.updateLivreEnCours)
-
   const isEdit = !!livreEnCours
-
   const [titre,    setTitre]    = useState(livreEnCours?.titre ?? '')
   const [auteur,   setAuteur]   = useState(livreEnCours?.auteur ?? '')
   const [couv,     setCouv]     = useState(livreEnCours?.couverture ?? '')
-  const [pageAct,  setPageAct]  = useState<string>(livreEnCours?.pageActuelle?.toString() ?? '')
-  const [pagesTot, setPagesTot] = useState<string>(livreEnCours?.pagesTotal?.toString() ?? '')
-
+  const [pageAct,  setPageAct]  = useState(livreEnCours?.pageActuelle?.toString() ?? '')
+  const [pagesTot, setPagesTot] = useState(livreEnCours?.pagesTotal?.toString() ?? '')
   const canSave = titre.trim() !== ''
+  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-1.5 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
+  const labelCls = 'block text-[11px] uppercase tracking-wide mb-1 text-[var(--fg-muted)]'
 
   function handleSave() {
     if (!canSave) return
-    const data = {
-      titre:        titre.trim(),
-      auteur:       auteur.trim(),
-      couverture:   couv,
+    const data = { titre: titre.trim(), auteur: auteur.trim(), couverture: couv,
       pageActuelle: pageAct ? parseInt(pageAct) : null,
-      pagesTotal:   pagesTot ? parseInt(pagesTot) : null,
-      impressions:  livreEnCours?.impressions ?? '',
-    }
-    if (isEdit) {
-      updateLivreEnCours(data)
-    } else {
-      setLivreEnCours(data)
-    }
+      pagesTotal: pagesTot ? parseInt(pagesTot) : null,
+      impressions: livreEnCours?.impressions ?? '' }
+    if (isEdit) updateLivreEnCours(data); else setLivreEnCours(data)
     onClose()
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div className="w-full max-w-md rounded-2xl bg-zinc-900 border border-zinc-800/60 shadow-2xl">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-800/60">
-          <h2 className="text-sm font-semibold text-zinc-100 font-serif">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(58,46,34,0.4)' }}
+      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-md rounded-2xl shadow-2xl"
+        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--border)' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
             {isEdit ? 'Modifier la lecture en cours' : 'Démarrer une lecture'}
           </h2>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">×</button>
+          <button onClick={onClose} style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 18 }}>×</button>
         </div>
-
         <div className="p-5 space-y-4">
           <ImageDropZone value={couv} onChange={setCouv} height={90} />
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Titre *</label>
-              <input
-                value={titre}
-                onChange={(e) => setTitre(e.target.value)}
-                placeholder="Titre"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 font-serif"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Auteur</label>
-              <input
-                value={auteur}
-                onChange={(e) => setAuteur(e.target.value)}
-                placeholder="Auteur"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50"
-              />
-            </div>
+            <div><label className={labelCls}>Titre *</label>
+              <input value={titre} onChange={(e) => setTitre(e.target.value)} placeholder="Titre"
+                className={inputCls} style={{ fontFamily: 'var(--font-serif)' }} /></div>
+            <div><label className={labelCls}>Auteur</label>
+              <input value={auteur} onChange={(e) => setAuteur(e.target.value)} placeholder="Auteur" className={inputCls} /></div>
           </div>
           <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Page actuelle</label>
-              <input
-                type="number"
-                value={pageAct}
-                onChange={(e) => setPageAct(e.target.value)}
-                placeholder="—"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 font-mono"
-              />
-            </div>
-            <div className="space-y-1">
-              <label className="text-[11px] text-zinc-500 uppercase tracking-wide">Pages totales</label>
-              <input
-                type="number"
-                value={pagesTot}
-                onChange={(e) => setPagesTot(e.target.value)}
-                placeholder="—"
-                className="w-full bg-zinc-800 border border-zinc-700/60 rounded-lg px-3 py-1.5 text-sm text-zinc-200 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 font-mono"
-              />
-            </div>
+            <div><label className={labelCls}>Page actuelle</label>
+              <input type="number" value={pageAct} onChange={(e) => setPageAct(e.target.value)} placeholder="—"
+                className={inputCls} style={{ fontFamily: 'var(--font-mono)' }} /></div>
+            <div><label className={labelCls}>Pages totales</label>
+              <input type="number" value={pagesTot} onChange={(e) => setPagesTot(e.target.value)} placeholder="—"
+                className={inputCls} style={{ fontFamily: 'var(--font-mono)' }} /></div>
           </div>
         </div>
-
-        <div className="flex justify-end gap-2 px-5 py-4 border-t border-zinc-800/60">
-          <button onClick={onClose} className="px-4 py-1.5 text-sm rounded-lg text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors">
-            Annuler
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={!canSave}
-            className="px-4 py-1.5 text-sm rounded-lg bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 transition-colors font-medium"
-          >
+        <div className="flex justify-end gap-2 px-5 py-4" style={{ borderTop: '1px solid var(--border)' }}>
+          <button onClick={onClose} className="px-4 py-1.5 text-sm rounded-lg"
+            style={{ color: 'var(--fg-muted)', background: 'none', border: 'none', cursor: 'pointer' }}>Annuler</button>
+          <button onClick={handleSave} disabled={!canSave}
+            className="px-4 py-1.5 text-sm rounded-full font-medium disabled:opacity-40"
+            style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>
             {isEdit ? 'Enregistrer' : 'Commencer'}
           </button>
         </div>
@@ -827,105 +567,205 @@ function EnCoursModal({ onClose }: EnCoursModalProps) {
   )
 }
 
-// ─── En Cours Section ─────────────────────────────────────────────────────────
+// ─── UI helpers ───────────────────────────────────────────────────────────────
 
-interface EnCoursSectionProps {
-  onFinish:     () => void
-  onEdit:       () => void
-  onStartNew:   () => void
+function SectionHeader({ label, caption, right }: { label: string; caption?: string; right?: React.ReactNode }) {
+  return (
+    <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
+      <div>
+        <span style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>{label}</span>
+        {caption && <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 500, color: 'var(--fg)', margin: 0, lineHeight: 1.15 }}>{caption}</h2>}
+      </div>
+      {right && <div style={{ paddingBottom: 4 }}>{right}</div>}
+    </div>
+  )
 }
+
+function ProgressBar({ value, max, color = 'var(--terra)', height = 6 }: { value: number; max: number; color?: string; height?: number }) {
+  return (
+    <div style={{ width: '100%', height, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
+      <div style={{ width: `${Math.min(100, (value / max) * 100)}%`, height: '100%', background: color, borderRadius: 999, transition: 'width var(--dur-slow) var(--ease)' }} />
+    </div>
+  )
+}
+
+function NoteBadge({ note }: { note: number }) {
+  return (
+    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, fontWeight: 500, color: 'var(--paper-1)', background: 'var(--ink)', padding: '3px 7px', borderRadius: 4, fontVariantNumeric: 'tabular-nums', flexShrink: 0 }}>
+      {note % 1 === 0 ? note : note.toFixed(1)}/10
+    </span>
+  )
+}
+
+function TypeBadge({ type }: { type: BookType }) {
+  const isFiction = type === 'fiction'
+  return (
+    <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: isFiction ? '#6B2F14' : '#3F5A3C', background: isFiction ? 'var(--terra-soft)' : 'var(--sage-soft)', border: `1px solid ${isFiction ? '#DEB89C' : '#B9C8B4'}`, padding: '2px 7px', borderRadius: 4 }}>
+      {isFiction ? 'Fiction' : 'Non-fic'}
+    </span>
+  )
+}
+
+// ─── BookCard — carte grille bibliothèque ─────────────────────────────────────
+
+function BookCard({ livre, onEdit }: { livre: BookCritique; onEdit: () => void }) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onClick={onEdit}
+      style={{ display: 'flex', flexDirection: 'column', gap: 14, padding: 14, borderRadius: 12, cursor: 'pointer', background: hover ? 'var(--paper-1)' : 'transparent', border: `1px solid ${hover ? 'var(--paper-2)' : 'transparent'}`, transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)' }}>
+      <div style={{ position: 'relative', alignSelf: 'center' }}>
+        <CoverDisplay src={livre.couverture} title={livre.titre} author={livre.auteur} width={148} height={222} />
+        <div style={{ position: 'absolute', top: 8, left: 8 }}><TypeBadge type={livre.type} /></div>
+        <div style={{ position: 'absolute', top: 8, right: 8 }}><NoteBadge note={livre.note} /></div>
+        {livre.critique && hover && (
+          <div style={{ position: 'absolute', inset: 0, background: 'rgba(58,46,34,0.82)', display: 'flex', alignItems: 'flex-end', padding: 12, borderRadius: 3 }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontSize: 10, color: 'var(--paper-1)', fontStyle: 'italic', lineHeight: 1.5, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 6, WebkitBoxOrient: 'vertical' }}>
+              {livre.critique}
+            </p>
+          </div>
+        )}
+      </div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+        <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500, lineHeight: 1.2, color: 'var(--fg)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{livre.titre}</h3>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--fg-muted)' }}>
+          {livre.auteur}{livre.anneePublication && <span style={{ color: 'var(--fg-subtle)' }}> · {livre.anneePublication}</span>}
+        </div>
+        {livre.troismots.filter(Boolean).length > 0 && (
+          <p style={{ fontFamily: 'var(--font-serif)', fontSize: 12, fontStyle: 'italic', color: 'var(--fg-subtle)', margin: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {livre.troismots.filter(Boolean).join(' · ')}
+          </p>
+        )}
+        {livre.genres.length > 0 && (
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 2 }}>
+            {livre.genres.slice(0, 2).map((g) => (
+              <span key={g} style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--fg-muted)', padding: '2px 8px', borderRadius: 999, background: 'var(--paper-2)' }}>{g}</span>
+            ))}
+          </div>
+        )}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6, fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-subtle)' }}>
+          <span>✓</span><span>{fmtDate(livre.dateLecture)}</span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── QueueRow — ligne liste file d'attente ────────────────────────────────────
+
+function QueueRow({ livre, index, isLast, onStart, onRemove }: {
+  livre: BookAttente; index: number; isLast: boolean; onStart: () => void; onRemove: () => void
+}) {
+  const [hover, setHover] = useState(false)
+  const sourceColor: Record<BookSource, string> = {
+    recommandation:    'var(--fg-muted)',
+    'prix-litteraire': 'var(--terra)',
+    recherche:         'var(--fg-muted)',
+    'reference-roman': 'var(--sage-deep)',
+  }
+  return (
+    <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      style={{ display: 'grid', gridTemplateColumns: '32px auto 1fr auto auto', alignItems: 'center', gap: 14, padding: '12px 18px', borderBottom: isLast ? 0 : '1px solid var(--paper-2)', background: hover ? 'var(--paper-2)' : 'transparent', transition: 'background var(--dur) var(--ease)' }}>
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-subtle)', fontVariantNumeric: 'tabular-nums' }}>{String(index).padStart(2, '0')}</span>
+      <BookCover title={livre.titre} author={livre.auteur ?? ''} width={44} height={66} style={{ borderRadius: 3 }} />
+      <div style={{ minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 500, color: 'var(--fg)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{livre.titre}</div>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--fg-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {livre.auteur && <span>{livre.auteur} · </span>}
+          <span style={{ color: sourceColor[livre.source], fontStyle: 'italic' }}>{SOURCE_LABELS[livre.source]}</span>
+          {livre.pourquoi && <span style={{ color: 'var(--fg-subtle)' }}> — {livre.pourquoi}</span>}
+        </div>
+      </div>
+      <button onClick={onStart}
+        className="text-xs px-3 py-1.5 rounded-full transition-colors"
+        style={{ background: 'var(--terra-soft)', color: 'var(--terra-deep)', border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', opacity: hover ? 1 : 0.7 }}>
+        ▶ Lire
+      </button>
+      <button onClick={onRemove}
+        className="transition-colors"
+        style={{ color: 'var(--fg-subtle)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, opacity: hover ? 1 : 0.4 }}>
+        ×
+      </button>
+    </div>
+  )
+}
+
+// ─── En cours Section ─────────────────────────────────────────────────────────
+
+interface EnCoursSectionProps { onFinish: () => void; onEdit: () => void; onStartNew: () => void }
 
 function EnCoursSection({ onFinish, onEdit, onStartNew }: EnCoursSectionProps) {
   const livreEnCours       = useBookStore((s) => s.livreEnCours)
   const updateLivreEnCours = useBookStore((s) => s.updateLivreEnCours)
   const clearLivreEnCours  = useBookStore((s) => s.clearLivreEnCours)
 
-  if (!livreEnCours) {
-    return (
-      <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-sm font-semibold text-zinc-200">En cours de lecture</h2>
-            <p className="text-xs text-zinc-600 mt-0.5">Aucune lecture en cours</p>
-          </div>
-          <button
-            onClick={onStartNew}
-            className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/15 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-600/25 transition-colors"
-          >
-            Commencer un livre
-          </button>
-        </div>
+  if (!livreEnCours) return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionHeader label="En cours de lecture" caption="Aucune lecture en cours" />
+      <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '22px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 24 }}>
+        <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16, color: 'var(--fg-muted)', margin: 0 }}>
+          Lance une lecture pour noter tes impressions en temps réel.
+        </p>
+        <button onClick={onStartNew}
+          className="px-4 py-2 text-sm font-medium rounded-full transition-colors whitespace-nowrap"
+          style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>
+          Commencer un livre
+        </button>
       </div>
-    )
-  }
+    </section>
+  )
 
   const { titre, auteur, couverture, pageActuelle, pagesTotal, impressions, dateDebut } = livreEnCours
-  const progress = (pageActuelle && pagesTotal && pagesTotal > 0)
-    ? Math.round((pageActuelle / pagesTotal) * 100)
-    : null
+  const progress = pageActuelle && pagesTotal && pagesTotal > 0 ? Math.round((pageActuelle / pagesTotal) * 100) : null
 
   return (
-    <div className="bg-zinc-900/50 border border-emerald-500/20 rounded-xl p-5">
-      <div className="flex items-start gap-4">
-        <CouvertureImg src={couverture} alt={titre} size={56} />
-        <div className="flex-1 min-w-0 space-y-1">
-          <div className="flex items-start justify-between gap-2">
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionHeader label="En cours de lecture" caption={`Commencé le ${fmtDate(dateDebut)}`} />
+      <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 28, background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: 24 }}>
+        <CoverDisplay src={couverture} title={titre} author={auteur} width={120} height={180} />
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 14, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
             <div>
-              <h3 className="text-sm font-semibold text-zinc-100 font-serif leading-snug">{titre}</h3>
-              <p className="text-xs text-zinc-500 mt-0.5">{auteur}</p>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--terra)', display: 'inline-block' }} />
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>En lecture</span>
+              </div>
+              <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 500, color: 'var(--fg)', margin: 0, lineHeight: 1.1 }}>{titre}</h2>
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 15, color: 'var(--fg-muted)', marginTop: 4 }}>{auteur}</p>
             </div>
-            <div className="flex gap-1.5 shrink-0">
-              <button
-                onClick={onEdit}
-                className="px-2 py-1 text-[11px] rounded text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 transition-colors"
-              >
-                Modifier
-              </button>
-              <button
-                onClick={onFinish}
-                className="px-2 py-1 text-[11px] rounded bg-emerald-600/15 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-600/25 transition-colors"
-              >
-                Critique →
-              </button>
-              <button
-                onClick={() => { if (window.confirm('Arrêter cette lecture sans critique ?')) clearLivreEnCours() }}
-                className="px-2 py-1 text-[11px] rounded text-zinc-600 hover:text-red-400 transition-colors"
-              >
-                Arrêter
-              </button>
+            <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+              <button onClick={onEdit} className="px-3 py-1 text-xs rounded-lg transition-colors"
+                style={{ color: 'var(--fg-muted)', background: 'var(--paper-2)', border: '1px solid var(--border)', cursor: 'pointer' }}>Modifier</button>
+              <button onClick={onFinish} className="px-3 py-1 text-xs rounded-full font-medium transition-colors"
+                style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>Critique →</button>
+              <button onClick={() => { if (window.confirm('Arrêter sans critique ?')) clearLivreEnCours() }}
+                className="px-3 py-1 text-xs rounded-lg transition-colors"
+                style={{ color: 'var(--fg-subtle)', background: 'transparent', border: 'none', cursor: 'pointer' }}>Arrêter</button>
             </div>
           </div>
 
-          {/* Progression pages */}
           {pagesTotal && (
-            <div className="space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-zinc-600">
-                  {pageActuelle ?? 0} / {pagesTotal} pages
-                  {progress !== null && <span className="ml-1 text-emerald-500/70">({progress}%)</span>}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-muted)', fontVariantNumeric: 'tabular-nums' }}>
+                  Page {pageActuelle ?? 0} / {pagesTotal}
                 </span>
+                {progress !== null && <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>{progress}% lu</span>}
               </div>
-              {progress !== null && (
-                <div className="h-1 bg-zinc-800 rounded-full overflow-hidden">
-                  <div className="h-full bg-emerald-500/60 rounded-full transition-all" style={{ width: `${progress}%` }} />
-                </div>
-              )}
+              {progress !== null && <ProgressBar value={progress} max={100} />}
             </div>
           )}
 
-          <p className="text-[11px] text-zinc-600">Commencé le {fmtDate(dateDebut)}</p>
-
-          {/* Impressions */}
           <textarea
             value={impressions}
             onChange={(e) => updateLivreEnCours({ impressions: e.target.value })}
             placeholder="Impressions à chaud — notes libres pendant la lecture…"
-            rows={2}
-            className="w-full mt-1 bg-zinc-800/60 border border-zinc-700/40 rounded-lg px-3 py-2 text-xs text-zinc-400 outline-none placeholder:text-zinc-700 focus:border-emerald-500/40 resize-none leading-relaxed"
+            rows={3}
+            style={{ width: '100%', fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--fg)', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', padding: '10px 12px', outline: 'none', resize: 'vertical', boxSizing: 'border-box', lineHeight: 1.5 }}
           />
         </div>
       </div>
-    </div>
+    </section>
   )
 }
 
@@ -933,15 +773,10 @@ function EnCoursSection({ onFinish, onEdit, onStartNew }: EnCoursSectionProps) {
 
 type SortKey = 'note' | 'date' | 'titre' | 'auteur'
 
-interface BibliothequeSectionProps {
-  onEdit: (livre: BookCritique) => void
-}
-
-function BibliothequeSection({ onEdit }: BibliothequeSectionProps) {
+function BibliothequeSection({ onEdit }: { onEdit: (l: BookCritique) => void }) {
   const bibliotheque = useBookStore((s) => s.bibliotheque)
   const genresPerso  = useBookStore((s) => s.genresPerso)
   const allGenres    = [...GENRES_DEFAUT, ...genresPerso]
-
   const [sort,          setSort]          = useState<SortKey>('date')
   const [filterGenre,   setFilterGenre]   = useState('')
   const [filterType,    setFilterType]    = useState<BookType | ''>('')
@@ -952,173 +787,135 @@ function BibliothequeSection({ onEdit }: BibliothequeSectionProps) {
     .filter((b) => !filterGenre || b.genres.includes(filterGenre))
     .filter((b) => !filterType  || b.type === filterType)
     .filter((b) => filterNoteMin === 0 || b.note >= filterNoteMin)
-    .filter((b) => {
-      if (!search) return true
-      const q = search.toLowerCase()
-      return b.titre.toLowerCase().includes(q) || b.auteur.toLowerCase().includes(q)
-    })
+    .filter((b) => !search || (b.titre + b.auteur).toLowerCase().includes(search.toLowerCase()))
     .sort((a, b) => {
-      if (sort === 'note') return b.note - a.note
-      if (sort === 'titre') return a.titre.localeCompare(b.titre)
+      if (sort === 'note')   return b.note - a.note
+      if (sort === 'titre')  return a.titre.localeCompare(b.titre)
       if (sort === 'auteur') return a.auteur.localeCompare(b.auteur)
       return b.dateLecture.localeCompare(a.dateLecture)
     })
 
-  if (bibliotheque.length === 0) {
-    return (
-      <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5">
-        <h2 className="text-sm font-semibold text-zinc-200 mb-1">Bibliothèque</h2>
-        <p className="text-xs text-zinc-600">Aucun livre critique pour l'instant — commence par ajouter un livre lu.</p>
-      </div>
-    )
-  }
+  const selectCls = 'rounded-[var(--r-md)] px-3 py-1.5 text-xs outline-none transition-colors bg-[var(--bg-elev)] border border-[var(--border)] text-[var(--fg-muted)]'
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5 space-y-4">
-      <div className="flex items-center justify-between flex-wrap gap-2">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-200">Bibliothèque</h2>
-          <p className="text-xs text-zinc-600">{bibliotheque.length} livre{bibliotheque.length > 1 ? 's' : ''} critiqué{bibliotheque.length > 1 ? 's' : ''}</p>
-        </div>
-      </div>
+    <section style={{ marginTop: 56, display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <SectionHeader label="Bibliothèque" caption={`Ta collection`}
+        right={<span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--fg-muted)' }}>→ {bibliotheque.length} lecture{bibliotheque.length > 1 ? 's' : ''}</span>} />
 
-      {/* Filtres */}
-      <div className="flex flex-wrap gap-2">
-        {/* Recherche */}
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Rechercher…"
-          className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-2.5 py-1 text-xs text-zinc-300 outline-none placeholder:text-zinc-600 focus:border-emerald-500/50 w-36"
-        />
-        {/* Tri */}
-        <select
-          value={sort}
-          onChange={(e) => setSort(e.target.value as SortKey)}
-          className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-2 py-1 text-xs text-zinc-400 outline-none focus:border-emerald-500/50"
-        >
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center' }}>
+        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher…"
+          className="rounded-[var(--r-md)] px-3 py-1.5 text-xs outline-none transition-colors bg-[var(--bg-elev)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]"
+          style={{ width: 160 }} />
+        <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className={selectCls}>
           <option value="date">Date de lecture</option>
           <option value="note">Note</option>
           <option value="titre">Titre</option>
           <option value="auteur">Auteur</option>
         </select>
-        {/* Type */}
-        <select
-          value={filterType}
-          onChange={(e) => setFilterType(e.target.value as BookType | '')}
-          className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-2 py-1 text-xs text-zinc-400 outline-none focus:border-emerald-500/50"
-        >
+        <select value={filterType} onChange={(e) => setFilterType(e.target.value as BookType | '')} className={selectCls}>
           <option value="">Tous types</option>
           <option value="fiction">Fiction</option>
           <option value="non-fiction">Non-fiction</option>
         </select>
-        {/* Genre */}
-        <select
-          value={filterGenre}
-          onChange={(e) => setFilterGenre(e.target.value)}
-          className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-2 py-1 text-xs text-zinc-400 outline-none focus:border-emerald-500/50"
-        >
+        <select value={filterGenre} onChange={(e) => setFilterGenre(e.target.value)} className={selectCls}>
           <option value="">Tous genres</option>
-          {allGenres.map((g) => (
-            <option key={g} value={g}>{g}</option>
-          ))}
+          {allGenres.map((g) => <option key={g} value={g}>{g}</option>)}
         </select>
-        {/* Note min */}
-        <select
-          value={filterNoteMin}
-          onChange={(e) => setFilterNoteMin(Number(e.target.value))}
-          className="bg-zinc-800 border border-zinc-700/60 rounded-lg px-2 py-1 text-xs text-zinc-400 outline-none focus:border-emerald-500/50"
-        >
+        <select value={filterNoteMin} onChange={(e) => setFilterNoteMin(Number(e.target.value))} className={selectCls}>
           <option value={0}>Toutes notes</option>
-          {[7, 8, 9].map((n) => (
-            <option key={n} value={n}>≥ {n}/10</option>
-          ))}
+          {[7, 8, 9].map((n) => <option key={n} value={n}>≥ {n}/10</option>)}
         </select>
       </div>
 
-      {/* Grille */}
-      {filtered.length === 0 ? (
-        <p className="text-xs text-zinc-600 py-2">Aucun livre ne correspond aux filtres.</p>
+      {bibliotheque.length === 0 ? (
+        <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--fg-muted)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
+          Aucun livre critiqué pour l'instant — commence par ajouter un livre lu.
+        </div>
+      ) : filtered.length === 0 ? (
+        <p style={{ color: 'var(--fg-subtle)', fontSize: 14, fontStyle: 'italic' }}>Aucun livre ne correspond aux filtres.</p>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {filtered.map((livre) => (
-            <BookCard key={livre.id} livre={livre} onEdit={() => onEdit(livre)} />
-          ))}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
+          {filtered.map((livre) => <BookCard key={livre.id} livre={livre} onEdit={() => onEdit(livre)} />)}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
 // ─── Panthéon Section ─────────────────────────────────────────────────────────
 
-function PantheonSection({ onEdit }: { onEdit: (livre: BookCritique) => void }) {
+function PantheonSection({ onEdit }: { onEdit: (l: BookCritique) => void }) {
   const bibliotheque = useBookStore((s) => s.bibliotheque)
-  const pantheon = bibliotheque.filter((b) => b.note >= 9)
+  const scrollRef    = useRef<HTMLDivElement>(null)
+  const pantheon     = bibliotheque.filter((b) => b.note >= 9).sort((a, b) => b.note - a.note || a.titre.localeCompare(b.titre))
 
   if (pantheon.length === 0) return null
 
+  const scrollBy = (dx: number) => scrollRef.current?.scrollBy({ left: dx, behavior: 'smooth' })
+
   return (
-    <div className="bg-zinc-900/50 border border-amber-500/15 rounded-xl p-5 space-y-3">
-      <div>
-        <h2 className="text-sm font-semibold text-zinc-200 flex items-center gap-2">
-          <span className="text-amber-400">◆</span> Le Panthéon
-          <span className="text-xs font-normal text-zinc-600 ml-1">{pantheon.length} livre{pantheon.length > 1 ? 's' : ''}</span>
-        </h2>
-        <p className="text-xs text-zinc-600 mt-0.5">Les 9-10 / 10 — tes références absolues</p>
-      </div>
-      <div className="flex flex-wrap gap-3">
+    <section style={{ marginTop: 72, display: 'flex', flexDirection: 'column', gap: 18 }}>
+      <SectionHeader label="Panthéon" caption="Tes classiques"
+        right={
+          <div style={{ display: 'flex', gap: 4 }}>
+            {[{ dx: -360, icon: '‹' }, { dx: 360, icon: '›' }].map(({ dx, icon }) => (
+              <button key={dx} onClick={() => scrollBy(dx)}
+                style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid var(--paper-2)', background: 'var(--paper-1)', color: 'var(--fg-muted)', display: 'grid', placeItems: 'center', cursor: 'pointer', fontSize: 18 }}>
+                {icon}
+              </button>
+            ))}
+          </div>
+        }
+      />
+      <div ref={scrollRef} style={{ display: 'flex', gap: 18, overflowX: 'auto', padding: '8px 4px 20px', scrollbarWidth: 'thin', scrollbarColor: 'var(--paper-3) transparent', maskImage: 'linear-gradient(to right, transparent, black 24px, black calc(100% - 60px), transparent)' }}>
         {pantheon.map((livre) => (
-          <button
-            key={livre.id}
-            onClick={() => onEdit(livre)}
-            title={`${livre.titre} — ${livre.auteur} (${livre.note}/10)`}
-            className="group relative rounded overflow-hidden border border-zinc-700/50 hover:border-amber-500/40 transition-all hover:scale-105"
-          >
-            <CouvertureImg src={livre.couverture} alt={livre.titre} size={56} />
-            <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors rounded" />
+          <button key={livre.id} onClick={() => onEdit(livre)}
+            style={{ display: 'flex', flexDirection: 'column', gap: 10, flexShrink: 0, width: 132, background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', padding: 0 }}>
+            <div style={{ position: 'relative' }}>
+              <CoverDisplay src={livre.couverture} title={livre.titre} author={livre.auteur} width={132} height={198} />
+              <div style={{ position: 'absolute', bottom: -8, right: -8, width: 36, height: 36, borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 13, fontWeight: 500, boxShadow: '0 6px 20px -8px rgba(58,46,34,0.35)', border: '2px solid var(--paper-1)' }}>
+                {livre.note}
+              </div>
+            </div>
+            <div>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 13, lineHeight: 1.2, color: 'var(--fg)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{livre.titre}</div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--fg-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {livre.auteur}{livre.anneePublication && <span style={{ color: 'var(--fg-subtle)' }}> · {livre.anneePublication}</span>}
+              </div>
+            </div>
           </button>
         ))}
       </div>
-    </div>
+    </section>
   )
 }
 
 // ─── File d'attente Section ───────────────────────────────────────────────────
 
-interface FileAttenteSectionProps {
-  onAddNew: () => void
-}
-
-function FileAttenteSection({ onAddNew }: FileAttenteSectionProps) {
+function FileAttenteSection({ onAddNew }: { onAddNew: () => void }) {
   const fileAttente    = useBookStore((s) => s.fileAttente)
   const removeFromFile = useBookStore((s) => s.removeFromFile)
   const startReading   = useBookStore((s) => s.startReading)
   const livreEnCours   = useBookStore((s) => s.livreEnCours)
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5 space-y-3">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-200">File d'attente</h2>
-          <p className="text-xs text-zinc-600">{fileAttente.length} livre{fileAttente.length !== 1 ? 's' : ''} à lire</p>
-        </div>
-        <button
-          onClick={onAddNew}
-          className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/15 border border-emerald-500/25 text-emerald-400 hover:bg-emerald-600/25 transition-colors"
-        >
-          + Ajouter
-        </button>
-      </div>
-
+    <section style={{ marginTop: 72, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionHeader label="File d'attente" caption={`${fileAttente.length} livre${fileAttente.length > 1 ? 's' : ''} patienten${fileAttente.length > 1 ? 't' : 't'}`}
+        right={
+          <button onClick={onAddNew} className="px-4 py-1.5 text-sm font-medium rounded-full"
+            style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>
+            + Ajouter
+          </button>
+        }
+      />
       {fileAttente.length === 0 ? (
-        <p className="text-xs text-zinc-600 py-1">Ta pile à lire est vide.</p>
+        <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--fg-muted)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
+          Ta pile à lire est vide.
+        </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {fileAttente.map((livre) => (
-            <WaitlistCard
-              key={livre.id}
-              livre={livre}
+        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+          {fileAttente.map((livre, i) => (
+            <QueueRow key={livre.id} livre={livre} index={i + 1} isLast={i === fileAttente.length - 1}
               onStart={() => {
                 if (livreEnCours && !window.confirm('Tu as déjà un livre en cours. Démarrer quand même ?')) return
                 startReading(livre.id)
@@ -1128,7 +925,7 @@ function FileAttenteSection({ onAddNew }: FileAttenteSectionProps) {
           ))}
         </div>
       )}
-    </div>
+    </section>
   )
 }
 
@@ -1137,187 +934,180 @@ function FileAttenteSection({ onAddNew }: FileAttenteSectionProps) {
 function StatsSection() {
   const bibliotheque = useBookStore((s) => s.bibliotheque)
   const year = getCurrentYear()
-
   const thisYear = bibliotheque.filter((b) => b.dateLecture?.startsWith(String(year)))
   if (thisYear.length === 0) return null
 
   const fiction    = thisYear.filter((b) => b.type === 'fiction').length
   const nonfiction = thisYear.filter((b) => b.type === 'non-fiction').length
-  const moyNote    = thisYear.length > 0
-    ? (thisYear.reduce((s, b) => s + b.note, 0) / thisYear.length).toFixed(1)
-    : '—'
-
-  // Auteur le plus lu
+  const moyNote    = (thisYear.reduce((s, b) => s + b.note, 0) / thisYear.length).toFixed(1).replace('.', ',')
   const auteurCount: Record<string, number> = {}
-  thisYear.forEach((b) => {
-    auteurCount[b.auteur] = (auteurCount[b.auteur] ?? 0) + 1
-  })
+  thisYear.forEach((b) => { auteurCount[b.auteur] = (auteurCount[b.auteur] ?? 0) + 1 })
   const topAuteur = Object.entries(auteurCount).sort((a, b) => b[1] - a[1])[0]
 
-  const stats = [
-    { label: 'Livres lus', value: thisYear.length },
-    { label: 'Fiction', value: fiction },
-    { label: 'Non-fiction', value: nonfiction },
-    { label: 'Note moyenne', value: moyNote },
-    ...(topAuteur && topAuteur[1] > 1 ? [{ label: 'Auteur le + lu', value: topAuteur[0] }] : []),
+  const kpis = [
+    { label: 'Livres lus', value: String(thisYear.length), mono: true, accent: true },
+    { label: 'Fiction', value: String(fiction), mono: true },
+    { label: 'Non-fiction', value: String(nonfiction), mono: true },
+    { label: 'Note moyenne', value: moyNote, mono: true },
+    ...(topAuteur && topAuteur[1] > 1 ? [{ label: 'Auteur le + lu', value: topAuteur[0], mono: false }] : []),
   ]
 
   return (
-    <div className="bg-zinc-900/50 border border-zinc-800/40 rounded-xl p-5 space-y-3">
-      <h2 className="text-sm font-semibold text-zinc-200">Statistiques {year}</h2>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        {stats.map((s) => (
-          <div key={s.label} className="bg-zinc-800/40 rounded-lg p-3">
-            <p className="text-xs text-zinc-600">{s.label}</p>
-            <p className="text-lg font-bold text-zinc-200 tabular-nums mt-0.5 truncate">{s.value}</p>
+    <section style={{ marginTop: 72, display: 'flex', flexDirection: 'column', gap: 16 }}>
+      <SectionHeader label={`Statistiques ${year}`} caption="Ce que dit ton année" />
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 1, background: 'var(--paper-2)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+        {kpis.map((k) => (
+          <div key={k.label} style={{ background: 'var(--paper-1)', padding: '20px 22px' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-subtle)', display: 'block', marginBottom: 8 }}>{k.label}</span>
+            <div style={{ fontFamily: k.mono ? 'var(--font-serif)' : 'var(--font-serif)', fontSize: k.mono ? 40 : 20, fontWeight: 500, color: k.accent ? 'var(--terra)' : 'var(--fg)', lineHeight: 1, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>
+              {k.value}
+            </div>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   )
 }
 
-// ─── Main Page ────────────────────────────────────────────────────────────────
+// ─── BooksPage ────────────────────────────────────────────────────────────────
 
 export function BooksPage() {
-  const bibliotheque  = useBookStore((s) => s.bibliotheque)
+  const bibliotheque   = useBookStore((s) => s.bibliotheque)
   const objectifAnnuel = useBookStore((s) => s.objectifAnnuel)
-  const livreEnCours  = useBookStore((s) => s.livreEnCours)
-  const _hasHydrated  = useBookStore((s) => s._hasHydrated)
+  const livreEnCours   = useBookStore((s) => s.livreEnCours)
+  const _hasHydrated   = useBookStore((s) => s._hasHydrated)
 
-  const year = getCurrentYear()
-  const livresAnnee = bibliotheque.filter((b) => b.dateLecture?.startsWith(String(year))).length
-  const weeksElapsed = getWeeksElapsed()
-  const weeklyRate   = livresAnnee / weeksElapsed
-  const projected    = Math.round(weeklyRate * 52)
+  const year          = getCurrentYear()
+  const livresAnnee   = bibliotheque.filter((b) => b.dateLecture?.startsWith(String(year))).length
+  const weeksElapsed  = getWeeksElapsed()
+  const weeklyRate    = livresAnnee / weeksElapsed
+  const projected     = Math.round(weeklyRate * 52)
+  const pct           = Math.round(Math.min(100, (livresAnnee / objectifAnnuel) * 100))
 
-  // Modals state
   const [critiqueModal, setCritiqueModal] = useState<{ open: boolean; livre?: BookCritique | null; fromFile?: BookAttente | null }>({ open: false })
   const [fileModal,     setFileModal]     = useState(false)
   const [enCoursModal,  setEnCoursModal]  = useState(false)
 
-  if (!_hasHydrated) {
-    return (
-      <div className="flex h-full items-center justify-center">
-        <div className="flex gap-2">
-          {[0,1,2].map((i) => (
-            <span key={i} className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-bounce" style={{ animationDelay: `${i * 120}ms` }} />
-          ))}
-        </div>
+  if (!_hasHydrated) return (
+    <div className="flex h-full items-center justify-center">
+      <div className="flex gap-2">
+        {[0,1,2].map((i) => <span key={i} className="h-1.5 w-1.5 rounded-full animate-bounce" style={{ background: 'var(--terra)', animationDelay: `${i * 120}ms` }} />)}
       </div>
-    )
-  }
+    </div>
+  )
 
   return (
-    <div className="min-h-full bg-zinc-950 p-4 sm:p-6 lg:p-8">
-      <div className="mx-auto max-w-4xl space-y-6">
+    <div style={{ flex: 1, overflowY: 'auto', background: 'var(--paper)' }}>
+      <div style={{ maxWidth: 1240, margin: '0 auto', padding: '40px 48px 80px', display: 'flex', flexDirection: 'column', gap: 0 }}>
 
-        {/* ── Header ────────────────────────────────────────────────────── */}
-        <div className="flex items-start justify-between gap-4">
-          <div className="space-y-3">
-            {/* Titre page */}
-            <div>
-              <h1 className="text-xl font-semibold text-zinc-100 font-serif tracking-tight">Livres</h1>
-              <p className="text-xs text-zinc-600 mt-0.5">
-                Bibliothèque, critiques et lectures en cours
+        {/* ── Header ──────────────────────────────────────────────────────── */}
+        <header style={{ display: 'flex', flexDirection: 'column', gap: 24, paddingBottom: 32, borderBottom: '1px solid var(--paper-2)', marginBottom: 56 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 32 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                livres · bibliothèque
+              </span>
+              <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 52, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.015em', margin: '6px 0 12px', lineHeight: 1.05 }}>
+                Livres<span style={{ color: 'var(--terra)' }}>.</span>
+              </h1>
+              <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 19, color: 'var(--fg-muted)', margin: 0, maxWidth: '52ch', lineHeight: 1.4 }}>
+                Ce que tu lis, ce que tu as aimé, ce qui attend. {year} — une année que tu écris page après page.
               </p>
             </div>
-
-            {/* Objectif annuel */}
-            <div className="flex items-baseline gap-3 flex-wrap">
-              <div className="flex items-baseline gap-1.5">
-                <span className={`text-4xl font-bold tabular-nums font-serif ${
-                  livresAnnee >= objectifAnnuel ? 'text-amber-400' : 'text-emerald-400'
-                }`}>
-                  {livresAnnee}
-                </span>
-                <span className="text-lg text-zinc-600 font-serif">/ {objectifAnnuel}</span>
-              </div>
-              <div className="space-y-0.5">
-                <p className="text-xs text-zinc-500 font-medium">livres lus en {year}</p>
-                {livresAnnee > 0 ? (
-                  <p className="text-[11px] text-zinc-600">
-                    {projected >= objectifAnnuel
-                      ? `À ce rythme, tu atteindras les ${objectifAnnuel} — continue`
-                      : `À ce rythme : ${projected} livres en fin d'année`
-                    }
-                  </p>
-                ) : (
-                  <p className="text-[11px] text-zinc-600">Aucun livre ajouté cette année pour l'instant</p>
-                )}
-              </div>
-            </div>
-
-            {/* Barre de progression sobre */}
-            <div className="w-64 h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div
-                className={`h-full rounded-full transition-all ${livresAnnee >= objectifAnnuel ? 'bg-amber-400' : 'bg-emerald-500/70'}`}
-                style={{ width: `${Math.min(100, (livresAnnee / objectifAnnuel) * 100)}%` }}
-              />
+            <div style={{ display: 'flex', gap: 8, paddingTop: 12, flexShrink: 0 }}>
+              <button onClick={() => setFileModal(true)}
+                className="px-4 py-2 text-sm transition-colors"
+                style={{ background: 'transparent', color: 'var(--fg)', border: '1px solid var(--ink-4)', borderRadius: 8, cursor: 'pointer' }}>
+                File d'attente
+              </button>
+              <button onClick={() => setCritiqueModal({ open: true, livre: null })}
+                className="px-4 py-2 text-sm font-medium rounded-full transition-colors"
+                style={{ background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: 'pointer' }}>
+                + Livre lu
+              </button>
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-2 shrink-0 flex-col sm:flex-row">
-            <button
-              onClick={() => setFileModal(true)}
-              className="px-3 py-1.5 text-xs rounded-lg border border-zinc-700/60 text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800 transition-colors"
-            >
-              + File d'attente
-            </button>
-            <button
-              onClick={() => setCritiqueModal({ open: true, livre: null })}
-              className="px-3 py-1.5 text-xs rounded-lg bg-emerald-600/20 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-600/30 transition-colors font-medium"
-            >
-              + Livre lu
-            </button>
+          {/* Objectif annuel */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'center', background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '18px 22px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Objectif {year}</span>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', fontSize: 22 }}>{livresAnnee}</span>
+                    <span style={{ color: 'var(--fg-subtle)' }}> / </span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--fg-muted)' }}>{objectifAnnuel}</span>
+                    <span style={{ color: 'var(--fg-subtle)', fontStyle: 'italic', fontSize: 16 }}> livres</span>
+                  </span>
+                </div>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-muted)', letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
+              </div>
+              <ProgressBar value={livresAnnee} max={objectifAnnuel} height={8} />
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-subtle)', letterSpacing: '0.06em' }}>
+                {['JAN','FÉV','MAR','AVR','MAI','JUI','JUI','AOÛ','SEP','OCT','NOV','DÉC'].map((m) => <span key={m}>{m}</span>)}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, paddingLeft: 24, borderLeft: '1px solid var(--paper-2)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>au rythme actuel</span>
+              {livresAnnee > 0 ? (
+                <>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 20, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
+                    <span style={{ fontFamily: 'var(--font-mono)' }}>{projected}</span>
+                    <span style={{ color: 'var(--fg-subtle)', fontStyle: 'italic', fontSize: 14 }}> livres en {year}</span>
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', color: projected >= objectifAnnuel ? 'var(--sage-deep)' : 'var(--terra)' }}>
+                    {projected >= objectifAnnuel ? '→ objectif atteignable.' : '→ il faut accélérer un peu.'}
+                  </span>
+                </>
+              ) : (
+                <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--fg-muted)' }}>Aucune lecture cette année.</span>
+              )}
+            </div>
           </div>
-        </div>
+        </header>
 
-        {/* ── En cours ──────────────────────────────────────────────────── */}
+        {/* ── En cours ────────────────────────────────────────────────────── */}
         <EnCoursSection
           onFinish={() => setCritiqueModal({ open: true, livre: null })}
           onEdit={() => setEnCoursModal(true)}
           onStartNew={() => setEnCoursModal(true)}
         />
 
-        {/* ── Bibliothèque ──────────────────────────────────────────────── */}
+        {/* ── Bibliothèque ─────────────────────────────────────────────────── */}
         <BibliothequeSection onEdit={(livre) => setCritiqueModal({ open: true, livre })} />
 
-        {/* ── Panthéon ──────────────────────────────────────────────────── */}
+        {/* ── Panthéon ─────────────────────────────────────────────────────── */}
         <PantheonSection onEdit={(livre) => setCritiqueModal({ open: true, livre })} />
 
-        {/* ── File d'attente ────────────────────────────────────────────── */}
+        {/* ── File d'attente ───────────────────────────────────────────────── */}
         <FileAttenteSection onAddNew={() => setFileModal(true)} />
 
-        {/* ── Stats ─────────────────────────────────────────────────────── */}
+        {/* ── Stats ────────────────────────────────────────────────────────── */}
         <StatsSection />
 
-        {/* Spacer bas de page */}
-        <div className="h-8" />
+        {/* Footer */}
+        <footer style={{ marginTop: 72, paddingTop: 24, borderTop: '1px solid var(--paper-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.08em' }}>
+          <span>aetheris · livres · {bibliotheque.length} critique{bibliotheque.length > 1 ? 's' : ''}</span>
+          <span style={{ fontStyle: 'italic', fontFamily: 'var(--font-serif)', textTransform: 'none', letterSpacing: 0, color: 'var(--ink-2)', fontSize: 14 }}>
+            « lire, c'est élargir le territoire de l'attention. »
+          </span>
+        </footer>
       </div>
 
-      {/* ── Modals ────────────────────────────────────────────────────────── */}
+      {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {critiqueModal.open && (
-        <CritiqueModal
-          initial={critiqueModal.livre}
-          fromFile={critiqueModal.fromFile}
-          onClose={() => setCritiqueModal({ open: false })}
-        />
+        <CritiqueModal initial={critiqueModal.livre} fromFile={critiqueModal.fromFile} onClose={() => setCritiqueModal({ open: false })} />
       )}
-      {fileModal && (
-        <FileModal onClose={() => setFileModal(false)} />
-      )}
-      {enCoursModal && (
-        <EnCoursModal onClose={() => setEnCoursModal(false)} />
-      )}
+      {fileModal && <FileModal onClose={() => setFileModal(false)} />}
+      {enCoursModal && <EnCoursModal onClose={() => setEnCoursModal(false)} />}
 
-      {/* En cours visible → livre en cours affiche aussi le bouton "Démarrer lecture" dans la file */}
+      {/* Badge livre en cours (coin bas droit) */}
       {livreEnCours && (
-        <div className="fixed bottom-4 right-4 z-40">
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-zinc-900 border border-emerald-500/30 shadow-lg">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-xs text-zinc-400 max-w-[160px] truncate font-serif">{livreEnCours.titre}</span>
+        <div style={{ position: 'fixed', bottom: 16, right: 16, zIndex: 40 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', borderRadius: 999, background: 'var(--bg-elev)', border: '1px solid var(--border)', boxShadow: '0 6px 20px -8px rgba(58,46,34,0.25)' }}>
+            <span style={{ width: 6, height: 6, borderRadius: 999, background: 'var(--terra)', display: 'inline-block', animation: 'pulse 2s ease-in-out infinite' }} />
+            <span style={{ fontFamily: 'var(--font-serif)', fontSize: 13, color: 'var(--fg-muted)', maxWidth: 160, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{livreEnCours.titre}</span>
           </div>
         </div>
       )}
