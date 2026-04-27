@@ -116,8 +116,6 @@ function BookCover({ title, author, width = 120, height = 180, style }: {
     </div>
   )
   const Spine = <div style={{ position: 'absolute', top: 0, bottom: 0, left: 0, width: 3, background: 'linear-gradient(to right, rgba(0,0,0,0.18), rgba(0,0,0,0))', pointerEvents: 'none' }} />
-  const initText = <text x="18" y="168" fill={pal.fg ?? pal.ink} style={{ fontFamily: 'var(--font-serif)', fontSize: 13, fontStyle: 'italic', fontWeight: 500 }}>{initial}</text>
-
   if (tpl === 'plain') return (
     <div style={base}>{Spine}
       <div style={{ padding: pad, marginTop: 'auto' }}>{Title}{Author}</div>
