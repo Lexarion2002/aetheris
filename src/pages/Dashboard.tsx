@@ -13,7 +13,8 @@ import { useFilmSerieStore } from '../store/filmSerieStore'
 import { useShoppingStore } from '../store/shoppingStore'
 import { AddDomainModal } from '../components/AddDomainModal'
 import { getDomainIcon } from '../utils/domainColors'
-import type { Domain, Task, Transaction, SavingsGoal } from '../types'
+import { computeMonthBalance } from '../utils/financeUtils'
+import type { Domain, Task, SavingsGoal } from '../types'
 
 // ─── Locale ───────────────────────────────────────────────────────────────────
 
@@ -49,12 +50,6 @@ function trunc(text: string, max: number): string {
 
 // ─── Finance helpers ──────────────────────────────────────────────────────────
 
-function computeMonthBalance(transactions: Transaction[]): number {
-  const key = new Date().toISOString().slice(0, 7)
-  return transactions
-    .filter(t => t.date.startsWith(key))
-    .reduce((sum, t) => sum + (t.type === 'income' ? t.amount : -t.amount), 0)
-}
 
 function topSavingsGoal(goals: SavingsGoal[]): SavingsGoal | null {
   return (
@@ -504,7 +499,7 @@ export function Dashboard() {
   const doneCount  = useMemo(() => tasks.filter(t => t.status === 'done').length, [tasks])
   const totalCount = useMemo(() => tasks.filter(t => t.status !== 'cancelled').length, [tasks])
 
-  const monthBalance = useMemo(() => computeMonthBalance(transactions), [transactions])
+  const monthBalance = useMemo(() => computeMonthBalance(transactions, monthStr), [transactions, monthStr])
   const topGoal      = useMemo(() => topSavingsGoal(savingsGoals), [savingsGoals])
   const todayTxTotal = useMemo(() => {
     const d = todayStr()

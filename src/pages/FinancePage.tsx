@@ -7,6 +7,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useStore } from '../store'
+import { computeReport } from '../utils/financeUtils'
 import type { Transaction, SavingsGoal, FinanceCategory } from '../types'
 
 // ─── Design-system palettes for donut segments ────────────────────────────────
@@ -139,9 +140,7 @@ export function FinancePage() {
 
   // ── Month data ────────────────────────────────────────────────────────────────
   const previousBalance = useMemo(
-    () => transactions
-      .filter((t) => t.date < month + '-01')
-      .reduce((a, t) => a + (t.type === 'income' ? t.amount : -t.amount), 0),
+    () => computeReport(transactions, month),
     [transactions, month],
   )
   const monthTx = useMemo(
