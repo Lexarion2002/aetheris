@@ -113,15 +113,21 @@ function computeTodayActions(
     actions.push({ label, domain: 'Droit', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
   })
 
-  // Source 4 : tâches cabinet avec échéance dans les 7 jours
+  // Source 4 : tâches cabinet — avec échéance dans les 7j OU urgentes sans date
   cabinetTaches
-    .filter(t => t.statut !== 'rendu' && t.rendu)
+    .filter(t => t.statut !== 'rendu')
     .forEach(t => {
-      const days = daysUntil(t.rendu)
-      if (days === null || days > 7) return
-      const urgencyByDate: 0 | 1 | 2 = days <= 0 ? 0 : days <= 2 ? 1 : 2
-      const urgencyByPrio = PRIORITE_URGENCY[t.priorite] ?? 1
-      actions.push({ label: t.titre, domain: 'Cabinet', taskId: t.id, daysLeft: days, urgency: Math.min(urgencyByDate, urgencyByPrio) as 0 | 1 | 2 })
+      if (t.rendu) {
+        // Cas 1 : échéance dans les 7 jours
+        const days = daysUntil(t.rendu)
+        if (days === null || days > 7) return
+        const urgencyByDate: 0 | 1 | 2 = days <= 0 ? 0 : days <= 2 ? 1 : 2
+        const urgencyByPrio = PRIORITE_URGENCY[t.priorite] ?? 1
+        actions.push({ label: t.titre, domain: 'Cabinet', taskId: t.id, daysLeft: days, urgency: Math.min(urgencyByDate, urgencyByPrio) as 0 | 1 | 2 })
+      } else if (t.priorite === 'urgent') {
+        // Cas 2 : urgente sans échéance → traité comme overdue
+        actions.push({ label: t.titre, domain: 'Cabinet', taskId: t.id, daysLeft: 0, urgency: 0 })
+      }
     })
 
   return actions.sort((a, b) => a.urgency - b.urgency || a.daysLeft - b.daysLeft)
@@ -528,12 +534,7 @@ export function Dashboard() {
   }, [transactions])
 
   const todayActions = useMemo(
-    () => {
-      console.log('[Dashboard] cabinetTaches count:', cabinetTaches.length)
-      console.log('[Dashboard] cabinetTaches raw:', cabinetTaches)
-      console.log('[Dashboard] cabinetTaches avec rendu:', cabinetTaches.filter(t => t.rendu))
-      return computeTodayActions(domains, tasks, career.missions, law, cabinetTaches)
-    },
+    () => computeTodayActions(domains, tasks, career.missions, law, cabinetTaches),
     [domains, tasks, career.missions, law.grandOralDate, law.rapportDate, cabinetTaches],
   )
 
