@@ -308,7 +308,6 @@ function ModalAddContact({ onClose }: { onClose: () => void }) {
 
 function DossiersSection({ onAdd }: { onAdd: () => void }) {
   const dossiers      = useCabinetStore((s) => s.dossiers)
-  const updateDossier = useCabinetStore((s) => s.updateDossier)
   const removeDossier = useCabinetStore((s) => s.removeDossier)
   const [filter, setFilter] = useState<'tous' | DossierStatut>('tous')
 
