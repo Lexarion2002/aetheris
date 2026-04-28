@@ -528,7 +528,12 @@ export function Dashboard() {
   }, [transactions])
 
   const todayActions = useMemo(
-    () => computeTodayActions(domains, tasks, career.missions, law, cabinetTaches),
+    () => {
+      console.log('[Dashboard] cabinetTaches count:', cabinetTaches.length)
+      console.log('[Dashboard] cabinetTaches raw:', cabinetTaches)
+      console.log('[Dashboard] cabinetTaches avec rendu:', cabinetTaches.filter(t => t.rendu))
+      return computeTodayActions(domains, tasks, career.missions, law, cabinetTaches)
+    },
     [domains, tasks, career.missions, law.grandOralDate, law.rapportDate, cabinetTaches],
   )
 
