@@ -11,6 +11,8 @@ import { useSportStore } from '../store/sportStore'
 import { useBookStore } from '../store/bookStore'
 import { useFilmSerieStore } from '../store/filmSerieStore'
 import { useShoppingStore } from '../store/shoppingStore'
+import { useCabinetStore } from '../store/cabinetStore'
+import type { CabinetTache } from '../store/cabinetStore'
 import { AddDomainModal } from '../components/AddDomainModal'
 import { getDomainIcon } from '../utils/domainColors'
 import { computeMonthBalance } from '../utils/financeUtils'
@@ -70,11 +72,18 @@ interface TodayAction {
   urgency:  0 | 1 | 2
 }
 
+const PRIORITE_URGENCY: Record<string, 0 | 1 | 2> = {
+  'urgent':         0,
+  'normal':         1,
+  'quand possible': 2,
+}
+
 function computeTodayActions(
   domains: Domain[],
   tasks: Task[],
   missions: Array<{ id: string; sujet: string; deadline: string | null; stade: string }>,
   law: { grandOralDate: string | null; rapportDate: string | null },
+  cabinetTaches: CabinetTache[],
 ): TodayAction[] {
   const actions: TodayAction[] = []
 
@@ -103,6 +112,17 @@ function computeTodayActions(
     if (days === null || days > 7) return
     actions.push({ label, domain: 'Droit', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
   })
+
+  // Source 4 : tâches cabinet avec échéance dans les 7 jours
+  cabinetTaches
+    .filter(t => t.statut !== 'rendu' && t.rendu)
+    .forEach(t => {
+      const days = daysUntil(t.rendu)
+      if (days === null || days > 7) return
+      const urgencyByDate: 0 | 1 | 2 = days <= 0 ? 0 : days <= 2 ? 1 : 2
+      const urgencyByPrio = PRIORITE_URGENCY[t.priorite] ?? 1
+      actions.push({ label: t.titre, domain: 'Cabinet', taskId: t.id, daysLeft: days, urgency: Math.min(urgencyByDate, urgencyByPrio) as 0 | 1 | 2 })
+    })
 
   return actions.sort((a, b) => a.urgency - b.urgency || a.daysLeft - b.daysLeft)
 }
@@ -486,6 +506,7 @@ export function Dashboard() {
   const books        = useBookStore()
   const films        = useFilmSerieStore()
   const shopping     = useShoppingStore()
+  const cabinetTaches = useCabinetStore((s) => s.taches)
 
   const today    = new Date()
   const monthStr = today.toISOString().slice(0, 7)
@@ -507,8 +528,8 @@ export function Dashboard() {
   }, [transactions])
 
   const todayActions = useMemo(
-    () => computeTodayActions(domains, tasks, career.missions, law),
-    [domains, tasks, career.missions, law.grandOralDate, law.rapportDate],
+    () => computeTodayActions(domains, tasks, career.missions, law, cabinetTaches),
+    [domains, tasks, career.missions, law.grandOralDate, law.rapportDate, cabinetTaches],
   )
 
   // Writing
