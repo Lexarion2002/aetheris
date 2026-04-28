@@ -401,7 +401,7 @@ function BiblioCard({ item, onCritique, onEdit }: {
     <div
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer', transition: 'transform var(--dur) var(--ease)', transform: hover ? 'translateY(-2px)' : 'none' }}>
-      <div style={{ position: 'relative' }} onClick={onCritique}>
+      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6 }} onClick={onCritique}>
         <PosterDisplay src={item.imageUrl} title={item.title} year={item.releaseYear} width={168} />
         <div style={{
           position: 'absolute', top: 8, left: 8,
@@ -411,8 +411,18 @@ function BiblioCard({ item, onCritique, onEdit }: {
           textTransform: 'uppercase', fontWeight: 500,
         }}>{item.type === 'film' ? 'Film' : 'Série'}</div>
         {item.rating !== undefined && (
-          <div style={{ position: 'absolute', top: 8, right: 8 }}>
-            <StarBadge note={item.rating} />
+          <div style={{
+            position: 'absolute', top: 8, right: 8,
+            background: 'var(--ink)', color: 'var(--paper-1)',
+            padding: '3px 7px', borderRadius: 4,
+            fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.04em',
+            fontVariantNumeric: 'tabular-nums', fontWeight: 500,
+            display: 'inline-flex', alignItems: 'center', gap: 4,
+          }}>
+            <svg width="8" height="8" viewBox="0 0 10 10" fill="var(--terra-soft)" aria-hidden="true">
+              <polygon points="5,0.5 6.3,3.7 9.7,3.9 7.1,6.1 7.9,9.4 5,7.6 2.1,9.4 2.9,6.1 0.3,3.9 3.7,3.7" />
+            </svg>
+            {item.rating.toFixed(1)}
           </div>
         )}
         <button onClick={(e) => { e.stopPropagation(); onEdit() }} style={{
