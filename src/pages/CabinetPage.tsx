@@ -1,7 +1,7 @@
-import { useState, Fragment } from 'react'
+import { useState } from 'react'
 import {
   Plus, Archive, Users, Flame, Circle, CircleDashed,
-  AtSign, Mail, MessageCircle, Check, Trash2, Edit2,
+  AtSign, Mail, Check, Trash2,
 } from 'lucide-react'
 import { useCabinetStore } from '../store/cabinetStore'
 import type {
@@ -358,7 +358,6 @@ function DossiersSection({ onAdd }: { onAdd: () => void }) {
           </div>
           {filtered.map((d, i) => (
             <DossierRow key={d.id} dossier={d} last={i === filtered.length - 1}
-              onUpdateStatut={(s) => updateDossier(d.id, { statut: s })}
               onRemove={() => removeDossier(d.id)} />
           ))}
         </div>
@@ -367,9 +366,8 @@ function DossiersSection({ onAdd }: { onAdd: () => void }) {
   )
 }
 
-function DossierRow({ dossier, last, onUpdateStatut, onRemove }: {
-  dossier: CabinetDossier; last: boolean
-  onUpdateStatut: (s: DossierStatut) => void; onRemove: () => void
+function DossierRow({ dossier, last, onRemove }: {
+  dossier: CabinetDossier; last: boolean; onRemove: () => void
 }) {
   const [hover, setHover] = useState(false)
   const closed = dossier.statut === 'clôturé'
