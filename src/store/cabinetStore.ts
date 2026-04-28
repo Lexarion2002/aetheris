@@ -23,13 +23,14 @@ export interface CabinetDossier {
 }
 
 export interface CabinetTache {
-  id:        string
-  titre:     string
-  avocat:    string
-  priorite:  TachePriorite
-  statut:    TacheStatut
-  rendu:     string   // YYYY-MM-DD
-  createdAt: string
+  id:         string
+  titre:      string
+  avocat:     string
+  priorite:   TachePriorite
+  statut:     TacheStatut
+  rendu:      string   // YYYY-MM-DD
+  dossierId?: string   // id du dossier associé, undefined = tâche transversale
+  createdAt:  string
 }
 
 export interface CabinetNote {

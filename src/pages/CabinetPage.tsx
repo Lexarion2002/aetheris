@@ -178,16 +178,22 @@ function ModalAddDossier({ onClose }: { onClose: () => void }) {
 // ─── ModalAddTache ────────────────────────────────────────────────────────────
 
 function ModalAddTache({ onClose }: { onClose: () => void }) {
-  const addTache = useCabinetStore((s) => s.addTache)
-  const [titre,    setTitre]    = useState('')
-  const [avocat,   setAvocat]   = useState('')
-  const [priorite, setPriorite] = useState<TachePriorite>('normal')
-  const [statut,   setStatut]   = useState<TacheStatut>('à faire')
-  const [rendu,    setRendu]    = useState('')
+  const addTache  = useCabinetStore((s) => s.addTache)
+  const dossiers  = useCabinetStore((s) => s.dossiers)
+  const [titre,     setTitre]     = useState('')
+  const [avocat,    setAvocat]    = useState('')
+  const [dossierId, setDossierId] = useState('')
+  const [priorite,  setPriorite]  = useState<TachePriorite>('normal')
+  const [statut,    setStatut]    = useState<TacheStatut>('à faire')
+  const [rendu,     setRendu]     = useState('')
+
+  const dossiersActifs = [...dossiers]
+    .filter((d) => d.statut === 'en cours' || d.statut === 'en attente')
+    .sort((a, b) => b.ref.localeCompare(a.ref))
 
   function handleSubmit() {
     if (!titre.trim()) return
-    addTache({ titre: titre.trim(), avocat: avocat.trim(), priorite, statut, rendu })
+    addTache({ titre: titre.trim(), avocat: avocat.trim(), priorite, statut, rendu, dossierId: dossierId || undefined })
     onClose()
   }
 
@@ -200,6 +206,15 @@ function ModalAddTache({ onClose }: { onClose: () => void }) {
         </div>
         <div style={mRow}><span style={mLabel}>Intitulé *</span><input style={mInput} placeholder="Ex : Note de synthèse — non-concurrence" value={titre} onChange={(e) => setTitre(e.target.value)} autoFocus /></div>
         <div style={mRow}><span style={mLabel}>Demandé par</span><input style={mInput} placeholder="Ex : M. Marchais" value={avocat} onChange={(e) => setAvocat(e.target.value)} /></div>
+        <div style={mRow}>
+          <span style={mLabel}>Dossier associé</span>
+          <select style={{ ...mInput, appearance: 'none' }} value={dossierId} onChange={(e) => setDossierId(e.target.value)}>
+            <option value="">— Sans dossier —</option>
+            {dossiersActifs.map((d) => (
+              <option key={d.id} value={d.id}>{d.nom} — {d.ref}</option>
+            ))}
+          </select>
+        </div>
         <div style={mRow}><span style={mLabel}>Priorité</span>{chipOpts<TachePriorite>([['urgent', 'Urgent'], ['normal', 'Normal'], ['quand possible', 'Quand possible']], priorite, setPriorite)}</div>
         <div style={mRow}><span style={mLabel}>Statut</span>{chipOpts<TacheStatut>([['à faire', 'À faire'], ['en cours', 'En cours'], ['rendu', 'Rendu']], statut, setStatut)}</div>
         <div style={mRow}><span style={mLabel}>À rendre le</span><input type="date" style={mInput} value={rendu} onChange={(e) => setRendu(e.target.value)} /></div>
@@ -419,11 +434,25 @@ function DossierRow({ dossier, last, onRemove }: {
 
 function TachesSection({ onAdd }: { onAdd: () => void }) {
   const taches      = useCabinetStore((s) => s.taches)
+  const dossiers    = useCabinetStore((s) => s.dossiers)
   const updateTache = useCabinetStore((s) => s.updateTache)
   const removeTache = useCabinetStore((s) => s.removeTache)
+  const [filterDossier, setFilterDossier] = useState('')
 
   const actives = taches.filter((t) => t.statut !== 'rendu').length
   const rendues = taches.filter((t) => t.statut === 'rendu').length
+
+  // Dossiers qui ont au moins une tâche rattachée
+  const dossiersAvecTaches = dossiers.filter((d) =>
+    taches.some((t) => t.dossierId === d.id)
+  )
+
+  const filtered = filterDossier
+    ? taches.filter((t) => t.dossierId === filterDossier)
+    : taches
+
+  // Lookup ref par id pour le badge dans TacheRow
+  const dossierRefById = Object.fromEntries(dossiers.map((d) => [d.id, d.ref]))
 
   return (
     <section style={{ marginBottom: 56 }}>
@@ -437,12 +466,29 @@ function TachesSection({ onAdd }: { onAdd: () => void }) {
           </button>
         }
       />
-      {taches.length === 0 ? (
+      {dossiersAvecTaches.length > 0 && (
+        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
+          <button onClick={() => setFilterDossier('')} style={{
+            fontFamily: 'var(--font-sans)', fontSize: 13, padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
+            background: !filterDossier ? 'var(--paper-3)' : 'var(--paper-1)',
+            border: `1px solid ${!filterDossier ? 'var(--ink-4)' : 'var(--paper-2)'}`, color: 'var(--ink)',
+          }}>Tous les dossiers</button>
+          {dossiersAvecTaches.map((d) => (
+            <button key={d.id} onClick={() => setFilterDossier(d.id)} style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13, padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
+              background: filterDossier === d.id ? 'var(--paper-3)' : 'var(--paper-1)',
+              border: `1px solid ${filterDossier === d.id ? 'var(--ink-4)' : 'var(--paper-2)'}`, color: 'var(--ink)',
+            }}>{d.ref}</button>
+          ))}
+        </div>
+      )}
+      {filtered.length === 0 ? (
         <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-3)', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15 }}>Aucune tâche</div>
       ) : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {taches.map((t) => (
+          {filtered.map((t) => (
             <TacheRow key={t.id} tache={t}
+              dossierRef={t.dossierId ? dossierRefById[t.dossierId] : undefined}
               onToggle={() => updateTache(t.id, { statut: t.statut === 'rendu' ? 'à faire' : 'rendu' })}
               onRemove={() => removeTache(t.id)} />
           ))}
@@ -452,8 +498,8 @@ function TachesSection({ onAdd }: { onAdd: () => void }) {
   )
 }
 
-function TacheRow({ tache, onToggle, onRemove }: {
-  tache: CabinetTache; onToggle: () => void; onRemove: () => void
+function TacheRow({ tache, dossierRef, onToggle, onRemove }: {
+  tache: CabinetTache; dossierRef?: string; onToggle: () => void; onRemove: () => void
 }) {
   const [hover, setHover] = useState(false)
   const done = tache.statut === 'rendu'
@@ -487,7 +533,12 @@ function TacheRow({ tache, onToggle, onRemove }: {
         {done && <Check size={12} color="var(--paper-1)" />}
       </div>
       <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14.5, color: 'var(--ink)', lineHeight: 1.4, marginBottom: 4, textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'var(--ink-3)' }}>{tache.titre}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14.5, color: 'var(--ink)', lineHeight: 1.4, textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'var(--ink-3)' }}>{tache.titre}</span>
+          {dossierRef && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 4, background: 'var(--terra-soft)', color: 'var(--terra-deep)', fontWeight: 500, flexShrink: 0 }}>{dossierRef}</span>
+          )}
+        </div>
         {tache.avocat && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>
             <AtSign size={11} /><span style={{ fontStyle: 'italic' }}>demandé par</span> {tache.avocat}
