@@ -401,7 +401,7 @@ function BiblioCard({ item, onCritique, onEdit }: {
     <div
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{ display: 'flex', flexDirection: 'column', gap: 8, cursor: 'pointer', transition: 'transform var(--dur) var(--ease)', transform: hover ? 'translateY(-2px)' : 'none' }}>
-      <div style={{ position: 'relative', overflow: 'hidden', borderRadius: 6 }} onClick={onCritique}>
+      <div style={{ position: 'relative', display: 'block', overflow: 'hidden', borderRadius: 6, width: 'fit-content' }} onClick={onCritique}>
         <PosterDisplay src={item.imageUrl} title={item.title} year={item.releaseYear} width={168} />
         <div style={{
           position: 'absolute', top: 8, left: 8,
