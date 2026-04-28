@@ -27,6 +27,7 @@ const CuisinePage    = lazy(() => import('./pages/CuisinePage').then((m) => ({ d
 const ShoppingPage      = lazy(() => import('./pages/ShoppingPage').then((m) => ({ default: m.ShoppingPage })))
 const FilmsSeriesPage   = lazy(() => import('./pages/FilmsSeriesPage').then((m) => ({ default: m.FilmsSeriesPage })))
 const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ default: m.BooksPage })))
+const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => ({ default: m.CabinetPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -144,7 +145,8 @@ export default function App() {
           <Route path="cuisine" element={<Suspense fallback={<PageLoader />}><CuisinePage /></Suspense>} />
           <Route path="achats" element={<Suspense fallback={<PageLoader />}><ShoppingPage /></Suspense>} />
           <Route path="films" element={<Suspense fallback={<PageLoader />}><FilmsSeriesPage /></Suspense>} />
-          <Route path="livres" element={<Suspense fallback={<PageLoader />}><BooksPage /></Suspense>} />
+          <Route path="livres"   element={<Suspense fallback={<PageLoader />}><BooksPage /></Suspense>} />
+          <Route path="cabinet" element={<Suspense fallback={<PageLoader />}><CabinetPage /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>

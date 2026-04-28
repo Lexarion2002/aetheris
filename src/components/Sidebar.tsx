@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Landmark, ShoppingBag, BookOpen, Film, Circle } from 'lucide-react'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -237,6 +237,21 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
         >
           <Film size={14} className="shrink-0" />
           <span className="truncate">Films & Séries</span>
+        </NavLink>
+        {/* Cabinet — page standalone */}
+        <NavLink to="/cabinet" onClick={onNavigate}
+          className={({ isActive }) =>
+            [
+              'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
+              isActive
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
+            ].join(' ')
+          }
+        >
+          <Briefcase size={14} className="shrink-0" />
+          <span className="truncate">Cabinet</span>
         </NavLink>
       </div>
 
