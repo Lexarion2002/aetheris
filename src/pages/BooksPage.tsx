@@ -92,8 +92,6 @@ function BookCover({ title, author, width = 120, height = 180, style }: {
   const tSize = Math.max(11, Math.round(width * 0.105))
   const aSize = Math.max(8,  Math.round(width * 0.065))
   const pad   = Math.round(width * 0.09)
-  const initial = (title || 'A').trim().charAt(0).toUpperCase()
-
   const base: React.CSSProperties = {
     width, height, flexShrink: 0,
     background: pal.bg, color: pal.ink,
