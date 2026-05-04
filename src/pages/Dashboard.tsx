@@ -45,6 +45,8 @@ const weekAgoStr = () => { const d = new Date(); d.setDate(d.getDate() - 7); ret
 const fmtDate    = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
+const WRITING_STAGE_ORDER = ['idea', 'opening', 'development', 'ending-found', 'draft-complete', 'revision', 'done']
+
 function trunc(text: string, max: number): string {
   const words = text.trim().split(/\s+/)
   return words.length <= max ? text : words.slice(0, max).join(' ') + '…'
@@ -539,15 +541,24 @@ export function Dashboard() {
   )
 
   // Writing
-  const activeArc = writing.arcs.find(a => a.isActive) ?? writing.arcs[0]
+  const activeWritingStory = useMemo(
+    () => writing.stories.find((s) => s.status === 'active'),
+    [writing.stories],
+  )
+  const activeWritingSessions = useMemo(
+    () => activeWritingStory?.sessions ?? [],
+    [activeWritingStory],
+  )
   const lastWritingDays = useMemo(() => {
-    const latest = writing.dailySessions.map(s => s.date).sort().at(-1)
+    const latest = activeWritingSessions.map((s) => s.date).sort().at(-1)
     if (!latest) return null
     const d = daysUntil(latest + 'T23:59:59')
     return d !== null ? Math.abs(d) : null
-  }, [writing.dailySessions])
-  const writingSessionsWeek  = writing.dailySessions.filter(s => s.date >= waStr).length
-  const writingSessionsTotal = writing.dailySessions.length
+  }, [activeWritingSessions])
+  const writingSessionsWeek  = activeWritingSessions.filter((s) => s.date >= waStr).length
+  const writingSessionsTotal = activeWritingSessions.length
+  const writingProgressIndex = activeWritingStory ? WRITING_STAGE_ORDER.indexOf(activeWritingStory.stage) : -1
+  const writingProgress = writingProgressIndex >= 0 ? (writingProgressIndex + 1) / WRITING_STAGE_ORDER.length : 0
   const writingDomain        = domains.find(d => d.name.trim().toLowerCase() === 'écriture')
 
   // Books: lus cette année (BookCritique.dateLecture = YYYY-MM-DD)
@@ -584,10 +595,11 @@ export function Dashboard() {
       let secondary = nextTask ? `Prochain : ${fmtDate(nextTask.dueDate!)}` : ''
 
       if (n === 'écriture') {
-        const sessions = writing.dailySessions.filter(s => s.date >= waStr).length
-        primary   = writing.chapterTotal > 0 ? `${writing.chapterCurrent}` : String(active.length)
-        unit      = writing.chapterTotal > 0 ? `sur ${writing.chapterTotal} chapitres` : (active.length === 1 ? 'tâche active' : 'tâches actives')
-        secondary = activeArc ? `Arc : ${activeArc.name} · ${sessions} sessions/7j` : ''
+        const currentStory = writing.stories.find((story) => story.status === 'active')
+        const sessions = currentStory?.sessions.filter((session) => session.date >= waStr).length ?? 0
+        primary   = currentStory ? String(currentStory.sessions.length) : String(active.length)
+        unit      = currentStory ? 'sessions' : (active.length === 1 ? 'tâche active' : 'tâches actives')
+        secondary = currentStory ? `${currentStory.title} · ${sessions} sessions/7j` : ''
       }
       else if (n === 'droit') {
         const goD = daysUntil(law.grandOralDate)
@@ -637,7 +649,7 @@ export function Dashboard() {
       map[d.id] = { primary, unit, secondary }
     }
     return map
-  }, [domains, tasks, writing, law, career, sport, music, films, books, shopping, monthStr, waStr, activeArc, sportSessionsWeek])
+  }, [domains, tasks, writing, law, career, sport, music, films, books, shopping, monthStr, waStr, sportSessionsWeek])
 
   // Pomodoro
   const launchPom = (taskId: string) => {
@@ -687,22 +699,20 @@ export function Dashboard() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
           {/* Writing */}
           <OngoingCard
-            label={activeArc ? `Arc · ${activeArc.name}` : 'Écriture'}
-            title={writing.chapterTotal > 0
-              ? `Chapitre ${writing.chapterCurrent} / ${writing.chapterTotal}`
+            label={activeWritingStory ? 'Nouvelle en cours' : 'Écriture'}
+            title={activeWritingStory
+              ? activeWritingStory.title
               : writingSessionsTotal > 0
               ? `${writingSessionsTotal} session${writingSessionsTotal > 1 ? 's' : ''} enregistrée${writingSessionsTotal > 1 ? 's' : ''}`
               : 'Pas encore démarré'}
-            meta={writing.lastSentence
-              ? `« ${trunc(writing.lastSentence, 10)} »`
+            meta={activeWritingStory?.nextAction
+              ? trunc(activeWritingStory.nextAction, 10)
               : writingSessionsWeek > 0
               ? `${writingSessionsWeek} session${writingSessionsWeek > 1 ? 's' : ''} cette semaine`
               : 'Aucune session cette semaine'}
             kicker={lastWritingDays === null ? 'Pas encore' : lastWritingDays === 0 ? "Aujourd'hui" : `il y a ${lastWritingDays}j`}
-            progress={writing.chapterTotal > 0 ? writing.chapterCurrent / writing.chapterTotal : 0}
-            progressLabel={writing.chapterTotal > 0
-              ? `${Math.round((writing.chapterCurrent / writing.chapterTotal) * 100)}% du premier jet`
-              : 'Jalons non configurés'}
+            progress={writingProgress}
+            progressLabel={activeWritingStory ? 'progression narrative' : 'aucune nouvelle active'}
             icon={writingIcon}
             onClick={() => writingDomain ? navigate(`/domain/${writingDomain.id}`) : undefined}
           />

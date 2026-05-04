@@ -1,205 +1,179 @@
 import { nanoid } from '../utils/nanoid'
 import { createPersistedStore } from '../lib/persistenceManager'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+export type WritingStage =
+  | 'idea'
+  | 'opening'
+  | 'development'
+  | 'ending-found'
+  | 'draft-complete'
+  | 'revision'
+  | 'done'
 
-export interface WritingArc {
-  id:          string
-  name:        string
-  description: string
-  philosopher?: string
-  isActive:    boolean
-  order:       number
+export type StoryStatus = 'active' | 'queued' | 'done'
+
+export type WritingSession = {
+  id: string
+  date: string
+  durationMinutes: number
+  note?: string
+  wordsWritten?: number
 }
 
-export interface WritingCharacter {
-  id:                  string
-  name:                string
-  deathSurvival:       string   // façon de mourir/survivre
-  relationToHadrie:    string
-  revealsAboutHadrie:  string
-  philosophy?:         string
-  createdAt:           string
+export type Story = {
+  id: string
+  title: string
+  status: StoryStatus
+  stage: WritingStage
+  currentPoint?: string
+  nextAction?: string
+  startedAt?: string
+  completedAt?: string
+  sessions: WritingSession[]
+  note?: string
 }
 
-export interface WritingFragment {
-  id:        string
-  text:      string
-  date:      string   // YYYY-MM-DD
-  createdAt: string
-}
-
-export interface DailySession {
-  id:        string
-  date:      string   // YYYY-MM-DD
-  text:      string
-  createdAt: string
-}
-
-export interface WritingCitation {
-  id:          string
-  type:        'citation' | 'extract' | 'reference'
-  text:        string
-  author?:     string
-  ownExtract?: boolean
-  createdAt:   string
-}
-
-// ─── State ────────────────────────────────────────────────────────────────────
+type StoryDraft = Omit<Story, 'id' | 'sessions'>
+type StoryPatch = Partial<Omit<Story, 'id' | 'sessions' | 'status'>>
+type SessionDraft = Omit<WritingSession, 'id'>
 
 export interface WritingState {
-  lastSentence:    string
-  moodKeywords:    string[]
-  chapterCurrent:  number
-  chapterTotal:    number
-  arcs:            WritingArc[]
-  characters:      WritingCharacter[]
-  fragments:       WritingFragment[]
-  dailySessions:   DailySession[]
-  citations:       WritingCitation[]
+  stories: Story[]
 
-  updateLastSentence:    (sentence: string) => void
-  updateMood:            (keywords: string[]) => void
-  updateChapterProgress: (current: number, total: number) => void
-
-  addArc:            (arc: Omit<WritingArc, 'id'>) => void
-  updateArc:         (id: string, updates: Partial<Omit<WritingArc, 'id'>>) => void
-  deleteArc:         (id: string) => void
-  setActiveArc:      (id: string) => void
-  addArcPhilosopher: (id: string, philosopher: string) => void
-
-  addCharacter:    (char: Omit<WritingCharacter, 'id' | 'createdAt'>) => void
-  updateCharacter: (id: string, updates: Partial<Omit<WritingCharacter, 'id' | 'createdAt'>>) => void
-  deleteCharacter: (id: string) => void
-
-  addFragment:    (text: string) => void
-  deleteFragment: (id: string) => void
-
-  recordDailySession: (text: string) => void
-
-  addCitation:    (citation: Omit<WritingCitation, 'id' | 'createdAt'>) => void
-  deleteCitation: (id: string) => void
+  addStory: (story: StoryDraft) => { ok: boolean; reason?: string }
+  updateStory: (id: string, patch: StoryPatch) => void
+  activateStory: (id: string) => { ok: boolean; reason?: string }
+  completeStory: (id: string, patch?: Pick<Story, 'note' | 'completedAt'>) => void
+  addSession: (storyId: string, session: SessionDraft) => { ok: boolean; reason?: string }
+  deleteSession: (storyId: string, sessionId: string) => void
 }
 
-// ─── Defaults ─────────────────────────────────────────────────────────────────
+const today = () => new Date().toISOString().split('T')[0]
 
-const DEFAULT_ARCS: WritingArc[] = [
-  { id: 'arc-1', name: 'Passivité',  description: "Hadrie subit. Le monde lui arrive dessus sans qu'il ne choisisse rien.", isActive: true,  order: 0 },
-  { id: 'arc-2', name: 'Survie',     description: "Le corps continue même quand l'esprit voudrait s'arrêter.",              isActive: false, order: 1 },
-  { id: 'arc-3', name: 'Conscience', description: "Hadrie commence à voir les règles du jeu. À les nommer.",               isActive: false, order: 2 },
-  { id: 'arc-4', name: 'Choix',      description: "Pour la première fois, Hadrie décide. Quelle qu'en soit le prix.",      isActive: false, order: 3 },
+const DEFAULT_STORIES: Story[] = [
+  {
+    id: 'story-active-1',
+    title: 'La chambre sans fenêtre',
+    status: 'active',
+    stage: 'development',
+    currentPoint: "La narratrice comprend que le silence de l'immeuble n'est pas une absence.",
+    nextAction: 'Écrire la scène où elle descend au troisième étage et trouve la porte déjà ouverte.',
+    startedAt: today(),
+    sessions: [
+      {
+        id: 'session-1',
+        date: today(),
+        durationMinutes: 45,
+        note: 'Mise en place du motif de la cage d’escalier.',
+        wordsWritten: 620,
+      },
+    ],
+  },
+  {
+    id: 'story-queued-1',
+    title: 'Le garçon qui gardait les clefs',
+    status: 'queued',
+    stage: 'idea',
+    currentPoint: 'Une idée de pacte minuscule, presque administratif.',
+    nextAction: 'Trouver le geste final.',
+    sessions: [],
+  },
 ]
 
-// ─── Store ────────────────────────────────────────────────────────────────────
-
-const now   = () => new Date().toISOString()
-const today = () => new Date().toISOString().split('T')[0]
+const hasActiveStory = (stories: Story[], exceptId?: string) =>
+  stories.some((story) => story.status === 'active' && story.id !== exceptId)
 
 export const useWritingStore = createPersistedStore<WritingState>(
   'aetheris-writing-v1',
-  (set) => ({
-      lastSentence:   '',
-      moodKeywords:   ['tension', 'absurde', 'silence', 'sang'],
-      chapterCurrent: 1,
-      chapterTotal:   12,
-      arcs:           DEFAULT_ARCS,
-      characters:     [],
-      fragments:      [],
-      dailySessions:  [],
-      citations:      [],
+  (set, get) => ({
+    stories: DEFAULT_STORIES,
 
-      // ── Novel meta ──────────────────────────────────────────────────────────
+    addStory: (story) => {
+      if (story.status === 'active' && hasActiveStory(get().stories)) {
+        return { ok: false, reason: 'Une nouvelle est déjà active.' }
+      }
 
-      updateLastSentence: (sentence) => set({ lastSentence: sentence }),
+      set((s) => ({
+        stories: [
+          {
+            id: nanoid(),
+            ...story,
+            startedAt: story.status === 'active' ? (story.startedAt || today()) : story.startedAt,
+            sessions: [],
+          },
+          ...s.stories,
+        ],
+      }))
 
-      updateMood: (keywords) => set({ moodKeywords: keywords }),
+      return { ok: true }
+    },
 
-      updateChapterProgress: (current, total) =>
-        set({ chapterCurrent: current, chapterTotal: total }),
+    updateStory: (id, patch) =>
+      set((s) => ({
+        stories: s.stories.map((story) => (story.id === id ? { ...story, ...patch } : story)),
+      })),
 
-      // ── Arcs ────────────────────────────────────────────────────────────────
+    activateStory: (id) => {
+      const stories = get().stories
+      if (hasActiveStory(stories, id)) return { ok: false, reason: 'Termine la nouvelle active avant d’en activer une autre.' }
 
-      addArc: (arc) =>
-        set((s) => ({ arcs: [...s.arcs, { id: nanoid(), ...arc }] })),
+      set((s) => ({
+        stories: s.stories.map((story) =>
+          story.id === id
+            ? {
+                ...story,
+                status: 'active',
+                startedAt: story.startedAt || today(),
+                completedAt: undefined,
+              }
+            : story,
+        ),
+      }))
 
-      updateArc: (id, updates) =>
-        set((s) => ({
-          arcs: s.arcs.map((a) => (a.id === id ? { ...a, ...updates } : a)),
-        })),
+      return { ok: true }
+    },
 
-      deleteArc: (id) =>
-        set((s) => ({ arcs: s.arcs.filter((a) => a.id !== id) })),
+    completeStory: (id, patch) =>
+      set((s) => ({
+        stories: s.stories.map((story) =>
+          story.id === id
+            ? {
+                ...story,
+                ...patch,
+                status: 'done',
+                stage: 'done',
+                completedAt: patch?.completedAt || today(),
+              }
+            : story,
+        ),
+      })),
 
-      setActiveArc: (id) =>
-        set((s) => ({
-          arcs: s.arcs.map((a) => ({ ...a, isActive: a.id === id })),
-        })),
+    addSession: (storyId, session) => {
+      const story = get().stories.find((item) => item.id === storyId)
+      if (!story || story.status !== 'active') return { ok: false, reason: 'Aucune nouvelle active.' }
+      if (!story.nextAction?.trim()) return { ok: false, reason: 'Définis une prochaine action avant de lancer une session.' }
 
-      addArcPhilosopher: (id, philosopher) =>
-        set((s) => ({
-          arcs: s.arcs.map((a) => (a.id === id ? { ...a, philosopher } : a)),
-        })),
+      set((s) => ({
+        stories: s.stories.map((item) =>
+          item.id === storyId
+            ? {
+                ...item,
+                sessions: [{ id: nanoid(), ...session }, ...item.sessions],
+              }
+            : item,
+        ),
+      }))
 
-      // ── Characters ──────────────────────────────────────────────────────────
+      return { ok: true }
+    },
 
-      addCharacter: (char) =>
-        set((s) => ({
-          characters: [...s.characters, { id: nanoid(), createdAt: now(), ...char }],
-        })),
-
-      updateCharacter: (id, updates) =>
-        set((s) => ({
-          characters: s.characters.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-        })),
-
-      deleteCharacter: (id) =>
-        set((s) => ({ characters: s.characters.filter((c) => c.id !== id) })),
-
-      // ── Fragments ───────────────────────────────────────────────────────────
-
-      addFragment: (text) =>
-        set((s) => ({
-          fragments: [
-            { id: nanoid(), text, date: today(), createdAt: now() },
-            ...s.fragments,
-          ],
-        })),
-
-      deleteFragment: (id) =>
-        set((s) => ({ fragments: s.fragments.filter((f) => f.id !== id) })),
-
-      // ── Daily sessions ──────────────────────────────────────────────────────
-
-      recordDailySession: (text) =>
-        set((s) => {
-          const t = today()
-          const exists = s.dailySessions.some((d) => d.date === t)
-          if (exists) {
-            return {
-              dailySessions: s.dailySessions.map((d) =>
-                d.date === t ? { ...d, text, createdAt: now() } : d,
-              ),
-            }
-          }
-          return {
-            dailySessions: [
-              { id: nanoid(), date: t, text, createdAt: now() },
-              ...s.dailySessions,
-            ],
-          }
-        }),
-
-      // ── Citations ───────────────────────────────────────────────────────────
-
-      addCitation: (citation) =>
-        set((s) => ({
-          citations: [
-            { id: nanoid(), createdAt: now(), ...citation },
-            ...s.citations,
-          ],
-        })),
-
-      deleteCitation: (id) =>
-        set((s) => ({ citations: s.citations.filter((c) => c.id !== id) })),
+    deleteSession: (storyId, sessionId) =>
+      set((s) => ({
+        stories: s.stories.map((story) =>
+          story.id === storyId
+            ? { ...story, sessions: story.sessions.filter((session) => session.id !== sessionId) }
+            : story,
+        ),
+      })),
   }),
 )
