@@ -714,7 +714,7 @@ export function Dashboard() {
             progress={writingProgress}
             progressLabel={activeWritingStory ? 'progression narrative' : 'aucune nouvelle active'}
             icon={writingIcon}
-            onClick={() => writingDomain ? navigate(`/domain/${writingDomain.id}`) : undefined}
+            onClick={() => navigate(writingDomain ? `/domain/${writingDomain.id}` : '/ecriture')}
           />
 
           {/* Books ou Music */}
