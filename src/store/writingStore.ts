@@ -1,50 +1,38 @@
 import { nanoid } from '../utils/nanoid'
 import { createPersistedStore } from '../lib/persistenceManager'
 
-export type WritingStage =
-  | 'idea'
-  | 'opening'
-  | 'development'
-  | 'ending-found'
-  | 'draft-complete'
-  | 'revision'
-  | 'done'
+export type StoryStatus = 'active' | 'idea' | 'done'
 
-export type StoryStatus = 'active' | 'queued' | 'done'
-
-export type WritingSession = {
+export type Session = {
   id: string
   date: string
-  durationMinutes: number
+  duration: number
   note?: string
-  wordsWritten?: number
 }
 
 export type Story = {
   id: string
   title: string
   status: StoryStatus
-  stage: WritingStage
+  stage: string
   currentPoint?: string
   nextAction?: string
-  startedAt?: string
+  sessions: Session[]
   completedAt?: string
-  sessions: WritingSession[]
-  note?: string
 }
 
-type StoryDraft = Omit<Story, 'id' | 'sessions'>
+type StoryInput = Omit<Story, 'id' | 'sessions'>
 type StoryPatch = Partial<Omit<Story, 'id' | 'sessions' | 'status'>>
-type SessionDraft = Omit<WritingSession, 'id'>
+type SessionInput = Omit<Session, 'id' | 'date'>
 
-export interface WritingState {
+export type WritingStore = {
   stories: Story[]
 
-  addStory: (story: StoryDraft) => { ok: boolean; reason?: string }
-  updateStory: (id: string, patch: StoryPatch) => void
-  activateStory: (id: string) => { ok: boolean; reason?: string }
-  completeStory: (id: string, patch?: Pick<Story, 'note' | 'completedAt'>) => void
-  addSession: (storyId: string, session: SessionDraft) => { ok: boolean; reason?: string }
+  setActiveStory: (patch: StoryPatch) => void
+  addIdea: (title: string) => void
+  activateIdea: (id: string) => { ok: boolean; reason?: string }
+  completeActiveStory: () => void
+  addSessionToActive: (input: SessionInput) => { ok: boolean; reason?: string }
   deleteSession: (storyId: string, sessionId: string) => void
 }
 
@@ -55,121 +43,110 @@ const DEFAULT_STORIES: Story[] = [
     id: 'story-active-1',
     title: 'La chambre sans fenêtre',
     status: 'active',
-    stage: 'development',
+    stage: 'développement',
     currentPoint: "La narratrice comprend que le silence de l'immeuble n'est pas une absence.",
     nextAction: 'Écrire la scène où elle descend au troisième étage et trouve la porte déjà ouverte.',
-    startedAt: today(),
     sessions: [
       {
         id: 'session-1',
         date: today(),
-        durationMinutes: 45,
-        note: 'Mise en place du motif de la cage d’escalier.',
-        wordsWritten: 620,
+        duration: 45,
+        note: 'Cage d’escalier et motif de la porte.',
       },
     ],
   },
   {
-    id: 'story-queued-1',
+    id: 'story-idea-1',
     title: 'Le garçon qui gardait les clefs',
-    status: 'queued',
-    stage: 'idea',
-    currentPoint: 'Une idée de pacte minuscule, presque administratif.',
-    nextAction: 'Trouver le geste final.',
+    status: 'idea',
+    stage: 'idée',
     sessions: [],
   },
 ]
 
-const hasActiveStory = (stories: Story[], exceptId?: string) =>
-  stories.some((story) => story.status === 'active' && story.id !== exceptId)
+const hasActiveStory = (stories: Story[]) => stories.some((story) => story.status === 'active')
 
-export const useWritingStore = createPersistedStore<WritingState>(
+export const useWritingStore = createPersistedStore<WritingStore>(
   'aetheris-writing-v1',
   (set, get) => ({
     stories: DEFAULT_STORIES,
 
-    addStory: (story) => {
-      if (story.status === 'active' && hasActiveStory(get().stories)) {
-        return { ok: false, reason: 'Une nouvelle est déjà active.' }
-      }
+    setActiveStory: (patch) =>
+      set((state) => {
+        const active = state.stories.find((story) => story.status === 'active')
+        if (!active) {
+          const input: StoryInput = {
+            title: patch.title?.trim() || 'Nouvelle sans titre',
+            status: 'active',
+            stage: patch.stage || 'idée',
+            currentPoint: patch.currentPoint,
+            nextAction: patch.nextAction,
+            completedAt: patch.completedAt,
+          }
+          return {
+            stories: [{ id: nanoid(), ...input, sessions: [] }, ...state.stories],
+          }
+        }
 
-      set((s) => ({
+        return {
+          stories: state.stories.map((story) =>
+            story.id === active.id ? { ...story, ...patch, status: 'active' } : story,
+          ),
+        }
+      }),
+
+    addIdea: (title) => {
+      const cleanTitle = title.trim()
+      if (!cleanTitle) return
+      set((state) => ({
         stories: [
-          {
-            id: nanoid(),
-            ...story,
-            startedAt: story.status === 'active' ? (story.startedAt || today()) : story.startedAt,
-            sessions: [],
-          },
-          ...s.stories,
+          { id: nanoid(), title: cleanTitle, status: 'idea', stage: 'idée', sessions: [] },
+          ...state.stories,
         ],
       }))
-
-      return { ok: true }
     },
 
-    updateStory: (id, patch) =>
-      set((s) => ({
-        stories: s.stories.map((story) => (story.id === id ? { ...story, ...patch } : story)),
-      })),
-
-    activateStory: (id) => {
+    activateIdea: (id) => {
       const stories = get().stories
-      if (hasActiveStory(stories, id)) return { ok: false, reason: 'Termine la nouvelle active avant d’en activer une autre.' }
+      if (hasActiveStory(stories)) return { ok: false, reason: 'Une nouvelle est déjà active.' }
 
-      set((s) => ({
-        stories: s.stories.map((story) =>
-          story.id === id
-            ? {
-                ...story,
-                status: 'active',
-                startedAt: story.startedAt || today(),
-                completedAt: undefined,
-              }
-            : story,
+      set((state) => ({
+        stories: state.stories.map((story) =>
+          story.id === id ? { ...story, status: 'active' } : story,
         ),
       }))
-
       return { ok: true }
     },
 
-    completeStory: (id, patch) =>
-      set((s) => ({
-        stories: s.stories.map((story) =>
-          story.id === id
-            ? {
-                ...story,
-                ...patch,
-                status: 'done',
-                stage: 'done',
-                completedAt: patch?.completedAt || today(),
-              }
+    completeActiveStory: () =>
+      set((state) => ({
+        stories: state.stories.map((story) =>
+          story.status === 'active'
+            ? { ...story, status: 'done', stage: 'terminé', completedAt: today() }
             : story,
         ),
       })),
 
-    addSession: (storyId, session) => {
-      const story = get().stories.find((item) => item.id === storyId)
-      if (!story || story.status !== 'active') return { ok: false, reason: 'Aucune nouvelle active.' }
-      if (!story.nextAction?.trim()) return { ok: false, reason: 'Définis une prochaine action avant de lancer une session.' }
+    addSessionToActive: (input) => {
+      const active = get().stories.find((story) => story.status === 'active')
+      if (!active) return { ok: false, reason: 'Aucune nouvelle active.' }
 
-      set((s) => ({
-        stories: s.stories.map((item) =>
-          item.id === storyId
+      set((state) => ({
+        stories: state.stories.map((story) =>
+          story.id === active.id
             ? {
-                ...item,
-                sessions: [{ id: nanoid(), ...session }, ...item.sessions],
+                ...story,
+                sessions: [{ id: nanoid(), date: today(), ...input }, ...story.sessions],
               }
-            : item,
+            : story,
         ),
       }))
-
       return { ok: true }
     },
 
     deleteSession: (storyId, sessionId) =>
-      set((s) => ({
-        stories: s.stories.map((story) =>
+      set((state) => ({
+        stories: state.stories.map((story) =>
           story.id === storyId
             ? { ...story, sessions: story.sessions.filter((session) => session.id !== sessionId) }
             : story,

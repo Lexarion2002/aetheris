@@ -45,7 +45,7 @@ const weekAgoStr = () => { const d = new Date(); d.setDate(d.getDate() - 7); ret
 const fmtDate    = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-const WRITING_STAGE_ORDER = ['idea', 'opening', 'development', 'ending-found', 'draft-complete', 'revision', 'done']
+const WRITING_STAGE_ORDER = ['idée', 'ouverture', 'développement', 'fin', 'jet', 'révision', 'terminé']
 
 function trunc(text: string, max: number): string {
   const words = text.trim().split(/\s+/)
