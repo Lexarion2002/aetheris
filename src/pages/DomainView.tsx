@@ -6,7 +6,7 @@ import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import { TaskFormModal }      from '../components/TaskFormModal'
 import { ObjectiveFormModal } from '../components/ObjectiveFormModal'
 import { WritingView }        from './WritingView'
-import { LawView }           from './LawView'
+import { LawPage }            from './LawPage'
 import { CareerView }        from './CareerView'
 import { SportView }         from './SportView'
 import { MusicPage }         from './MusicPage'
@@ -677,8 +677,8 @@ export function DomainView() {
   // Dispatch to WritingView for the Écriture domain
   if (domain.name.trim().toLowerCase() === 'écriture') return <WritingView />
 
-  // Dispatch to LawView for the Droit domain
-  if (domain.name.trim().toLowerCase() === 'droit') return <LawView />
+  // Dispatch to LawPage for the Droit domain
+  if (domain.name.trim().toLowerCase() === 'droit') return <LawPage />
 
   // Dispatch to CareerView for the Carrière domain
   if (domain.name.trim().toLowerCase() === 'carrière') return <CareerView />

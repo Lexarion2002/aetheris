@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine } from 'lucide-react'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine, Scale } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -18,7 +18,7 @@ const daysUntil = (iso: string | null | undefined): number | null => {
 function computeDomainUrgency(
   domain: Domain,
   tasks: Task[],
-  law: { grandOralDate: string | null; rapportDate: string | null },
+  law: { keyDates: Array<{ date: string }> },
   career: { missions: Array<{ deadline: string | null }> },
 ): UrgencyLevel {
   const domainTasks = tasks.filter(
@@ -31,10 +31,11 @@ function computeDomainUrgency(
   const name = domain.name.trim().toLowerCase()
 
   if (name === 'droit') {
-    const go = daysUntil(law.grandOralDate)
-    const rp = daysUntil(law.rapportDate)
-    if ((go !== null && go <= 7) || (rp !== null && rp <= 7)) return 'critical'
-    if ((go !== null && go <= 21) || (rp !== null && rp <= 21)) return 'important'
+    const lawDays = law.keyDates
+      .map((keyDate) => daysUntil(keyDate.date))
+      .filter((d): d is number => d !== null && d >= 0)
+    if (lawDays.some((d) => d <= 7)) return 'critical'
+    if (lawDays.some((d) => d <= 21)) return 'important'
   }
 
   if (name === 'carrière') {
@@ -102,6 +103,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
   const law      = useLawStore()
   const career   = useCareerStore()
   const hasWritingDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'écriture')
+  const hasLawDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'droit')
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col bg-[var(--bg-elev)] border-r border-[var(--border)] py-4 px-3 gap-0.5 overflow-y-auto">
@@ -268,6 +270,22 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           >
             <PenLine size={14} className="shrink-0" />
             <span className="truncate">Écriture</span>
+          </NavLink>
+        )}
+        {!hasLawDomain && (
+          <NavLink to="/droit" onClick={onNavigate}
+            className={({ isActive }) =>
+              [
+                'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+                'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
+                isActive
+                  ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                  : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
+              ].join(' ')
+            }
+          >
+            <Scale size={14} className="shrink-0" />
+            <span className="truncate">Droit</span>
           </NavLink>
         )}
       </div>

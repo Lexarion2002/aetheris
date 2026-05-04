@@ -84,7 +84,7 @@ function computeTodayActions(
   domains: Domain[],
   tasks: Task[],
   missions: Array<{ id: string; sujet: string; deadline: string | null; stade: string }>,
-  law: { grandOralDate: string | null; rapportDate: string | null },
+  law: { keyDates: Array<{ title: string; date: string }> },
   cabinetTaches: CabinetTache[],
 ): TodayAction[] {
   const actions: TodayAction[] = []
@@ -106,13 +106,10 @@ function computeTodayActions(
       actions.push({ label: `Mission : ${trunc(m.sujet, 5)}`, domain: 'Carrière', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
     })
 
-  ;[
-    { label: 'Grand Oral',       date: law.grandOralDate },
-    { label: 'Rapport de stage', date: law.rapportDate   },
-  ].forEach(({ label, date }) => {
+  law.keyDates.forEach(({ title, date }) => {
     const days = daysUntil(date)
     if (days === null || days > 7) return
-    actions.push({ label, domain: 'Droit', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
+    actions.push({ label: title, domain: 'Droit', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
   })
 
   // Source 4 : tâches cabinet — avec échéance dans les 7j OU urgentes sans date
@@ -537,7 +534,7 @@ export function Dashboard() {
 
   const todayActions = useMemo(
     () => computeTodayActions(domains, tasks, career.missions, law, cabinetTaches),
-    [domains, tasks, career.missions, law.grandOralDate, law.rapportDate, cabinetTaches],
+    [domains, tasks, career.missions, law, cabinetTaches],
   )
 
   // Writing
@@ -602,10 +599,15 @@ export function Dashboard() {
         secondary = currentStory ? `${currentStory.title} · ${sessions} sessions/7j` : ''
       }
       else if (n === 'droit') {
-        const goD = daysUntil(law.grandOralDate)
-        secondary = goD !== null
-          ? (goD === 0 ? "Grand Oral : aujourd'hui !" : goD > 0 ? `Grand Oral : J−${goD}` : 'Grand Oral passé')
-          : law.globalStatus ? `Stade : ${law.globalStatus}` : ''
+        const nextDate = law.keyDates
+          .filter((keyDate) => keyDate.date)
+          .sort((a, b) => a.date.localeCompare(b.date))[0]
+        const nextDays = nextDate ? daysUntil(nextDate.date) : null
+        primary = String(law.subjects.length)
+        unit = law.subjects.length === 1 ? 'matière' : 'matières'
+        secondary = nextDate
+          ? `${nextDate.title} : ${nextDays === 0 ? "aujourd'hui" : nextDays !== null && nextDays > 0 ? `J−${nextDays}` : 'passé'}`
+          : law.statusNote ? trunc(law.statusNote, 6) : ''
       }
       else if (n === 'carrière') {
         const actMissions = career.missions.filter(m => m.stade !== 'rendu').length

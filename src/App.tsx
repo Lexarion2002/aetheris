@@ -29,6 +29,7 @@ const FilmsSeriesPage   = lazy(() => import('./pages/FilmsSeriesPage').then((m) 
 const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ default: m.BooksPage })))
 const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => ({ default: m.CabinetPage })))
 const WritingView       = lazy(() => import('./pages/WritingView').then((m) => ({ default: m.WritingView })))
+const LawPage           = lazy(() => import('./pages/LawPage').then((m) => ({ default: m.LawPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -149,6 +150,7 @@ export default function App() {
           <Route path="livres"   element={<Suspense fallback={<PageLoader />}><BooksPage /></Suspense>} />
           <Route path="cabinet" element={<Suspense fallback={<PageLoader />}><CabinetPage /></Suspense>} />
           <Route path="ecriture" element={<Suspense fallback={<PageLoader />}><WritingView /></Suspense>} />
+          <Route path="droit" element={<Suspense fallback={<PageLoader />}><LawPage /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>
