@@ -20,7 +20,11 @@ export interface CabinetDossier {
   urgent:    boolean
   domaine:   string
   createdAt: string
+  updatedAt?: string
 }
+
+type CabinetDossierInput = Omit<CabinetDossier, 'id' | 'createdAt' | 'updatedAt'>
+type CabinetDossierPatch = Partial<Omit<CabinetDossier, 'id' | 'createdAt' | 'ref'>>
 
 export interface CabinetTache {
   id:         string
@@ -61,8 +65,9 @@ interface CabinetState {
   notes:    CabinetNote[]
   contacts: CabinetContact[]
 
-  addDossier:    (d: Omit<CabinetDossier, 'id' | 'createdAt'>) => void
-  updateDossier: (id: string, updates: Partial<Omit<CabinetDossier, 'id' | 'createdAt'>>) => void
+  addDossier:    (d: CabinetDossierInput) => void
+  updateCase:    (id: string, patch: CabinetDossierPatch) => void
+  updateDossier: (id: string, updates: CabinetDossierPatch) => void
   removeDossier: (id: string) => void
 
   addTache:    (t: Omit<CabinetTache, 'id' | 'createdAt'>) => void
@@ -88,8 +93,10 @@ export const useCabinetStore = createPersistedStore<CabinetState>(
 
     addDossier: (d) =>
       set((s) => ({
-        dossiers: [{ ...d, id: crypto.randomUUID(), createdAt: new Date().toISOString() }, ...s.dossiers],
+        dossiers: [{ ...d, id: crypto.randomUUID(), createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, ...s.dossiers],
       })),
+    updateCase: (id, patch) =>
+      set((s) => ({ dossiers: s.dossiers.map((d) => d.id === id ? { ...d, ...patch } : d) })),
     updateDossier: (id, updates) =>
       set((s) => ({ dossiers: s.dossiers.map((d) => d.id === id ? { ...d, ...updates } : d) })),
     removeDossier: (id) =>

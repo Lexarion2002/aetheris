@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import {
   Plus, Archive, Users, Flame, Circle, CircleDashed,
-  AtSign, Mail, Check, Trash2,
+  AtSign, Mail, Check, Trash2, Pencil,
 } from 'lucide-react'
 import { useCabinetStore } from '../store/cabinetStore'
 import type {
@@ -108,11 +108,11 @@ function chipOpts<T extends string>(
   )
 }
 
-function ModalButtons({ onCancel, onSubmit, disabled }: { onCancel: () => void; onSubmit: () => void; disabled?: boolean }) {
+function ModalButtons({ onCancel, onSubmit, disabled, submitLabel = 'Ajouter' }: { onCancel: () => void; onSubmit: () => void; disabled?: boolean; submitLabel?: string }) {
   return (
     <div style={{ display: 'flex', gap: 10, paddingTop: 4 }}>
       <button onClick={onCancel} style={{ flex: 1, padding: 10, borderRadius: 'var(--r-md)', border: '1px solid var(--border)', background: 'transparent', color: 'var(--ink-2)', fontFamily: 'var(--font-sans)', fontSize: 14, cursor: 'pointer' }}>Annuler</button>
-      <button onClick={onSubmit} disabled={disabled} style={{ flex: 1, padding: 10, borderRadius: 'var(--r-md)', border: 'none', background: 'var(--terra)', color: 'var(--paper-1)', fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: disabled ? 0.4 : 1 }}>Ajouter</button>
+      <button onClick={onSubmit} disabled={disabled} style={{ flex: 1, padding: 10, borderRadius: 'var(--r-md)', border: 'none', background: 'var(--terra)', color: 'var(--paper-1)', fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, cursor: 'pointer', opacity: disabled ? 0.4 : 1 }}>{submitLabel}</button>
     </div>
   )
 }
@@ -134,21 +134,37 @@ function SectionHeader({ eyebrow, title, count, action }: {
   )
 }
 
-// ─── ModalAddDossier ──────────────────────────────────────────────────────────
+// ─── CaseModal ────────────────────────────────────────────────────────────────
 
-function ModalAddDossier({ onClose }: { onClose: () => void }) {
-  const { dossiers, addDossier } = useCabinetStore()
-  const [nom,      setNom]      = useState('')
-  const [avocat,   setAvocat]   = useState('')
-  const [domaine,  setDomaine]  = useState('')
-  const [type,     setType]     = useState<DossierType>('contentieux')
-  const [statut,   setStatut]   = useState<DossierStatut>('en cours')
-  const [deadline, setDeadline] = useState('')
-  const [urgent,   setUrgent]   = useState(false)
+function CaseModal({ mode, dossier, onClose }: {
+  mode: 'create' | 'edit'
+  dossier: CabinetDossier | null
+  onClose: () => void
+}) {
+  const { dossiers, addDossier, updateCase } = useCabinetStore()
+  const isEdit = mode === 'edit' && dossier
+  const [nom,      setNom]      = useState(dossier?.nom ?? '')
+  const [avocat,   setAvocat]   = useState(dossier?.avocat ?? '')
+  const [domaine,  setDomaine]  = useState(dossier?.domaine ?? '')
+  const [type,     setType]     = useState<DossierType>(dossier?.type ?? 'contentieux')
+  const [statut,   setStatut]   = useState<DossierStatut>(dossier?.statut ?? 'en cours')
+  const [deadline, setDeadline] = useState(dossier?.deadline ?? '')
 
   function handleSubmit() {
     if (!nom.trim()) return
-    addDossier({ ref: genRef(dossiers), nom: nom.trim(), avocat: avocat.trim(), domaine: domaine.trim(), type, statut, deadline, urgent })
+    if (isEdit) {
+      updateCase(dossier.id, {
+        nom: nom.trim(),
+        avocat: avocat.trim(),
+        domaine: domaine.trim(),
+        type,
+        statut,
+        deadline,
+        updatedAt: new Date().toISOString(),
+      })
+    } else {
+      addDossier({ ref: genRef(dossiers), nom: nom.trim(), avocat: avocat.trim(), domaine: domaine.trim(), type, statut, deadline, urgent: false })
+    }
     onClose()
   }
 
@@ -156,20 +172,22 @@ function ModalAddDossier({ onClose }: { onClose: () => void }) {
     <div style={mOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
       <div style={mBox}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, color: 'var(--ink)', margin: 0 }}>Nouveau dossier</h2>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, color: 'var(--ink)', margin: 0 }}>{isEdit ? 'Modifier le dossier' : 'Nouveau dossier'}</h2>
           <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 20, cursor: 'pointer' }}>×</button>
         </div>
-        <div style={mRow}><span style={mLabel}>Nom du dossier *</span><input style={mInput} placeholder="Ex : Méridien Capital c/ Sofiprom" value={nom} onChange={(e) => setNom(e.target.value)} autoFocus /></div>
+        {isEdit && (
+          <div style={mRow}>
+            <span style={mLabel}>Référence</span>
+            <input style={{ ...mInput, color: 'var(--ink-3)', background: 'var(--paper-2)' }} value={dossier.ref} disabled />
+          </div>
+        )}
+        <div style={mRow}><span style={mLabel}>Titre du dossier *</span><input style={mInput} placeholder="Ex : Méridien Capital c/ Sofiprom" value={nom} onChange={(e) => setNom(e.target.value)} autoFocus /></div>
         <div style={mRow}><span style={mLabel}>Avocat référent</span><input style={mInput} placeholder="Ex : M. Marchais" value={avocat} onChange={(e) => setAvocat(e.target.value)} /></div>
-        <div style={mRow}><span style={mLabel}>Domaine</span><input style={mInput} placeholder="Ex : Commercial" value={domaine} onChange={(e) => setDomaine(e.target.value)} /></div>
+        <div style={mRow}><span style={mLabel}>Domaine / matière</span><input style={mInput} placeholder="Ex : Commercial" value={domaine} onChange={(e) => setDomaine(e.target.value)} /></div>
         <div style={mRow}><span style={mLabel}>Type</span>{chipOpts<DossierType>([['contentieux', 'Contentieux'], ['rédaction', 'Rédaction'], ['conseil', 'Conseil']], type, setType)}</div>
         <div style={mRow}><span style={mLabel}>Statut</span>{chipOpts<DossierStatut>([['en cours', 'En cours'], ['en attente', 'En attente'], ['clôturé', 'Clôturé']], statut, setStatut)}</div>
         <div style={mRow}><span style={mLabel}>Échéance</span><input type="date" style={mInput} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
-          <input type="checkbox" checked={urgent} onChange={(e) => setUrgent(e.target.checked)} />
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>Marquer comme urgent</span>
-        </label>
-        <ModalButtons onCancel={onClose} onSubmit={handleSubmit} disabled={!nom.trim()} />
+        <ModalButtons onCancel={onClose} onSubmit={handleSubmit} disabled={!nom.trim()} submitLabel={isEdit ? 'Enregistrer' : 'Ajouter'} />
       </div>
     </div>
   )
@@ -321,7 +339,7 @@ function ModalAddContact({ onClose }: { onClose: () => void }) {
 
 // ─── DossiersSection ─────────────────────────────────────────────────────────
 
-function DossiersSection({ onAdd }: { onAdd: () => void }) {
+function DossiersSection({ onAdd, onEdit }: { onAdd: () => void; onEdit: (dossier: CabinetDossier) => void }) {
   const dossiers      = useCabinetStore((s) => s.dossiers)
   const removeDossier = useCabinetStore((s) => s.removeDossier)
   const [filter, setFilter] = useState<'tous' | DossierStatut>('tous')
@@ -359,19 +377,24 @@ function DossiersSection({ onAdd }: { onAdd: () => void }) {
           }}>{l}</button>
         ))}
       </div>
-      {filtered.length === 0 ? (
+      {dossiers.length === 0 ? (
+        <div style={{ padding: '34px 24px', textAlign: 'center', color: 'var(--ink-3)', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12 }}>
+          Aucun dossier pour le moment.
+        </div>
+      ) : filtered.length === 0 ? (
         <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-3)', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15 }}>
-          Aucun dossier
+          Aucun dossier dans ce filtre
         </div>
       ) : (
         <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '90px minmax(0,2.2fr) minmax(0,1.1fr) minmax(0,0.9fr) 110px 90px 40px', columnGap: 14, padding: '10px 18px', background: 'var(--paper)', borderBottom: '1px solid var(--paper-2)' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '90px minmax(0,2.2fr) minmax(0,1.1fr) minmax(0,0.9fr) 110px 90px 72px', columnGap: 14, padding: '10px 18px', background: 'var(--paper)', borderBottom: '1px solid var(--paper-2)' }}>
             {['Référence', 'Dossier', 'Avocat référent', 'Type', 'Statut', 'Échéance', ''].map((h, i) => (
               <span key={i} style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>{h}</span>
             ))}
           </div>
           {filtered.map((d, i) => (
             <DossierRow key={d.id} dossier={d} last={i === filtered.length - 1}
+              onEdit={() => onEdit(d)}
               onRemove={() => removeDossier(d.id)} />
           ))}
         </div>
@@ -380,8 +403,8 @@ function DossiersSection({ onAdd }: { onAdd: () => void }) {
   )
 }
 
-function DossierRow({ dossier, last, onRemove }: {
-  dossier: CabinetDossier; last: boolean; onRemove: () => void
+function DossierRow({ dossier, last, onEdit, onRemove }: {
+  dossier: CabinetDossier; last: boolean; onEdit: () => void; onRemove: () => void
 }) {
   const [hover, setHover] = useState(false)
   const closed = dossier.statut === 'clôturé'
@@ -395,9 +418,10 @@ function DossierRow({ dossier, last, onRemove }: {
 
   return (
     <div
+      onClick={onEdit}
       onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
       style={{
-        display: 'grid', gridTemplateColumns: '90px minmax(0,2.2fr) minmax(0,1.1fr) minmax(0,0.9fr) 110px 90px 40px',
+        display: 'grid', gridTemplateColumns: '90px minmax(0,2.2fr) minmax(0,1.1fr) minmax(0,0.9fr) 110px 90px 72px',
         columnGap: 14, padding: '14px 18px', alignItems: 'center',
         borderBottom: last ? 'none' : '1px solid var(--paper-2)',
         background: hover ? 'var(--paper)' : 'transparent',
@@ -421,6 +445,10 @@ function DossierRow({ dossier, last, onRemove }: {
         {fmtDate(dossier.deadline)}
       </span>
       <div style={{ display: 'flex', gap: 4, opacity: hover ? 1 : 0, transition: 'opacity var(--dur) var(--ease)' }}>
+        <button aria-label="Modifier le dossier" title="Modifier" onClick={(e) => { e.stopPropagation(); onEdit() }}
+          style={{ width: 26, height: 26, borderRadius: 6, background: 'transparent', border: '1px solid var(--paper-2)', color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
+          <Pencil size={12} />
+        </button>
         <button onClick={(e) => { e.stopPropagation(); onRemove() }}
           style={{ width: 26, height: 26, borderRadius: 6, background: 'transparent', border: '1px solid var(--paper-2)', color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center' }}>
           <Trash2 size={12} />
@@ -736,10 +764,30 @@ export function CabinetPage() {
   const dateShort = `${String(today.getDate()).padStart(2, '0')}.${String(today.getMonth() + 1).padStart(2, '0')}.${today.getFullYear()}`
   const dateLong  = `${JOURS[today.getDay()]} ${today.getDate()} ${MOIS[today.getMonth()]} ${today.getFullYear()}`
 
-  const [showAddDossier, setShowAddDossier] = useState(false)
+  const [selectedCase, setSelectedCase] = useState<CabinetDossier | null>(null)
+  const [isCaseModalOpen, setIsCaseModalOpen] = useState(false)
+  const [caseModalMode, setCaseModalMode] = useState<'create' | 'edit'>('create')
   const [showAddTache,   setShowAddTache]   = useState(false)
   const [showAddNote,    setShowAddNote]    = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
+
+  function openCreateCaseModal() {
+    setSelectedCase(null)
+    setCaseModalMode('create')
+    setIsCaseModalOpen(true)
+  }
+
+  function openEditCaseModal(dossier: CabinetDossier) {
+    setSelectedCase(dossier)
+    setCaseModalMode('edit')
+    setIsCaseModalOpen(true)
+  }
+
+  function closeCaseModal() {
+    setIsCaseModalOpen(false)
+    setSelectedCase(null)
+    setCaseModalMode('create')
+  }
 
   return (
     <div style={{ padding: '32px 48px 96px', maxWidth: 1180, margin: '0 auto' }}>
@@ -766,13 +814,13 @@ export function CabinetPage() {
       </div>
 
       {/* ── Sections ────────────────────────────────────────────────────────── */}
-      <DossiersSection onAdd={() => setShowAddDossier(true)} />
+      <DossiersSection onAdd={openCreateCaseModal} onEdit={openEditCaseModal} />
       <TachesSection   onAdd={() => setShowAddTache(true)} />
       <NotesSection    onAdd={() => setShowAddNote(true)} />
       <ContactsSection onAdd={() => setShowAddContact(true)} />
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
-      {showAddDossier && <ModalAddDossier onClose={() => setShowAddDossier(false)} />}
+      {isCaseModalOpen && <CaseModal mode={caseModalMode} dossier={selectedCase} onClose={closeCaseModal} />}
       {showAddTache   && <ModalAddTache   onClose={() => setShowAddTache(false)} />}
       {showAddNote    && <ModalAddNote    onClose={() => setShowAddNote(false)} />}
       {showAddContact && <ModalAddContact onClose={() => setShowAddContact(false)} />}
