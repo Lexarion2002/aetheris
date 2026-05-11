@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine, Scale } from 'lucide-react'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine, Scale, Music } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -104,6 +104,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
   const career   = useCareerStore()
   const hasWritingDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'écriture')
   const hasLawDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'droit')
+  const hasMusicDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'musique')
 
   return (
     <aside className="flex h-full w-56 shrink-0 flex-col bg-[var(--bg-elev)] border-r border-[var(--border)] py-4 px-3 gap-0.5 overflow-y-auto">
@@ -211,6 +212,22 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           <span className="text-sm w-4 text-center shrink-0">🍳</span>
           <span className="truncate">Cuisine</span>
         </NavLink>
+        {!hasMusicDomain && (
+          <NavLink to="/musique" onClick={onNavigate}
+            className={({ isActive }) =>
+              [
+                'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+                'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
+                isActive
+                  ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                  : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
+              ].join(' ')
+            }
+          >
+            <Music size={14} className="shrink-0" />
+            <span className="truncate">Musique</span>
+          </NavLink>
+        )}
         {/* Livres — page standalone */}
         <NavLink to="/livres" onClick={onNavigate}
           className={({ isActive }) =>
