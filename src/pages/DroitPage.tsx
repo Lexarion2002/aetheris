@@ -531,8 +531,8 @@ const CompactRow = ({
 }
 
 const ApresUrgent = ({
-  items, matieres, prep,
-}: { items: Echeance[]; matieres: Matiere[]; prep: Record<string, number> }) => {
+  items, matieres,
+}: { items: Echeance[]; matieres: Matiere[] }) => {
   const [open, setOpen] = useState(false)
   if (items.length === 0) return null
 
@@ -782,7 +782,7 @@ export function DroitPage() {
       {/* 4 — Mémoire */}
       <Memoire memoire={memoire} />
       {/* 5 — Après l'urgent */}
-      <ApresUrgent items={apresUrgent} matieres={matieres} prep={prep} />
+      <ApresUrgent items={apresUrgent} matieres={matieres} />
       {/* 6 — Référentiel */}
       <Referentiel notes={notes} biblio={biblio} matieres={matieres} />
     </div>
