@@ -146,8 +146,8 @@ const DistRow = ({ jour, h }: { jour: string; h: string }) => (
 )
 
 const Distribution = ({
-  surLeFeu, heuresTotal, prep,
-}: { surLeFeu: Echeance[]; heuresTotal: number; prep: Record<string, number> }) => {
+  surLeFeu, heuresTotal,
+}: { surLeFeu: Echeance[]; heuresTotal: number }) => {
   const semaineCount = surLeFeu.filter((e) => daysUntil(parseDate(e.date)) <= 7).length
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
@@ -261,7 +261,7 @@ const PrioritesSuggerees = ({
         {p2 && (
           <PrioBloc rang="puis" e={p2} matieres={matieres} notes={notes} prep={prep} />
         )}
-        <Distribution surLeFeu={surLeFeu} heuresTotal={heuresTotal} prep={prep} />
+        <Distribution surLeFeu={surLeFeu} heuresTotal={heuresTotal} />
       </div>
     </header>
   )
@@ -501,8 +501,8 @@ const Memoire = ({ memoire }: { memoire: MemoireType }) => {
 // ─── Section 5 : ApresUrgent ─────────────────────────────────────────────────
 
 const CompactRow = ({
-  e, last, matieres, prep,
-}: { e: Echeance; last: boolean; matieres: Matiere[]; prep: Record<string, number> }) => {
+  e, last, matieres,
+}: { e: Echeance; last: boolean; matieres: Matiere[] }) => {
   const m = matieres.find((mat) => mat.code === e.matiereCode)
   const d = daysUntil(parseDate(e.date))
   const date = parseDate(e.date)
@@ -562,7 +562,7 @@ const ApresUrgent = ({
           {items.map((e, i) => (
             <CompactRow
               key={e.id} e={e} last={i === items.length - 1}
-              matieres={matieres} prep={prep}
+              matieres={matieres}
             />
           ))}
         </div>
