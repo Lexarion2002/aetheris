@@ -66,8 +66,11 @@ export interface DroitStore {
   // actions
   setPrep: (id: string, value: number) => void
   updateEcheance: (id: string, data: Partial<Echeance>) => void
+  addEcheance: (data: Omit<Echeance, 'id'>) => void
   addNote: (note: NotesDroit) => void
   updateMemoire: (data: Partial<Memoire>) => void
+  updateMatierePrep: (code: string, prepValue: number) => void
+  addBiblioItem: (matiere: string, item: BiblioItem) => void
 }
 
 // ─── Données initiales ────────────────────────────────────────────────────────
@@ -184,8 +187,8 @@ const DEFAULT_BIBLIO: BiblioDroit[] = [
   },
   {
     matiere: 'FISC', items: [
-      { type: 'Code',   auteur: 'CGI',              titre: 'Art. 145, 209, 219, 223 A',              meta: 'LF 2026' },
-      { type: 'Manuel', auteur: 'Cozian, Deboissy',  titre: 'Précis de fiscalité des entreprises',   meta: '49ᵉ éd., 2025' },
+      { type: 'Code',   auteur: 'CGI',             titre: 'Art. 145, 209, 219, 223 A',            meta: 'LF 2026' },
+      { type: 'Manuel', auteur: 'Cozian, Deboissy', titre: 'Précis de fiscalité des entreprises',  meta: '49ᵉ éd., 2025' },
     ],
   },
   {
@@ -224,17 +227,46 @@ export const useDroitStore = createPersistedStore<DroitStore>(
     memoire:   DEFAULT_MEMOIRE,
 
     setPrep: (id, value) =>
-      set((s) => ({ prep: { ...s.prep, [id]: value } })),
+      set((s) => ({ prep: { ...s.prep, [id]: Math.min(100, Math.max(0, value)) } })),
 
     updateEcheance: (id, data) =>
       set((s) => ({
         echeances: s.echeances.map((e) => (e.id === id ? { ...e, ...data } : e)),
       })),
 
+    addEcheance: (data) =>
+      set((s) => {
+        const id = crypto.randomUUID()
+        return {
+          echeances: [...s.echeances, { id, ...data }],
+          prep: { ...s.prep, [id]: 0 },
+        }
+      }),
+
     addNote: (note) =>
       set((s) => ({ notes: [note, ...s.notes] })),
 
     updateMemoire: (data) =>
       set((s) => ({ memoire: { ...s.memoire, ...data } })),
+
+    updateMatierePrep: (code, prepValue) =>
+      set((s) => ({
+        matieres: s.matieres.map((m) =>
+          m.code === code ? { ...m, prep: Math.min(100, Math.max(0, prepValue)) } : m,
+        ),
+      })),
+
+    addBiblioItem: (matiere, item) =>
+      set((s) => {
+        const exists = s.biblio.some((g) => g.matiere === matiere)
+        if (exists) {
+          return {
+            biblio: s.biblio.map((g) =>
+              g.matiere === matiere ? { ...g, items: [...g.items, item] } : g,
+            ),
+          }
+        }
+        return { biblio: [...s.biblio, { matiere, items: [item] }] }
+      }),
   }),
 )

@@ -1,13 +1,48 @@
-import { useState } from 'react'
-import { Scale, BookOpen, Library, ExternalLink } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Scale, BookOpen, Library, ExternalLink, Plus, X } from 'lucide-react'
 import { useDroitStore } from '../store/droitStore'
 import type { Matiere, NotesDroit, BiblioDroit, Memoire as MemoireType, Jalon as JalonType } from '../store/droitStore'
-import type { Echeance } from '../lib/droitEngine'
+import type { Echeance, TypeEcheance } from '../lib/droitEngine'
 import { daysUntil, urgencyScore, isOnFire, heuresRestantes, parseDate } from '../lib/droitEngine'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const MONTH_SHORT = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] as const
+const TAGS_DROIT = ['Important', 'À réviser', 'Jurisprudence', 'Doctrine'] as const
+const TYPES_ECHEANCE: TypeEcheance[] = ['Partiel', 'Exposé', 'Rendu', 'Mémoire']
+const TYPES_BIBLIO = ['Manuel', 'Article', 'Arrêt', 'Code'] as const
+
+// ─── Styles partagés ─────────────────────────────────────────────────────────
+
+const inpStyle: React.CSSProperties = {
+  background: 'var(--paper)', border: '1px solid var(--ink-4)', borderRadius: 6,
+  padding: '8px 10px', fontFamily: 'var(--font-sans)', fontSize: 14,
+  color: 'var(--ink)', outline: 'none', width: '100%', boxSizing: 'border-box',
+}
+
+const btnPrimary: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', borderRadius: 6,
+  padding: '6px 12px', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+}
+
+const btnSecondary: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  background: 'transparent', color: 'var(--ink-2)', border: '1px solid var(--paper-2)',
+  borderRadius: 6, padding: '6px 10px', fontFamily: 'var(--font-sans)', fontSize: 13, cursor: 'pointer',
+}
+
+const smallStepBtn: React.CSSProperties = {
+  background: 'var(--paper-2)', border: 'none', borderRadius: 4, padding: '2px 7px',
+  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', cursor: 'pointer',
+}
+
+const ghostBtn: React.CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 5,
+  background: 'transparent', border: '1px solid var(--paper-2)',
+  borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
+  fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-2)', whiteSpace: 'nowrap',
+}
 
 // ─── Local helpers ────────────────────────────────────────────────────────────
 
@@ -22,6 +57,11 @@ const weekNum = (d: Date): number => {
   date.setUTCDate(date.getUTCDate() + 4 - dayN)
   const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
   return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+}
+
+const todayStr = (): string => {
+  const d = new Date()
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
 }
 
 // ─── Local primitives ─────────────────────────────────────────────────────────
@@ -39,14 +79,6 @@ const Num = ({ children, style }: { children: React.ReactNode; style?: React.CSS
     color: 'var(--ink)', letterSpacing: '0.01em', ...style,
   }}>{children}</span>
 )
-
-const ghostBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  background: 'transparent', border: '1px solid var(--paper-2)',
-  borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
-  fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-2)',
-  whiteSpace: 'nowrap',
-}
 
 const Chip = ({
   active, onClick, children,
@@ -78,8 +110,6 @@ const Badge = ({
   )
 }
 
-// ─── TypeBadge (local) ────────────────────────────────────────────────────────
-
 const TypeBadge = ({ type }: { type: string }) => {
   const tones: Record<string, { bg: string; color: string }> = {
     Partiel: { bg: 'var(--ink)',        color: 'var(--paper-1)' },
@@ -97,13 +127,11 @@ const TypeBadge = ({ type }: { type: string }) => {
   )
 }
 
-// ─── SectionHead ──────────────────────────────────────────────────────────────
-
 const SectionHead = ({
   label, hint, children,
 }: { label: string; hint?: string; children?: React.ReactNode }) => (
   <div style={{
-    display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
     marginBottom: 12, gap: 16, flexWrap: 'wrap',
   }}>
     <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexShrink: 0, minWidth: 0 }}>
@@ -122,8 +150,6 @@ const SectionHead = ({
   </div>
 )
 
-// ─── PrepBar ─────────────────────────────────────────────────────────────────
-
 const PrepBar = ({ value, accent }: { value: number; accent: string }) => (
   <div>
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
@@ -131,9 +157,22 @@ const PrepBar = ({ value, accent }: { value: number; accent: string }) => (
       <Num style={{ fontSize: 11.5, fontWeight: 500 }}>{value} %</Num>
     </div>
     <div style={{ height: 3, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${value}%`, background: accent, borderRadius: 999 }} />
+      <div style={{ height: '100%', width: `${value}%`, background: accent, borderRadius: 999, transition: 'width 200ms ease' }} />
     </div>
   </div>
+)
+
+// ─── Tag toggle button ────────────────────────────────────────────────────────
+
+const TagToggle = ({
+  tag, active, onToggle,
+}: { tag: string; active: boolean; onToggle: () => void }) => (
+  <button onClick={onToggle} style={{
+    ...btnSecondary, padding: '3px 8px', fontSize: 12,
+    background: active ? 'var(--paper-3)' : 'transparent',
+    borderColor: active ? 'var(--ink-4)' : 'var(--paper-2)',
+    color: active ? 'var(--ink)' : 'var(--ink-2)',
+  }}>{tag}</button>
 )
 
 // ─── Section 1 : PrioritesSuggerees ──────────────────────────────────────────
@@ -169,8 +208,104 @@ const Distribution = ({
   )
 }
 
+// Panel de notes qui s'ouvre sous le header
+const NotesDrawer = ({
+  matiereCode, notes, matieres, onClose,
+}: {
+  matiereCode: string
+  notes: NotesDroit[]
+  matieres: Matiere[]
+  onClose: () => void
+}) => {
+  const addNote = useDroitStore((s) => s.addNote)
+  const [showForm, setShowForm] = useState(false)
+  const [titre, setTitre] = useState('')
+  const [extrait, setExtrait] = useState('')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const matiere = matieres.find((m) => m.code === matiereCode)
+
+  const handleAdd = () => {
+    if (!titre.trim()) return
+    addNote({ matiere: matiereCode, date: todayStr(), titre: titre.trim(), extrait: extrait.trim(), tags: selectedTags })
+    setTitre(''); setExtrait(''); setSelectedTags([])
+    setShowForm(false)
+  }
+
+  const toggleTag = (tag: string) =>
+    setSelectedTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
+
+  return (
+    <div style={{
+      marginTop: 10, border: '1px solid var(--paper-2)', borderRadius: 12,
+      background: 'var(--paper-1)', overflow: 'hidden',
+    }}>
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: '10px 16px', borderBottom: '1px solid var(--paper-2)',
+      }}>
+        <Lbl>Notes · {matiere?.court ?? matiereCode}</Lbl>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          <button
+            onClick={() => setShowForm(!showForm)}
+            style={{ ...btnPrimary, padding: '4px 8px', fontSize: 12 }}>
+            <Plus size={11} /> Note
+          </button>
+          <button onClick={onClose} style={{ ...btnSecondary, padding: '4px 6px', border: 'none' }}>
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+
+      {showForm && (
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--paper-2)', display: 'grid', gap: 8 }}>
+          <input
+            value={titre} onChange={(e) => setTitre(e.target.value)}
+            placeholder="Titre de la note" style={inpStyle} autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowForm(false) }}
+          />
+          <textarea
+            value={extrait} onChange={(e) => setExtrait(e.target.value)}
+            placeholder="Extrait ou résumé..." rows={2}
+            style={{ ...inpStyle, resize: 'vertical' as const }}
+          />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {TAGS_DROIT.map((tag) => (
+              <TagToggle key={tag} tag={tag} active={selectedTags.includes(tag)} onToggle={() => toggleTag(tag)} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleAdd} style={btnPrimary}>Ajouter</button>
+            <button onClick={() => setShowForm(false)} style={btnSecondary}>Annuler</button>
+          </div>
+        </div>
+      )}
+
+      {notes.length === 0 && !showForm ? (
+        <div style={{ padding: '14px 16px', fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14 }}>
+          Aucune note pour cette matière.
+        </div>
+      ) : (
+        notes.map((n, i) => (
+          <div key={i} style={{
+            padding: '10px 16px',
+            borderBottom: i < notes.length - 1 ? '1px solid var(--paper-2)' : 'none',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
+              <Num style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{n.date}</Num>
+              <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{n.titre}</span>
+            </div>
+            {n.extrait && (
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.4 }}>{n.extrait}</span>
+            )}
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 const PrioBloc = ({
-  rang, e, dominant, matieres, notes, prep,
+  rang, e, dominant, matieres, notes, prep, openNotes, onNotesClick,
 }: {
   rang: string
   e: Echeance
@@ -178,6 +313,8 @@ const PrioBloc = ({
   matieres: Matiere[]
   notes: NotesDroit[]
   prep: Record<string, number>
+  openNotes: boolean
+  onNotesClick: (code: string) => void
 }) => {
   const m = matieres.find((mat) => mat.code === e.matiereCode)
   const d = daysUntil(parseDate(e.date))
@@ -193,7 +330,7 @@ const PrioBloc = ({
       opacity: dominant ? 1 : 0.78,
     }}>
       <Lbl style={{ color: dominant ? 'var(--terra)' : 'var(--ink-3)' }}>{rang}</Lbl>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+      <div>
         <span style={{
           fontFamily: 'var(--font-serif)', fontSize: dominant ? 22 : 18, fontWeight: 500,
           color: 'var(--ink)', lineHeight: 1.2, letterSpacing: '-0.005em',
@@ -204,21 +341,17 @@ const PrioBloc = ({
         fontSize: dominant ? 15 : 14, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55, maxWidth: '40ch',
       }}>
         Il te reste{' '}
-        <span style={{ fontStyle: 'normal', fontWeight: 600, color: dominant ? 'var(--terra)' : 'var(--ink)' }}>
-          {restant} %
-        </span>{' '}
-        à finir en{' '}
-        <span style={{ fontStyle: 'normal', fontWeight: 600, color: dominant ? 'var(--terra)' : 'var(--ink)' }}>
-          {d} j
-        </span>{' '}
-        — environ{' '}
-        <span style={{ fontStyle: 'normal', fontWeight: 600, color: 'var(--ink)' }}>
-          {heures} h
-        </span>{' '}
-        de travail.
+        <span style={{ fontStyle: 'normal', fontWeight: 600, color: dominant ? 'var(--terra)' : 'var(--ink)' }}>{restant} %</span>
+        {' '}à finir en{' '}
+        <span style={{ fontStyle: 'normal', fontWeight: 600, color: dominant ? 'var(--terra)' : 'var(--ink)' }}>{d} j</span>
+        {' '}— environ{' '}
+        <span style={{ fontStyle: 'normal', fontWeight: 600, color: 'var(--ink)' }}>{heures} h</span>
+        {' '}de travail.
       </p>
       <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
-        <button style={ghostBtn}>
+        <button
+          onClick={() => onNotesClick(e.matiereCode)}
+          style={{ ...ghostBtn, ...(openNotes ? { borderColor: 'var(--terra)', color: 'var(--terra)' } : {}) }}>
           <BookOpen size={12} />notes ({notesCount})
         </button>
         <button style={ghostBtn}>
@@ -237,10 +370,14 @@ const PrioritesSuggerees = ({
   notes: NotesDroit[]
   prep: Record<string, number>
 }) => {
+  const [openNotesFor, setOpenNotesFor] = useState<string | null>(null)
   const p1 = surLeFeu[0]
   const p2 = surLeFeu[1]
   const heuresTotal = surLeFeu.slice(0, 3).reduce((n, e) => n + heuresRestantes(e, prep), 0)
   const today = new Date()
+
+  const handleNotesClick = (code: string) =>
+    setOpenNotesFor((prev) => (prev === code ? null : code))
 
   return (
     <header style={{ marginBottom: 24 }}>
@@ -256,23 +393,86 @@ const PrioritesSuggerees = ({
         padding: '20px 24px', alignItems: 'stretch',
       }}>
         {p1 && (
-          <PrioBloc rang="priorité" e={p1} dominant matieres={matieres} notes={notes} prep={prep} />
+          <PrioBloc
+            rang="priorité" e={p1} dominant matieres={matieres} notes={notes} prep={prep}
+            openNotes={openNotesFor === p1.matiereCode} onNotesClick={handleNotesClick}
+          />
         )}
         {p2 && (
-          <PrioBloc rang="puis" e={p2} matieres={matieres} notes={notes} prep={prep} />
+          <PrioBloc
+            rang="puis" e={p2} matieres={matieres} notes={notes} prep={prep}
+            openNotes={openNotesFor === p2.matiereCode} onNotesClick={handleNotesClick}
+          />
         )}
         <Distribution surLeFeu={surLeFeu} heuresTotal={heuresTotal} />
       </div>
+
+      {openNotesFor && (
+        <NotesDrawer
+          matiereCode={openNotesFor}
+          notes={notes.filter((n) => n.matiere === openNotesFor)}
+          matieres={matieres}
+          onClose={() => setOpenNotesFor(null)}
+        />
+      )}
     </header>
   )
 }
 
 // ─── Section 2 : SurLeFeu ────────────────────────────────────────────────────
 
+const EcheanceForm = ({
+  matieres, onClose,
+}: { matieres: Matiere[]; onClose: () => void }) => {
+  const addEcheance = useDroitStore((s) => s.addEcheance)
+  const [titre, setTitre] = useState('')
+  const [matiereCode, setMatiereCode] = useState(matieres[0]?.code ?? '')
+  const [type, setType] = useState<TypeEcheance>('Partiel')
+  const [date, setDate] = useState('')
+  const [poids, setPoids] = useState<'lourd' | 'moyen'>('moyen')
+
+  const handleSubmit = () => {
+    if (!titre.trim() || !date) return
+    addEcheance({ titre: titre.trim(), matiereCode, type, date, poids, detail: '' })
+    onClose()
+  }
+
+  return (
+    <div style={{
+      background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10,
+      padding: '14px 16px', marginBottom: 10,
+    }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr repeat(4, auto)', gap: 8, marginBottom: 10, alignItems: 'end' }}>
+        <input
+          value={titre} onChange={(e) => setTitre(e.target.value)}
+          placeholder="Titre de l'échéance" style={inpStyle} autoFocus
+          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); if (e.key === 'Escape') onClose() }}
+        />
+        <select value={matiereCode} onChange={(e) => setMatiereCode(e.target.value)} style={{ ...inpStyle, width: 'auto' }}>
+          {matieres.map((m) => <option key={m.code} value={m.code}>{m.court}</option>)}
+        </select>
+        <select value={type} onChange={(e) => setType(e.target.value as TypeEcheance)} style={{ ...inpStyle, width: 'auto' }}>
+          {TYPES_ECHEANCE.map((t) => <option key={t}>{t}</option>)}
+        </select>
+        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inpStyle, width: 'auto' }} />
+        <select value={poids} onChange={(e) => setPoids(e.target.value as 'lourd' | 'moyen')} style={{ ...inpStyle, width: 'auto' }}>
+          <option value="moyen">Moyen</option>
+          <option value="lourd">Lourd</option>
+        </select>
+      </div>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <button onClick={handleSubmit} style={btnPrimary}>Ajouter</button>
+        <button onClick={onClose} style={btnSecondary}>Annuler</button>
+      </div>
+    </div>
+  )
+}
+
 const FireRow = ({
   e, matieres, prep,
 }: { e: Echeance; matieres: Matiere[]; prep: Record<string, number> }) => {
   const [hover, setHover] = useState(false)
+  const setPrep = useDroitStore((s) => s.setPrep)
   const m = matieres.find((mat) => mat.code === e.matiereCode)
   const d = daysUntil(parseDate(e.date))
   const prepVal = prep[e.id] ?? 0
@@ -282,16 +482,19 @@ const FireRow = ({
   const mo = MONTH_SHORT[date.getMonth()]
   const isCritical = d <= 7 && prepVal < 70
 
+  const handleDelta = (delta: number) =>
+    setPrep(e.id, Math.min(100, Math.max(0, prepVal + delta)))
+
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        display: 'grid', gridTemplateColumns: '56px 90px minmax(0, 1fr) 160px 84px',
+        display: 'grid', gridTemplateColumns: '56px 90px minmax(0, 1fr) 170px 84px',
         gap: 14, alignItems: 'center', padding: '14px 16px',
         background: 'var(--paper-1)', borderRadius: 10,
         border: `1px solid ${hover ? 'var(--ink-4)' : isCritical ? '#DEB89C' : 'var(--paper-2)'}`,
-        cursor: 'pointer', transition: 'border-color var(--dur) var(--ease)',
+        transition: 'border-color var(--dur) var(--ease)',
       }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
         <Num style={{ fontSize: 20, fontWeight: 500, color: isCritical ? 'var(--terra)' : 'var(--ink)', lineHeight: 1 }}>
@@ -309,7 +512,24 @@ const FireRow = ({
         }}>{e.titre}</span>
         <Lbl style={{ fontSize: 9.5 }}>{m?.court}</Lbl>
       </div>
-      <PrepBar value={prepVal} accent={isCritical ? 'var(--terra)' : 'var(--ink-2)'} />
+      {/* Prep interactive */}
+      <div>
+        <PrepBar value={prepVal} accent={isCritical ? 'var(--terra)' : 'var(--ink-2)'} />
+        {hover && (
+          <div style={{ display: 'flex', gap: 4, marginTop: 5, justifyContent: 'flex-end' }}>
+            <button
+              onClick={(ev) => { ev.stopPropagation(); handleDelta(-10) }}
+              style={{ ...smallStepBtn, opacity: prepVal <= 0 ? 0.4 : 1 }}>
+              −10 %
+            </button>
+            <button
+              onClick={(ev) => { ev.stopPropagation(); handleDelta(+10) }}
+              style={{ ...smallStepBtn, opacity: prepVal >= 100 ? 0.4 : 1 }}>
+              +10 %
+            </button>
+          </div>
+        )}
+      </div>
       <div style={{ justifySelf: 'end', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
         <Num style={{ fontSize: 13, fontWeight: 500, color: isCritical ? 'var(--terra)' : 'var(--ink)' }}>
           J-{d}
@@ -323,18 +543,26 @@ const FireRow = ({
 const SurLeFeu = ({
   items, matieres, prep,
 }: { items: Echeance[]; matieres: Matiere[]; prep: Record<string, number> }) => {
-  if (items.length === 0) return null
+  const [showForm, setShowForm] = useState(false)
+  const hint = items.length > 0
+    ? `${items.length} échéance${items.length > 1 ? 's' : ''} active${items.length > 1 ? 's' : ''}`
+    : undefined
+
   return (
     <section style={{ marginBottom: 32 }}>
-      <SectionHead
-        label="Sur le feu"
-        hint={`${items.length} échéance${items.length > 1 ? 's' : ''} active${items.length > 1 ? 's' : ''}`}
-      />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {items.map((e) => (
-          <FireRow key={e.id} e={e} matieres={matieres} prep={prep} />
-        ))}
-      </div>
+      <SectionHead label="Sur le feu" hint={hint}>
+        <button onClick={() => setShowForm(!showForm)} style={{ ...btnPrimary, padding: '5px 10px', fontSize: 12 }}>
+          <Plus size={12} /> Échéance
+        </button>
+      </SectionHead>
+      {showForm && <EcheanceForm matieres={matieres} onClose={() => setShowForm(false)} />}
+      {items.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {items.map((e) => (
+            <FireRow key={e.id} e={e} matieres={matieres} prep={prep} />
+          ))}
+        </div>
+      )}
     </section>
   )
 }
@@ -342,28 +570,71 @@ const SurLeFeu = ({
 // ─── Section 3 : SuiviGlobal ─────────────────────────────────────────────────
 
 const MatiereDot = ({ m }: { m: Matiere }) => {
-  const [hover, setHover] = useState(false)
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  const updateMatierePrep = useDroitStore((s) => s.updateMatierePrep)
+
+  useEffect(() => {
+    if (!open) return
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [open])
+
   const status = m.prep >= 70 ? 'ok' : m.prep >= 45 ? 'mid' : 'low'
   const color = status === 'ok' ? 'var(--sage)' : status === 'mid' ? 'var(--ink-3)' : 'var(--terra)'
   const symbol = status === 'ok' ? '✓' : status === 'low' ? '!' : '·'
 
   return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-        padding: '2px 6px', borderRadius: 6,
-        background: hover ? 'var(--paper-2)' : 'transparent',
-        transition: 'background var(--dur) var(--ease)',
-      }}>
-      <span style={{
-        width: 14, height: 14, borderRadius: 999, background: color,
-        color: 'var(--paper-1)', display: 'inline-grid', placeItems: 'center',
-        fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-      }}>{symbol}</span>
-      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>{m.court}</span>
-      <Num style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.prep}%</Num>
+    <div ref={ref} style={{ position: 'relative' }}>
+      <div
+        onClick={() => setOpen(!open)}
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+          padding: '2px 6px', borderRadius: 6,
+          background: open ? 'var(--paper-2)' : 'transparent',
+          transition: 'background var(--dur) var(--ease)',
+        }}>
+        <span style={{
+          width: 14, height: 14, borderRadius: 999, background: color,
+          color: 'var(--paper-1)', display: 'inline-grid', placeItems: 'center',
+          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
+        }}>{symbol}</span>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>{m.court}</span>
+        <Num style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.prep}%</Num>
+      </div>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20,
+          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+          borderRadius: 8, padding: '10px 12px',
+          boxShadow: '0 6px 20px -8px rgba(58,46,34,.18)',
+          minWidth: 170,
+        }}>
+          <Lbl style={{ display: 'block', marginBottom: 8 }}>{m.nom}</Lbl>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+            <button
+              onClick={() => updateMatierePrep(m.code, m.prep - 5)}
+              style={{ ...smallStepBtn, opacity: m.prep <= 0 ? 0.4 : 1 }}>
+              −5 %
+            </button>
+            <Num style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 500 }}>{m.prep} %</Num>
+            <button
+              onClick={() => updateMatierePrep(m.code, m.prep + 5)}
+              style={{ ...smallStepBtn, opacity: m.prep >= 100 ? 0.4 : 1 }}>
+              +5 %
+            </button>
+          </div>
+          <input
+            type="range" min={0} max={100} step={5} value={m.prep}
+            onChange={(e) => updateMatierePrep(m.code, Number(e.target.value))}
+            style={{ width: '100%', accentColor: 'var(--terra)', cursor: 'pointer' }}
+          />
+        </div>
+      )}
     </div>
   )
 }
@@ -383,7 +654,7 @@ const SuiviGlobal = ({ matieres }: { matieres: Matiere[] }) => {
           {sorted.map((m) => <MatiereDot key={m.code} m={m} />)}
         </div>
         <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-          glisser pour ajuster
+          cliquer pour ajuster
         </span>
       </div>
     </section>
@@ -410,8 +681,7 @@ const JalonItem = ({ j }: { j: JalonType }) => {
       }} />
       <span style={{
         fontFamily: 'var(--font-sans)', fontSize: 11.5, color: c.text,
-        textAlign: 'center', lineHeight: 1.3,
-        fontWeight: j.etat === 'en cours' ? 500 : 400,
+        textAlign: 'center', lineHeight: 1.3, fontWeight: j.etat === 'en cours' ? 500 : 400,
       }}>{j.label}</span>
       <Num style={{ fontSize: 10, color: 'var(--ink-3)' }}>{j.date}</Num>
     </div>
@@ -420,13 +690,34 @@ const JalonItem = ({ j }: { j: JalonType }) => {
 
 const Memoire = ({ memoire }: { memoire: MemoireType }) => {
   const [showAll, setShowAll] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [draftPages, setDraftPages] = useState(memoire.pagesEcrites)
+  const [draftRdv, setDraftRdv] = useState(memoire.prochaineReunion)
+  const updateMemoire = useDroitStore((s) => s.updateMemoire)
+
+  useEffect(() => {
+    setDraftPages(memoire.pagesEcrites)
+    setDraftRdv(memoire.prochaineReunion)
+  }, [memoire.pagesEcrites, memoire.prochaineReunion])
+
+  const handleSave = () => {
+    updateMemoire({ pagesEcrites: Number(draftPages), prochaineReunion: draftRdv })
+    setEditing(false)
+  }
+
   const j = memoire.jalonCourant
   const d = daysUntil(parseDate(j.date))
   const pct = Math.round((memoire.pagesEcrites / memoire.pagesTotal) * 100)
 
   return (
     <section style={{ marginBottom: 32 }}>
-      <SectionHead label="Mémoire" hint="suivi propre" />
+      <SectionHead label="Mémoire" hint="suivi propre">
+        <button
+          onClick={() => setEditing(!editing)}
+          style={{ ...btnSecondary, fontSize: 12, padding: '4px 10px' }}>
+          {editing ? 'Fermer' : 'Modifier'}
+        </button>
+      </SectionHead>
       <div style={{
         background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
         borderRadius: 12, padding: '20px 24px',
@@ -457,17 +748,44 @@ const Memoire = ({ memoire }: { memoire: MemoireType }) => {
             display: 'flex', flexDirection: 'column', gap: 6,
           }}>
             <Lbl style={{ fontSize: 9.5 }}>rédaction</Lbl>
-            <Num style={{
-              fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 500,
-              color: 'var(--ink)', lineHeight: 1,
-            }}>
+            <Num style={{ fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 500, color: 'var(--ink)', lineHeight: 1 }}>
               {pct} <span style={{ fontSize: 14, color: 'var(--ink-3)' }}>%</span>
             </Num>
             <div style={{ height: 3, background: 'var(--paper-3)', borderRadius: 999, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--ink)' }} />
+              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--ink)', transition: 'width 200ms ease' }} />
             </div>
           </div>
         </div>
+
+        {/* Formulaire d'édition inline */}
+        {editing && (
+          <div style={{
+            marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--paper-2)',
+            display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, alignItems: 'end',
+          }}>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <Lbl>Pages écrites</Lbl>
+              <input
+                type="number" value={draftPages} min={0} max={memoire.pagesTotal}
+                onChange={(e) => setDraftPages(Number(e.target.value))}
+                style={inpStyle}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
+              />
+            </label>
+            <label style={{ display: 'grid', gap: 4 }}>
+              <Lbl>Prochain RDV</Lbl>
+              <input
+                value={draftRdv} onChange={(e) => setDraftRdv(e.target.value)}
+                style={inpStyle} placeholder="ex : lun. 18 mai · 10h00"
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: 6, gridColumn: '1 / -1' }}>
+              <button onClick={handleSave} style={btnPrimary}>Enregistrer</button>
+              <button onClick={() => setEditing(false)} style={btnSecondary}>Annuler</button>
+            </div>
+          </div>
+        )}
 
         <button
           onClick={() => setShowAll(!showAll)}
@@ -560,10 +878,7 @@ const ApresUrgent = ({
       {open && (
         <div style={{ display: 'flex', flexDirection: 'column' }}>
           {items.map((e, i) => (
-            <CompactRow
-              key={e.id} e={e} last={i === items.length - 1}
-              matieres={matieres}
-            />
+            <CompactRow key={e.id} e={e} last={i === items.length - 1} matieres={matieres} />
           ))}
         </div>
       )}
@@ -574,10 +889,10 @@ const ApresUrgent = ({
 // ─── Section 6 : Referentiel ─────────────────────────────────────────────────
 
 const TAG_TONES: Record<string, 'terra' | 'sauge' | 'default'> = {
-  Important:    'terra',
-  'À réviser':  'default',
+  Important:     'terra',
+  'À réviser':   'default',
   Jurisprudence: 'sauge',
-  Doctrine:     'default',
+  Doctrine:      'default',
 }
 
 const NoteRow = ({
@@ -616,26 +931,89 @@ const NoteRow = ({
 const NotesList = ({
   notes, matieres,
 }: { notes: NotesDroit[]; matieres: Matiere[] }) => {
+  const addNote = useDroitStore((s) => s.addNote)
   const [filter, setFilter] = useState('toutes')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({
+    matiere: matieres[0]?.code ?? '',
+    titre: '', extrait: '', tags: [] as string[],
+  })
+
   const codes = ['toutes', ...Array.from(new Set(notes.map((n) => n.matiere)))]
   const filtered = filter === 'toutes' ? notes : notes.filter((n) => n.matiere === filter)
 
+  const toggleTag = (tag: string) =>
+    setForm((f) => ({ ...f, tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag] }))
+
+  const handleAdd = () => {
+    if (!form.titre.trim()) return
+    addNote({ ...form, titre: form.titre.trim(), extrait: form.extrait.trim(), date: todayStr() })
+    setForm({ matiere: matieres[0]?.code ?? '', titre: '', extrait: '', tags: [] })
+    setShowForm(false)
+  }
+
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         {codes.map((c) => (
           <Chip key={c} active={filter === c} onClick={() => setFilter(c)}>
             {c === 'toutes' ? 'Toutes' : matieres.find((m) => m.code === c)?.court ?? c}
           </Chip>
         ))}
+        <button
+          onClick={() => setShowForm(!showForm)}
+          style={{ ...btnPrimary, padding: '4px 10px', fontSize: 12, marginLeft: 'auto' }}>
+          <Plus size={11} /> Note
+        </button>
       </div>
+
+      {showForm && (
+        <div style={{
+          background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10,
+          padding: '14px 16px', marginBottom: 10, display: 'grid', gap: 8,
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
+            <select
+              value={form.matiere} onChange={(e) => setForm((f) => ({ ...f, matiere: e.target.value }))}
+              style={{ ...inpStyle, width: 'auto' }}>
+              {matieres.map((m) => <option key={m.code} value={m.code}>{m.court}</option>)}
+            </select>
+            <input
+              value={form.titre} onChange={(e) => setForm((f) => ({ ...f, titre: e.target.value }))}
+              placeholder="Titre de la note" style={inpStyle} autoFocus
+              onKeyDown={(e) => { if (e.key === 'Escape') setShowForm(false) }}
+            />
+          </div>
+          <textarea
+            value={form.extrait} onChange={(e) => setForm((f) => ({ ...f, extrait: e.target.value }))}
+            placeholder="Extrait ou résumé..." rows={2}
+            style={{ ...inpStyle, resize: 'vertical' as const }}
+          />
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {TAGS_DROIT.map((tag) => (
+              <TagToggle key={tag} tag={tag} active={form.tags.includes(tag)} onToggle={() => toggleTag(tag)} />
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleAdd} style={btnPrimary}>Ajouter</button>
+            <button onClick={() => setShowForm(false)} style={btnSecondary}>Annuler</button>
+          </div>
+        </div>
+      )}
+
       <div style={{
         background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
         borderRadius: 10, overflow: 'hidden',
       }}>
-        {filtered.map((n, i, a) => (
-          <NoteRow key={i} n={n} last={i === a.length - 1} matieres={matieres} />
-        ))}
+        {filtered.length === 0 ? (
+          <div style={{ padding: '20px 16px', fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14 }}>
+            Aucune note pour cette matière.
+          </div>
+        ) : (
+          filtered.map((n, i, a) => (
+            <NoteRow key={i} n={n} last={i === a.length - 1} matieres={matieres} />
+          ))
+        )}
       </div>
     </div>
   )
@@ -662,9 +1040,9 @@ const BiblioRow = ({ it, last }: { it: { type: string; auteur: string; titre: st
         background: tt.bg, color: tt.color, justifySelf: 'start',
       }}>{it.type}</span>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{
-          fontFamily: 'var(--font-serif)', fontSize: 14.5, fontWeight: 500, color: 'var(--ink)',
-        }}>{it.titre}</span>
+        <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14.5, fontWeight: 500, color: 'var(--ink)' }}>
+          {it.titre}
+        </span>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
           <span style={{ fontFamily: 'var(--font-sans)', color: 'var(--ink-2)' }}>{it.auteur}</span>
           <span style={{ color: 'var(--ink-4)' }}>·</span>
@@ -679,18 +1057,69 @@ const BiblioRow = ({ it, last }: { it: { type: string; auteur: string; titre: st
 const BiblioList = ({
   biblio, matieres,
 }: { biblio: BiblioDroit[]; matieres: Matiere[] }) => {
+  const addBiblioItem = useDroitStore((s) => s.addBiblioItem)
   const [active, setActive] = useState(biblio[0]?.matiere ?? '')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ type: 'Manuel', auteur: '', titre: '', meta: '' })
+
   const cur = biblio.find((g) => g.matiere === active) ?? biblio[0]
+
+  const handleAdd = () => {
+    if (!form.titre.trim() || !form.auteur.trim()) return
+    addBiblioItem(active, { ...form, titre: form.titre.trim(), auteur: form.auteur.trim(), meta: form.meta.trim() })
+    setForm({ type: 'Manuel', auteur: '', titre: '', meta: '' })
+    setShowForm(false)
+  }
 
   return (
     <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap' }}>
+      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
         {biblio.map((g) => (
           <Chip key={g.matiere} active={active === g.matiere} onClick={() => setActive(g.matiere)}>
             {matieres.find((m) => m.code === g.matiere)?.court ?? g.matiere} · {g.items.length}
           </Chip>
         ))}
+        <button
+          onClick={() => setShowForm(!showForm)}
+          style={{ ...btnPrimary, padding: '4px 10px', fontSize: 12, marginLeft: 'auto' }}>
+          <Plus size={11} /> Référence
+        </button>
       </div>
+
+      {showForm && (
+        <div style={{
+          background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10,
+          padding: '14px 16px', marginBottom: 10, display: 'grid', gap: 8,
+        }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr auto', gap: 8 }}>
+            <select
+              value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
+              style={{ ...inpStyle, width: 'auto' }}>
+              {TYPES_BIBLIO.map((t) => <option key={t}>{t}</option>)}
+            </select>
+            <input
+              value={form.auteur} onChange={(e) => setForm((f) => ({ ...f, auteur: e.target.value }))}
+              placeholder="Auteur" style={inpStyle} autoFocus
+              onKeyDown={(e) => { if (e.key === 'Escape') setShowForm(false) }}
+            />
+            <input
+              value={form.titre} onChange={(e) => setForm((f) => ({ ...f, titre: e.target.value }))}
+              placeholder="Titre" style={inpStyle}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowForm(false) }}
+            />
+            <input
+              value={form.meta} onChange={(e) => setForm((f) => ({ ...f, meta: e.target.value }))}
+              placeholder="Référence (éd., revue…)" style={{ ...inpStyle, width: 'auto' }}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowForm(false) }}
+            />
+          </div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            <button onClick={handleAdd} style={btnPrimary}>Ajouter</button>
+            <button onClick={() => setShowForm(false)} style={btnSecondary}>Annuler</button>
+          </div>
+        </div>
+      )}
+
       {cur && (
         <div style={{
           background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
@@ -712,8 +1141,7 @@ const TabBtn = ({
     background: active ? 'var(--paper-1)' : 'transparent',
     color: active ? 'var(--ink)' : 'var(--ink-2)',
     border: 0, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
-    fontFamily: 'var(--font-sans)', fontSize: 13,
-    fontWeight: active ? 500 : 400,
+    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: active ? 500 : 400,
   }}>{children}</button>
 )
 
@@ -769,12 +1197,7 @@ export function DroitPage() {
   return (
     <div style={{ padding: '24px 48px 80px', maxWidth: 1100, margin: '0 auto' }}>
       {/* 1 — Priorités suggérées */}
-      <PrioritesSuggerees
-        surLeFeu={surLeFeu}
-        matieres={matieres}
-        notes={notes}
-        prep={prep}
-      />
+      <PrioritesSuggerees surLeFeu={surLeFeu} matieres={matieres} notes={notes} prep={prep} />
       {/* 2 — Sur le feu */}
       <SurLeFeu items={surLeFeu} matieres={matieres} prep={prep} />
       {/* 3 — Suivi global */}
