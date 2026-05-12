@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Label, Num } from './primitives'
 import { StoryRow } from './components/StoryRow'
-import { PAST } from './data'
+import type { NouvellePassee } from './data'
 
 type Filtre = 'tout' | 'term' | 'aban'
 
@@ -31,12 +31,12 @@ function FilterPill({ active, onClick, children }: { active: boolean; onClick: (
   )
 }
 
-export function Bibliotheque() {
+export function Bibliotheque({ past }: { past: NouvellePassee[] }) {
   const [filtre, setFiltre] = useState<Filtre>('tout')
 
-  const totalTerm = PAST.filter(s => s.statut === 'terminée').length
-  const totalAban = PAST.filter(s => s.statut === 'abandonnée').length
-  const visibles = PAST.filter(s =>
+  const totalTerm = past.filter(s => s.statut === 'terminée').length
+  const totalAban = past.filter(s => s.statut === 'abandonnée').length
+  const visibles = past.filter(s =>
     filtre === 'tout' ||
     (filtre === 'term' && s.statut === 'terminée') ||
     (filtre === 'aban' && s.statut === 'abandonnée')
@@ -56,7 +56,7 @@ export function Bibliotheque() {
       }}>
         <div style={{ display: 'flex', gap: 6 }}>
           <FilterPill active={filtre === 'tout'} onClick={() => setFiltre('tout')}>
-            Tout <Num style={{ color: 'var(--ink-3)', fontSize: 12 }}>· {PAST.length}</Num>
+            Tout <Num style={{ color: 'var(--ink-3)', fontSize: 12 }}>· {past.length}</Num>
           </FilterPill>
           <FilterPill active={filtre === 'term'} onClick={() => setFiltre('term')}>
             Terminées <Num style={{ color: 'var(--ink-3)', fontSize: 12 }}>· {totalTerm}</Num>

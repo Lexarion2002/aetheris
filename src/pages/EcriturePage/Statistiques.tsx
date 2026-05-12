@@ -1,9 +1,13 @@
 import { Label } from './primitives'
 import { SummaryCard } from './components/SummaryCard'
 import { BarChart, LegendDot } from './components/BarChart'
-import { WEEKS, GENRES, PAST, OBJECTIF_MOTS } from './data'
+import { OBJECTIF_MOTS } from './data'
+import type { SemaineStats, GenreStats, NouvellePassee } from './data'
 
-export function Statistiques() {
+export function Statistiques({ weeks, genres, past }: { weeks: SemaineStats[]; genres: GenreStats[]; past: NouvellePassee[] }) {
+  const WEEKS = weeks
+  const GENRES = genres
+  const PAST = past
   const total = WEEKS.length
   const term  = WEEKS.filter(w => w.etat === 'terminée').length
   const aban  = WEEKS.filter(w => w.etat === 'abandonnée').length
