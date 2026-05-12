@@ -1,22 +1,22 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ArrowUpRight, Landmark } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
 import { useWritingStore } from '../store/writingStore'
-import { usePomodoroStore } from '../store/pomodoroStore'
+import { useTodayStore } from '../store/todayStore'
+import type { TodayTask } from '../store/todayStore'
+import { useDroitStore } from '../store/droitStore'
 import { useMusicStore } from '../store/musicStore'
 import { useSportStore } from '../store/sportStore'
 import { useBookStore } from '../store/bookStore'
 import { useFilmSerieStore } from '../store/filmSerieStore'
 import { useShoppingStore } from '../store/shoppingStore'
-import { useCabinetStore } from '../store/cabinetStore'
-import type { CabinetTache } from '../store/cabinetStore'
 import { AddDomainModal } from '../components/AddDomainModal'
 import { getDomainIcon } from '../utils/domainColors'
 import { computeMonthBalance } from '../utils/financeUtils'
-import type { Domain, Task, SavingsGoal } from '../types'
+import type { Domain, SavingsGoal } from '../types'
 
 // ─── Locale ───────────────────────────────────────────────────────────────────
 
@@ -62,74 +62,6 @@ function topSavingsGoal(goals: SavingsGoal[]): SavingsGoal | null {
       .sort((a, b) => b.currentAmount / b.targetAmount - a.currentAmount / a.targetAmount)[0] ??
     goals[0] ?? null
   )
-}
-
-// ─── Today actions ────────────────────────────────────────────────────────────
-
-interface TodayAction {
-  label:   string
-  domain:  string
-  taskId?: string
-  daysLeft: number
-  urgency:  0 | 1 | 2
-}
-
-const PRIORITE_URGENCY: Record<string, 0 | 1 | 2> = {
-  'urgent':         0,
-  'normal':         1,
-  'quand possible': 2,
-}
-
-function computeTodayActions(
-  domains: Domain[],
-  tasks: Task[],
-  missions: Array<{ id: string; sujet: string; deadline: string | null; stade: string }>,
-  law: { keyDates: Array<{ title: string; date: string }> },
-  cabinetTaches: CabinetTache[],
-): TodayAction[] {
-  const actions: TodayAction[] = []
-
-  tasks
-    .filter(t => t.dueDate && t.status !== 'done' && t.status !== 'cancelled')
-    .forEach(t => {
-      const days = daysUntil(t.dueDate!)
-      if (days === null || days > 7) return
-      const dom = domains.find(d => d.id === t.domainId)
-      actions.push({ label: t.title, domain: dom?.name ?? '—', taskId: t.id, daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
-    })
-
-  missions
-    .filter(m => m.deadline && ['redaction', 'relecture'].includes(m.stade))
-    .forEach(m => {
-      const days = daysUntil(m.deadline!)
-      if (days === null || days > 7) return
-      actions.push({ label: `Mission : ${trunc(m.sujet, 5)}`, domain: 'Carrière', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
-    })
-
-  law.keyDates.forEach(({ title, date }) => {
-    const days = daysUntil(date)
-    if (days === null || days > 7) return
-    actions.push({ label: title, domain: 'Droit', daysLeft: days, urgency: days <= 0 ? 0 : days <= 2 ? 1 : 2 })
-  })
-
-  // Source 4 : tâches cabinet — avec échéance dans les 7j OU urgentes sans date
-  cabinetTaches
-    .filter(t => t.statut !== 'rendu')
-    .forEach(t => {
-      if (t.rendu) {
-        // Cas 1 : échéance dans les 7 jours
-        const days = daysUntil(t.rendu)
-        if (days === null || days > 7) return
-        const urgencyByDate: 0 | 1 | 2 = days <= 0 ? 0 : days <= 2 ? 1 : 2
-        const urgencyByPrio = PRIORITE_URGENCY[t.priorite] ?? 1
-        actions.push({ label: t.titre, domain: 'Cabinet', taskId: t.id, daysLeft: days, urgency: Math.min(urgencyByDate, urgencyByPrio) as 0 | 1 | 2 })
-      } else if (t.priorite === 'urgent') {
-        // Cas 2 : urgente sans échéance → traité comme overdue
-        actions.push({ label: t.titre, domain: 'Cabinet', taskId: t.id, daysLeft: 0, urgency: 0 })
-      }
-    })
-
-  return actions.sort((a, b) => a.urgency - b.urgency || a.daysLeft - b.daysLeft)
 }
 
 // ─── DashHeader ───────────────────────────────────────────────────────────────
@@ -253,110 +185,244 @@ function OngoingCard({
 
 // ─── TodaySection ─────────────────────────────────────────────────────────────
 
-function TodayGroup({
-  groupLabel, actions, pomIdle, launchPom,
-}: {
-  groupLabel: string
-  actions:    TodayAction[]
-  pomIdle:    boolean
-  launchPom:  (taskId: string) => void
-}) {
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 18px 8px', background: 'var(--paper)', borderBottom: '1px solid var(--paper-2)' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-          {groupLabel}
-        </span>
-        <div style={{ height: 1, background: 'var(--paper-2)', flex: 1 }} />
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{actions.length}</span>
-      </div>
-      {actions.map((action, i) => (
-        <TodayRow key={i} action={action} pomIdle={pomIdle} launchPom={launchPom} />
-      ))}
-    </div>
-  )
+interface SelectableItem {
+  sourceId:     string
+  sourceDomain: string
+  label:        string
+  sublabel?:    string
+  domainGroup:  string
 }
 
-function TodayRow({
-  action, pomIdle, launchPom,
-}: {
-  action:    TodayAction
-  pomIdle:   boolean
-  launchPom: (id: string) => void
+function TodayTaskRow({ task, last, onToggle, onRemove }: {
+  task:     TodayTask
+  last:     boolean
+  onToggle: () => void
+  onRemove: () => void
 }) {
   const [hover, setHover] = useState(false)
-  const overdue = action.daysLeft < 0
-  const today   = action.daysLeft === 0
-  const urgencyLabel = overdue
-    ? `${Math.abs(action.daysLeft)}j retard`
-    : today ? "Aujourd'hui"
-    : `J−${action.daysLeft}`
-
-  const dotBg = action.urgency === 0
-    ? (overdue ? 'var(--danger)' : 'var(--terra)')
-    : action.urgency === 1 ? 'var(--warn)' : 'transparent'
-  const dotBorder = action.urgency === 2 ? '1.5px solid var(--ink-4)' : 'none'
-
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
       style={{
-        display: 'grid', gridTemplateColumns: '80px 14px 1fr auto',
-        alignItems: 'center', gap: 16, padding: '12px 18px',
-        borderBottom: '1px solid var(--paper-2)',
-        background: hover ? 'var(--paper-1)' : 'transparent',
-        transition: 'background var(--dur) var(--ease)',
-      }}>
-      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: action.urgency === 0 ? 'var(--danger)' : 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>
-        {urgencyLabel}
-      </span>
+        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px',
+        borderBottom: last ? 'none' : '1px solid var(--paper-2)',
+        transition: 'background 120ms ease',
+      }}
+    >
+      {/* Checkbox */}
+      <button
+        onClick={onToggle}
+        role="checkbox"
+        aria-checked={task.done}
+        style={{
+          width: 14, height: 14, padding: 0, flexShrink: 0,
+          border: `1px solid ${task.done ? 'var(--terra)' : 'var(--ink-4)'}`,
+          background: task.done ? 'var(--terra)' : 'transparent',
+          borderRadius: 3, cursor: 'pointer',
+          display: 'grid', placeItems: 'center',
+          transition: 'background 180ms ease, border-color 180ms ease',
+        }}
+      >
+        {task.done && (
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"
+            stroke="var(--paper-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="2,6.5 5,9 10,3" />
+          </svg>
+        )}
+      </button>
 
-      <span style={{ width: 8, height: 8, borderRadius: 999, background: dotBg, border: dotBorder, display: 'inline-block', flexShrink: 0 }} />
-
-      <div style={{ minWidth: 0 }}>
-        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 450, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {action.label}
+      {/* Label + meta */}
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{
+            fontFamily: 'var(--font-serif)', fontSize: 16,
+            color: task.done ? 'var(--ink-3)' : 'var(--ink)',
+            textDecoration: task.done ? 'line-through' : 'none',
+            textDecorationColor: 'var(--ink-4)',
+          }}>{task.label}</span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em',
+            textTransform: 'uppercase', color: 'var(--ink-3)', flexShrink: 0,
+          }}>{task.sourceDomain}</span>
         </div>
-        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-          {action.domain}
-        </div>
+        {task.sublabel && (
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic', color: 'var(--ink-3)', marginTop: 2 }}>
+            {task.sublabel}
+          </div>
+        )}
       </div>
 
-      {action.taskId && pomIdle && (
-        <button
-          onClick={() => launchPom(action.taskId!)}
-          style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500, padding: '4px 10px', borderRadius: 6, border: 0, background: 'var(--terra-soft)', color: 'var(--terra)', cursor: 'pointer' }}>
-          Focus
-        </button>
-      )}
+      {/* Remove */}
+      <button
+        onClick={onRemove}
+        aria-label="Retirer"
+        style={{
+          opacity: hover ? 0.6 : 0, background: 'transparent', border: 0,
+          cursor: 'pointer', padding: 4, color: 'var(--ink-3)',
+          fontSize: 18, lineHeight: 1, display: 'flex', alignItems: 'center',
+          transition: 'opacity 180ms ease',
+        }}
+      >×</button>
     </div>
   )
 }
 
-function TodaySection({ actions, pomIdle, launchPom }: { actions: TodayAction[]; pomIdle: boolean; launchPom: (id: string) => void }) {
-  const urgent = actions.filter(a => a.urgency === 0)
-  const week   = actions.filter(a => a.urgency > 0)
+function TodaySection() {
+  const tasks      = useTodayStore((s) => s.tasks)
+  const addTask    = useTodayStore((s) => s.addTask)
+  const toggleTask = useTodayStore((s) => s.toggleTask)
+  const removeTask = useTodayStore((s) => s.removeTask)
+
+  const droitTaches    = useDroitStore((s) => s.taches)
+  const writingStories = useWritingStore((s) => s.stories)
+
+  const [panelOpen, setPanelOpen] = useState(false)
+
+  const existingSourceIds = useMemo(() => new Set(tasks.map((t) => t.sourceId)), [tasks])
+
+  const availableItems = useMemo((): SelectableItem[] => {
+    const items: SelectableItem[] = []
+
+    for (const tache of droitTaches) {
+      const progress = tache.subtasks.length > 0
+        ? Math.round((tache.subtasks.filter((s) => s.done).length / tache.subtasks.length) * 100)
+        : (tache.manualProgress ?? 0)
+      if (progress >= 100) continue
+
+      if (tache.subtasks.length > 0) {
+        for (const st of tache.subtasks.filter((s) => !s.done)) {
+          if (!existingSourceIds.has(st.id)) {
+            items.push({ sourceId: st.id, sourceDomain: 'droit', label: st.label, sublabel: tache.matiere, domainGroup: 'Droit' })
+          }
+        }
+      } else {
+        if (!existingSourceIds.has(tache.id)) {
+          items.push({ sourceId: tache.id, sourceDomain: 'droit', label: tache.title, sublabel: tache.matiere, domainGroup: 'Droit' })
+        }
+      }
+    }
+
+    for (const story of writingStories.filter((s) => s.status === 'active')) {
+      if (!existingSourceIds.has(story.id)) {
+        items.push({ sourceId: story.id, sourceDomain: 'ecriture', label: `Écriture — ${story.title}`, domainGroup: 'Écriture' })
+      }
+    }
+
+    return items
+  }, [droitTaches, writingStories, existingSourceIds])
+
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, SelectableItem[]> = {}
+    for (const item of availableItems) {
+      if (!groups[item.domainGroup]) groups[item.domainGroup] = []
+      groups[item.domainGroup].push(item)
+    }
+    return groups
+  }, [availableItems])
+
+  const doneCount = tasks.filter((t) => t.done).length
 
   return (
     <section style={{ marginBottom: 56 }}>
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
         <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 28, color: 'var(--ink)', margin: 0 }}>
           Aujourd'hui
         </h2>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-          {actions.length > 0 ? `${actions.length} action${actions.length > 1 ? 's' : ''}` : "Rien d'urgent · tu es à jour"}
-        </span>
+        <button
+          onClick={() => setPanelOpen(!panelOpen)}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+            background: panelOpen ? 'var(--paper-2)' : 'var(--terra)',
+            color: panelOpen ? 'var(--ink-2)' : 'var(--paper-1)',
+            border: 0, borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
+            transition: 'background 180ms ease, color 180ms ease',
+          }}
+        >
+          + Planifier
+        </button>
       </div>
 
-      {actions.length === 0 ? (
+      {/* Panel de sélection */}
+      {panelOpen && (
+        <div style={{
+          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+          borderRadius: 12, padding: '16px 20px', marginBottom: 16,
+        }}>
+          {availableItems.length === 0 ? (
+            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14, margin: 0 }}>
+              Toutes les tâches sont planifiées.
+            </p>
+          ) : (
+            Object.entries(groupedItems).map(([group, items]) => (
+              <div key={group} style={{ marginBottom: 12 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                    {group}
+                  </span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-4)' }}>
+                    {items.length}
+                  </span>
+                </div>
+                {items.map((item) => (
+                  <button
+                    key={item.sourceId}
+                    onClick={() => addTask({ sourceId: item.sourceId, sourceDomain: item.sourceDomain, label: item.label, sublabel: item.sublabel })}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--paper-2)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: 2,
+                      width: '100%', textAlign: 'left',
+                      background: 'transparent', border: 0, cursor: 'pointer',
+                      padding: '6px 8px', borderRadius: 6,
+                      transition: 'background 120ms ease',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)' }}>{item.label}</span>
+                    {item.sublabel && (
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic', color: 'var(--ink-3)' }}>{item.sublabel}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))
+          )}
+          <div style={{ marginTop: 12, borderTop: '1px solid var(--paper-2)', paddingTop: 12 }}>
+            <button
+              onClick={() => setPanelOpen(false)}
+              style={{
+                background: 'transparent', border: '1px solid var(--paper-2)',
+                borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
+              }}
+            >Fermer</button>
+          </div>
+        </div>
+      )}
+
+      {/* Liste ou placeholder */}
+      {tasks.length === 0 ? (
         <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '24px 22px', fontFamily: 'var(--font-serif)', fontSize: 16, fontStyle: 'italic', color: 'var(--ink-3)' }}>
-          Pas d'actions critiques cette semaine.
+          Rien de planifié · commence par ajouter une tâche
         </div>
       ) : (
         <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
-          {urgent.length > 0 && <TodayGroup groupLabel="Urgent" actions={urgent} pomIdle={pomIdle} launchPom={launchPom} />}
-          {week.length > 0  && <TodayGroup groupLabel="Cette semaine" actions={week} pomIdle={pomIdle} launchPom={launchPom} />}
+          {tasks.map((task, i) => (
+            <TodayTaskRow
+              key={task.id}
+              task={task}
+              last={i === tasks.length - 1}
+              onToggle={() => toggleTask(task.id)}
+              onRemove={() => removeTask(task.id)}
+            />
+          ))}
+          <div style={{ padding: '10px 18px', borderTop: '1px solid var(--paper-2)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
+              {doneCount} sur {tasks.length} tâche{tasks.length > 1 ? 's' : ''} faite{doneCount > 1 ? 's' : ''}
+            </span>
+          </div>
         </div>
       )}
     </section>
@@ -501,17 +567,19 @@ export function Dashboard() {
   const tasks        = useStore(s => s.tasks)
   const transactions = useStore(s => s.transactions)
   const savingsGoals = useStore(s => s.savingsGoals)
-  const pomSettings  = useStore(s => s.pomodoroSettings)
   const law          = useLawStore()
   const career       = useCareerStore()
   const writing      = useWritingStore()
-  const pom          = usePomodoroStore()
   const music        = useMusicStore()
   const sport        = useSportStore()
   const books        = useBookStore()
   const films        = useFilmSerieStore()
   const shopping     = useShoppingStore()
-  const cabinetTaches = useCabinetStore((s) => s.taches)
+
+  const clearIfNewDay = useTodayStore((s) => s.clearIfNewDay)
+  const todayTasks    = useTodayStore((s) => s.tasks)
+
+  useEffect(() => { clearIfNewDay() }, [clearIfNewDay])
 
   const today    = new Date()
   const monthStr = today.toISOString().slice(0, 7)
@@ -522,8 +590,8 @@ export function Dashboard() {
   const hasCareerInfo = !!(career.cabinetInfo.nom || career.cabinetInfo.maitreStage)
   const cabinetNom    = career.cabinetInfo.nom ?? ''
 
-  const doneCount  = useMemo(() => tasks.filter(t => t.status === 'done').length, [tasks])
-  const totalCount = useMemo(() => tasks.filter(t => t.status !== 'cancelled').length, [tasks])
+  const doneCount  = todayTasks.filter(t => t.done).length
+  const totalCount = todayTasks.length
 
   const monthBalance = useMemo(() => computeMonthBalance(transactions, monthStr), [transactions, monthStr])
   const topGoal      = useMemo(() => topSavingsGoal(savingsGoals), [savingsGoals])
@@ -531,11 +599,6 @@ export function Dashboard() {
     const d = todayStr()
     return transactions.filter(t => t.type === 'expense' && t.date === d).reduce((s, t) => s + t.amount, 0)
   }, [transactions])
-
-  const todayActions = useMemo(
-    () => computeTodayActions(domains, tasks, career.missions, law, cabinetTaches),
-    [domains, tasks, career.missions, law, cabinetTaches],
-  )
 
   // Writing
   const activeWritingStory = useMemo(
@@ -652,14 +715,6 @@ export function Dashboard() {
     }
     return map
   }, [domains, tasks, writing, law, career, sport, music, films, books, shopping, monthStr, waStr, sportSessionsWeek])
-
-  // Pomodoro
-  const launchPom = (taskId: string) => {
-    if (pom.status !== 'idle') return
-    pom.init(taskId, pomSettings.focusDuration * 60)
-    pom.startTimer()
-    navigate('/focus')
-  }
 
   // Finance excluded from domain grid (always rendered as fixed card)
   const domainGridItems = domains.filter(d => !['finance', 'finances'].includes(d.name.trim().toLowerCase()))
@@ -786,11 +841,7 @@ export function Dashboard() {
       </section>
 
       {/* ── 3. Aujourd'hui ─────────────────────────────────────────────────── */}
-      <TodaySection
-        actions={todayActions}
-        pomIdle={pom.status === 'idle'}
-        launchPom={launchPom}
-      />
+      <TodaySection />
 
       {/* ── 4. Domaines ────────────────────────────────────────────────────── */}
       <section>
