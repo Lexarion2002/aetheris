@@ -7,8 +7,9 @@ import { FragmentCard } from './components/FragmentCard'
 import type { NouvelleActuelle } from './data'
 
 interface Props {
-  current: NouvelleActuelle | null
-  onCommencer: (data: { titre: string; genre: string; synopsis: string; objectif: number }) => void
+  current:        NouvelleActuelle | null
+  onCommencer:    (data: { titre: string; genre: string; synopsis: string; objectif: number }) => void
+  onSession:      (data: { note: string; mots: number; duree: string }) => void
 }
 
 const fieldStyle: React.CSSProperties = {
@@ -24,12 +25,25 @@ const fieldStyle: React.CSSProperties = {
   outline: 'none',
 }
 
-export function SemaineEnCours({ current: c, onCommencer }: Props) {
-  const [formOpen, setFormOpen] = useState(false)
-  const [titre, setTitre]       = useState('')
-  const [genre, setGenre]       = useState('')
-  const [synopsis, setSynopsis] = useState('')
-  const [objectif, setObjectif] = useState('6000')
+export function SemaineEnCours({ current: c, onCommencer, onSession }: Props) {
+  const [formOpen, setFormOpen]         = useState(false)
+  const [titre, setTitre]               = useState('')
+  const [genre, setGenre]               = useState('')
+  const [synopsis, setSynopsis]         = useState('')
+  const [objectif, setObjectif]         = useState('6000')
+
+  const [sessionOpen, setSessionOpen]   = useState(false)
+  const [sessionNote, setSessionNote]   = useState('')
+  const [sessionMots, setSessionMots]   = useState('')
+  const [sessionDuree, setSessionDuree] = useState('')
+
+  function handleSession() {
+    const mots = parseInt(sessionMots)
+    if (!sessionNote.trim() || !mots) return
+    onSession({ note: sessionNote.trim(), mots, duree: sessionDuree.trim() || '—' })
+    setSessionOpen(false)
+    setSessionNote(''); setSessionMots(''); setSessionDuree('')
+  }
 
   function handleSubmit() {
     if (!titre.trim()) return
@@ -163,9 +177,9 @@ export function SemaineEnCours({ current: c, onCommencer }: Props) {
       {/* ── CTA + deadline ────────────────────────────────────────────────────── */}
       <div style={{
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        gap: 24, marginBottom: 20, flexWrap: 'wrap',
+        gap: 24, marginBottom: sessionOpen ? 12 : 20, flexWrap: 'wrap',
       }}>
-        <Btn variant="primary" style={{ fontSize: 14, padding: '10px 18px' }}>
+        <Btn variant="primary" style={{ fontSize: 14, padding: '10px 18px' }} onClick={() => setSessionOpen(v => !v)}>
           <Plus size={16} />Enregistrer une session
         </Btn>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
@@ -176,6 +190,56 @@ export function SemaineEnCours({ current: c, onCommencer }: Props) {
           }}>J−{c.jours_restants}</span>
         </div>
       </div>
+
+      {/* ── Formulaire session ────────────────────────────────────────────────── */}
+      {sessionOpen && (
+        <div style={{
+          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+          borderRadius: 10, padding: '16px 20px', marginBottom: 20,
+          display: 'flex', flexDirection: 'column', gap: 10,
+        }}>
+          <Label>Nouvelle session</Label>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 110px', gap: 10 }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: 4 }}><Label>Note</Label></label>
+              <input
+                style={fieldStyle}
+                placeholder="Ce que tu as écrit…"
+                value={sessionNote}
+                onChange={e => setSessionNote(e.target.value)}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 4 }}><Label>Mots *</Label></label>
+              <input
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                type="number"
+                placeholder="1 200"
+                value={sessionMots}
+                onChange={e => setSessionMots(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSession()}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 4 }}><Label>Durée</Label></label>
+              <input
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                placeholder="1h30"
+                value={sessionDuree}
+                onChange={e => setSessionDuree(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handleSession()}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <Btn variant="ghost" onClick={() => setSessionOpen(false)}>Annuler</Btn>
+            <Btn variant="primary" style={{ fontSize: 13, padding: '6px 14px' }} onClick={handleSession}>
+              Ajouter
+            </Btn>
+          </div>
+        </div>
+      )}
 
       {/* ── Progression ───────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 28 }}>

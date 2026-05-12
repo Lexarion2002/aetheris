@@ -59,7 +59,8 @@ interface EcritureHebdoStore {
   weeks:   SemaineStats[]
   genres:  GenreStats[]
 
-  commencer: (data: { titre: string; genre: string; synopsis: string; objectif: number }) => void
+  commencer:      (data: { titre: string; genre: string; synopsis: string; objectif: number }) => void
+  ajouterSession: (session: { note: string; mots: number; duree: string }) => void
 }
 
 export const useEcritureHebdoStore = createPersistedStore<EcritureHebdoStore>(
@@ -94,6 +95,27 @@ export const useEcritureHebdoStore = createPersistedStore<EcritureHebdoStore>(
         : [...genres, { nom: genre, n: 1 }]
 
       set({ current: nouvelle, weeks: newWeeks, genres: newGenres })
+    },
+
+    ajouterSession: ({ note, mots, duree }) => {
+      const { current, weeks } = get()
+      if (!current) return
+
+      const dateStr = new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
+      const session: EcritureSession = { date: dateStr, note, mots, duree }
+      const newEcrits = current.ecrits + mots
+
+      const newCurrent: NouvelleActuelle = {
+        ...current,
+        ecrits: newEcrits,
+        sessions: [session, ...current.sessions],
+      }
+
+      const newWeeks: SemaineStats[] = weeks.map(w =>
+        w.n === current.n ? { ...w, mots: newEcrits } : w
+      )
+
+      set({ current: newCurrent, weeks: newWeeks })
     },
   }),
 )

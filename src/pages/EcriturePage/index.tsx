@@ -13,12 +13,13 @@ export function EcriturePage() {
   const past      = useEcritureHebdoStore(s => s.past)
   const weeks     = useEcritureHebdoStore(s => s.weeks)
   const genres    = useEcritureHebdoStore(s => s.genres)
-  const commencer = useEcritureHebdoStore(s => s.commencer)
+  const commencer      = useEcritureHebdoStore(s => s.commencer)
+  const ajouterSession = useEcritureHebdoStore(s => s.ajouterSession)
 
   return (
     <div>
       <EcritureHeader tab={tab} setTab={setTab} />
-      {tab === 'semaine' && <SemaineEnCours current={current} onCommencer={commencer} />}
+      {tab === 'semaine' && <SemaineEnCours current={current} onCommencer={commencer} onSession={ajouterSession} />}
       {tab === 'biblio'  && <Bibliotheque past={past} />}
       {tab === 'stats'   && <Statistiques weeks={weeks} genres={genres} past={past} />}
     </div>
