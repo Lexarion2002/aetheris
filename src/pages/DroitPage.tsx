@@ -1,67 +1,63 @@
-import { useState, useRef, useEffect } from 'react'
-import { Scale, BookOpen, Library, ExternalLink, Plus, X } from 'lucide-react'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 import { useDroitStore } from '../store/droitStore'
-import type { Matiere, NotesDroit, BiblioDroit, Memoire as MemoireType, Jalon as JalonType } from '../store/droitStore'
-import type { Echeance, TypeEcheance } from '../lib/droitEngine'
-import { daysUntil, urgencyScore, isOnFire, heuresRestantes, parseDate } from '../lib/droitEngine'
+import type { Tache, SousTache } from '../store/droitStore'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
-const MONTH_SHORT = ['jan', 'fév', 'mar', 'avr', 'mai', 'juin', 'juil', 'août', 'sep', 'oct', 'nov', 'déc'] as const
-const TAGS_DROIT = ['Important', 'À réviser', 'Jurisprudence', 'Doctrine'] as const
-const TYPES_ECHEANCE: TypeEcheance[] = ['Partiel', 'Exposé', 'Rendu', 'Mémoire']
-const TYPES_BIBLIO = ['Manuel', 'Article', 'Arrêt', 'Code'] as const
-
-// ─── Styles partagés ─────────────────────────────────────────────────────────
-
-const inpStyle: React.CSSProperties = {
-  background: 'var(--paper)', border: '1px solid var(--ink-4)', borderRadius: 6,
-  padding: '8px 10px', fontFamily: 'var(--font-sans)', fontSize: 14,
-  color: 'var(--ink)', outline: 'none', width: '100%', boxSizing: 'border-box',
+const parseDateFR = (s: string | null): Date | null => {
+  if (!s) return null
+  const parts = s.split('.').map(Number)
+  if (parts.length !== 3) return null
+  const [d, m, y] = parts
+  return new Date(y, m - 1, d)
 }
 
-const btnPrimary: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', borderRadius: 6,
-  padding: '6px 12px', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+const daysBetween = (a: Date, b: Date): number =>
+  Math.round((b.getTime() - a.getTime()) / 86400000)
+
+const formatDeadline = (s: string | null): { label: string; diff: number } | null => {
+  const d = parseDateFR(s)
+  if (!d) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const diff = daysBetween(today, d)
+  const prefix = s!.slice(0, 5)
+  let label: string
+  if (diff < 0) label = `passée · ${prefix}`
+  else if (diff === 0) label = `aujourd'hui · ${prefix}`
+  else if (diff === 1) label = `demain · ${prefix}`
+  else if (diff < 7) label = `dans ${diff} j · ${prefix}`
+  else label = prefix
+  return { label, diff }
 }
 
-const btnSecondary: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  background: 'transparent', color: 'var(--ink-2)', border: '1px solid var(--paper-2)',
-  borderRadius: 6, padding: '6px 10px', fontFamily: 'var(--font-sans)', fontSize: 13, cursor: 'pointer',
+const taskProgress = (task: Tache): number => {
+  if (task.subtasks.length > 0) {
+    const done = task.subtasks.filter((s) => s.done).length
+    return Math.round((done / task.subtasks.length) * 100)
+  }
+  return task.manualProgress ?? 0
 }
 
-const smallStepBtn: React.CSSProperties = {
-  background: 'var(--paper-2)', border: 'none', borderRadius: 4, padding: '2px 7px',
-  fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-2)', cursor: 'pointer',
-}
+const DIST_SLOTS = ['mar. soir', 'jeu. soir', 'week-end'] as const
 
-const ghostBtn: React.CSSProperties = {
-  display: 'inline-flex', alignItems: 'center', gap: 5,
-  background: 'transparent', border: '1px solid var(--paper-2)',
-  borderRadius: 6, padding: '4px 8px', cursor: 'pointer',
-  fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-2)', whiteSpace: 'nowrap',
-}
-
-// ─── Local helpers ────────────────────────────────────────────────────────────
-
-const dayLabel = (d: Date): string => {
-  const days = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.']
-  return `${days[d.getDay()]} ${String(d.getDate()).padStart(2, '0')} ${MONTH_SHORT[d.getMonth()]}`
-}
-
-const weekNum = (d: Date): number => {
-  const date = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()))
-  const dayN = date.getUTCDay() || 7
-  date.setUTCDate(date.getUTCDate() + 4 - dayN)
-  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1))
-  return Math.ceil(((date.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
-}
-
-const todayStr = (): string => {
-  const d = new Date()
-  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
+const buildDistribution = (task: Tache) => {
+  const remaining = task.subtasks.filter((s) => !s.done)
+  if (remaining.length === 0) {
+    if (task.estimation) {
+      return [{ slot: DIST_SLOTS[0], label: task.title, duration: task.estimation }]
+    }
+    return []
+  }
+  const n = Math.min(remaining.length, 3)
+  const durMap: Record<number, string> = { 1: '2 h', 2: '1 h 30', 3: '1 h' }
+  const dur = durMap[n] ?? '1 h'
+  return remaining.slice(0, 3).map((st, i) => ({
+    slot: DIST_SLOTS[i],
+    label: st.label,
+    duration: dur,
+  }))
 }
 
 // ─── Local primitives ─────────────────────────────────────────────────────────
@@ -73,1141 +69,733 @@ const Lbl = ({ children, style }: { children: React.ReactNode; style?: React.CSS
   }}>{children}</span>
 )
 
-const Num = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
+const Nm = ({ children, style }: { children: React.ReactNode; style?: React.CSSProperties }) => (
   <span style={{
     fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
     color: 'var(--ink)', letterSpacing: '0.01em', ...style,
   }}>{children}</span>
 )
 
-const Chip = ({
-  active, onClick, children,
-}: { active?: boolean; onClick?: () => void; children: React.ReactNode }) => (
-  <button onClick={onClick} style={{
-    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 400,
-    padding: '4px 10px', borderRadius: 999,
-    background: active ? 'var(--paper-3)' : 'var(--paper-1)',
-    border: `1px solid ${active ? 'var(--ink-4)' : 'var(--paper-2)'}`,
-    color: 'var(--ink)', cursor: 'pointer',
-  }}>{children}</button>
+// ─── TypeBadge ────────────────────────────────────────────────────────────────
+
+const TypeBadge = ({ type }: { type: string }) => (
+  <span style={{
+    fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em',
+    textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
+    background: 'var(--paper-2)', color: 'var(--ink)', fontWeight: 500,
+    display: 'inline-flex', alignItems: 'center', whiteSpace: 'nowrap',
+  }}>{type}</span>
 )
 
-const Badge = ({
-  tone = 'default', children,
-}: { tone?: 'default' | 'terra' | 'sauge'; children: React.ReactNode }) => {
-  const tones = {
-    default: { bg: 'var(--paper-2)', color: 'var(--ink-2)' },
-    terra:   { bg: 'var(--terra-soft)', color: '#6B2F14' },
-    sauge:   { bg: 'var(--sage-soft)', color: '#3F5A3C' },
-  }
-  const t = tones[tone]
-  return (
-    <span style={{
-      fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.08em',
-      textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
-      background: t.bg, color: t.color,
-    }}>{children}</span>
-  )
-}
+// ─── ProgressBar ─────────────────────────────────────────────────────────────
 
-const TypeBadge = ({ type }: { type: string }) => {
-  const tones: Record<string, { bg: string; color: string }> = {
-    Partiel: { bg: 'var(--ink)',        color: 'var(--paper-1)' },
-    Exposé:  { bg: 'var(--terra-soft)', color: '#6B2F14' },
-    Rendu:   { bg: 'var(--paper-2)',    color: 'var(--ink-2)' },
-    Mémoire: { bg: 'var(--sage-soft)',  color: '#3F5A3C' },
-  }
-  const t = tones[type] ?? tones.Rendu
-  return (
-    <span style={{
-      fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em',
-      textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
-      background: t.bg, color: t.color, whiteSpace: 'nowrap',
-    }}>{type}</span>
-  )
-}
-
-const SectionHead = ({
-  label, hint, children,
-}: { label: string; hint?: string; children?: React.ReactNode }) => (
-  <div style={{
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    marginBottom: 12, gap: 16, flexWrap: 'wrap',
-  }}>
-    <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexShrink: 0, minWidth: 0 }}>
-      <h2 style={{
-        fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--ink)',
-        letterSpacing: '-0.01em', margin: 0, lineHeight: 1.2, whiteSpace: 'nowrap',
-      }}>{label}</h2>
-      {hint && (
-        <span style={{
-          fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)',
-          fontStyle: 'italic', whiteSpace: 'nowrap',
-        }}>{hint}</span>
-      )}
-    </div>
-    {children}
-  </div>
-)
-
-const PrepBar = ({ value, accent }: { value: number; accent: string }) => (
-  <div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 3 }}>
-      <Lbl style={{ fontSize: 9 }}>préparation</Lbl>
-      <Num style={{ fontSize: 11.5, fontWeight: 500 }}>{value} %</Num>
-    </div>
-    <div style={{ height: 3, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
-      <div style={{ height: '100%', width: `${value}%`, background: accent, borderRadius: 999, transition: 'width 200ms ease' }} />
-    </div>
-  </div>
-)
-
-// ─── Tag toggle button ────────────────────────────────────────────────────────
-
-const TagToggle = ({
-  tag, active, onToggle,
-}: { tag: string; active: boolean; onToggle: () => void }) => (
-  <button onClick={onToggle} style={{
-    ...btnSecondary, padding: '3px 8px', fontSize: 12,
-    background: active ? 'var(--paper-3)' : 'transparent',
-    borderColor: active ? 'var(--ink-4)' : 'var(--paper-2)',
-    color: active ? 'var(--ink)' : 'var(--ink-2)',
-  }}>{tag}</button>
-)
-
-// ─── Section 1 : PrioritesSuggerees ──────────────────────────────────────────
-
-const DistRow = ({ jour, h }: { jour: string; h: string }) => (
-  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
-    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>{jour}</span>
-    <Num style={{ fontSize: 12, color: 'var(--ink)', whiteSpace: 'nowrap' }}>{h}</Num>
-  </div>
-)
-
-const Distribution = ({
-  surLeFeu, heuresTotal,
-}: { surLeFeu: Echeance[]; heuresTotal: number }) => {
-  const semaineCount = surLeFeu.filter((e) => daysUntil(parseDate(e.date)) <= 7).length
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
-      <Lbl>répartition suggérée</Lbl>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <DistRow jour="mar. soir" h="3–4 h" />
-        <DistRow jour="jeu. soir" h="3–4 h" />
-        <DistRow jour="sam. matin" h="5–6 h" />
-      </div>
-      <div style={{
-        marginTop: 6, paddingTop: 10, borderTop: '1px dashed var(--paper-2)',
-        fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
-        fontStyle: 'italic', lineHeight: 1.4,
-      }}>
-        ~<Num style={{ fontStyle: 'normal', fontWeight: 500, color: 'var(--ink)' }}>{heuresTotal} h</Num>
-        {' à placer · '}{semaineCount} échéance{semaineCount > 1 ? 's' : ''} sous 7 j
-      </div>
-    </div>
-  )
-}
-
-// Panel de notes qui s'ouvre sous le header
-const NotesDrawer = ({
-  matiereCode, notes, matieres, onClose,
-}: {
-  matiereCode: string
-  notes: NotesDroit[]
-  matieres: Matiere[]
-  onClose: () => void
-}) => {
-  const addNote = useDroitStore((s) => s.addNote)
-  const [showForm, setShowForm] = useState(false)
-  const [titre, setTitre] = useState('')
-  const [extrait, setExtrait] = useState('')
-  const [selectedTags, setSelectedTags] = useState<string[]>([])
-  const matiere = matieres.find((m) => m.code === matiereCode)
-
-  const handleAdd = () => {
-    if (!titre.trim()) return
-    addNote({ matiere: matiereCode, date: todayStr(), titre: titre.trim(), extrait: extrait.trim(), tags: selectedTags })
-    setTitre(''); setExtrait(''); setSelectedTags([])
-    setShowForm(false)
-  }
-
-  const toggleTag = (tag: string) =>
-    setSelectedTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])
-
+const ProgressBar = ({ value, style }: { value: number; style?: React.CSSProperties }) => {
+  const color = value >= 100 ? 'var(--sage)' : value < 50 ? 'var(--terra)' : 'var(--ink-2)'
   return (
     <div style={{
-      marginTop: 10, border: '1px solid var(--paper-2)', borderRadius: 12,
-      background: 'var(--paper-1)', overflow: 'hidden',
+      width: '100%', height: 4, background: 'var(--paper-2)',
+      borderRadius: 999, overflow: 'hidden', ...style,
     }}>
       <div style={{
-        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        padding: '10px 16px', borderBottom: '1px solid var(--paper-2)',
+        width: `${Math.max(0, Math.min(100, value))}%`, height: '100%',
+        background: color,
+        transition: 'width 180ms cubic-bezier(0.2,0.8,0.2,1), background 180ms cubic-bezier(0.2,0.8,0.2,1)',
+      }} />
+    </div>
+  )
+}
+
+// ─── Checkbox ────────────────────────────────────────────────────────────────
+
+const Checkbox = ({ checked, onChange }: { checked: boolean; onChange: () => void }) => (
+  <button
+    onClick={onChange}
+    role="checkbox"
+    aria-checked={checked}
+    style={{
+      width: 14, height: 14, padding: 0, flexShrink: 0,
+      border: `1px solid ${checked ? 'var(--terra)' : 'var(--ink-4)'}`,
+      background: checked ? 'var(--terra)' : 'transparent',
+      borderRadius: 3, cursor: 'pointer',
+      display: 'grid', placeItems: 'center',
+      transition: 'background 180ms ease, border-color 180ms ease',
+    }}
+  >
+    {checked && (
+      <svg viewBox="0 0 12 12" width="10" height="10" fill="none"
+        stroke="var(--paper-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <polyline points="2,6.5 5,9 10,3" />
+      </svg>
+    )}
+  </button>
+)
+
+// ─── EveningPriority ─────────────────────────────────────────────────────────
+
+const EveningPriority = ({ task }: { task: Tache }) => {
+  const dl = formatDeadline(task.deadline)
+  const urgent = dl && dl.diff < 3
+  const progress = taskProgress(task)
+  const dist = buildDistribution(task)
+
+  return (
+    <section style={{ marginBottom: 40 }}>
+      <Lbl style={{ display: 'block', marginBottom: 12 }}>Priorité du soir</Lbl>
+      <div style={{
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        borderLeft: '3px solid var(--terra)',
+        borderRadius: 12,
+        padding: '22px 26px',
+        display: 'grid',
+        gridTemplateColumns: dist.length > 0 ? 'minmax(0, 1.3fr) minmax(0, 1fr)' : '1fr',
+        gap: 32,
       }}>
-        <Lbl>Notes · {matiere?.court ?? matiereCode}</Lbl>
-        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            style={{ ...btnPrimary, padding: '4px 8px', fontSize: 12 }}>
-            <Plus size={11} /> Note
-          </button>
-          <button onClick={onClose} style={{ ...btnSecondary, padding: '4px 6px', border: 'none' }}>
-            <X size={14} />
-          </button>
-        </div>
-      </div>
-
-      {showForm && (
-        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--paper-2)', display: 'grid', gap: 8 }}>
-          <input
-            value={titre} onChange={(e) => setTitre(e.target.value)}
-            placeholder="Titre de la note" style={inpStyle} autoFocus
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowForm(false) }}
-          />
-          <textarea
-            value={extrait} onChange={(e) => setExtrait(e.target.value)}
-            placeholder="Extrait ou résumé..." rows={2}
-            style={{ ...inpStyle, resize: 'vertical' as const }}
-          />
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {TAGS_DROIT.map((tag) => (
-              <TagToggle key={tag} tag={tag} active={selectedTags.includes(tag)} onToggle={() => toggleTag(tag)} />
-            ))}
+        {/* Left */}
+        <div style={{ minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+            <TypeBadge type={task.type} />
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
+              letterSpacing: '0.04em', whiteSpace: 'nowrap',
+            }}>{task.matiere.toLowerCase()}</span>
           </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleAdd} style={btnPrimary}>Ajouter</button>
-            <button onClick={() => setShowForm(false)} style={btnSecondary}>Annuler</button>
-          </div>
-        </div>
-      )}
-
-      {notes.length === 0 && !showForm ? (
-        <div style={{ padding: '14px 16px', fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14 }}>
-          Aucune note pour cette matière.
-        </div>
-      ) : (
-        notes.map((n, i) => (
-          <div key={i} style={{
-            padding: '10px 16px',
-            borderBottom: i < notes.length - 1 ? '1px solid var(--paper-2)' : 'none',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 2 }}>
-              <Num style={{ fontSize: 10.5, color: 'var(--ink-3)' }}>{n.date}</Num>
-              <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>{n.titre}</span>
-            </div>
-            {n.extrait && (
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)', lineHeight: 1.4 }}>{n.extrait}</span>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 500,
+            color: 'var(--ink)', letterSpacing: '-0.01em', lineHeight: 1.2,
+            margin: '0 0 14px',
+          }}>{task.title}</h2>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 18, flexWrap: 'wrap' }}>
+            {dl && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 13,
+                color: urgent ? 'var(--terra)' : 'var(--ink-2)',
+                fontWeight: urgent ? 500 : 400, letterSpacing: '0.02em',
+              }}>{dl.label}</span>
+            )}
+            {task.estimation && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 12,
+                color: 'var(--ink-3)', letterSpacing: '0.02em',
+              }}>{task.estimation}</span>
             )}
           </div>
-        ))
-      )}
-    </div>
-  )
-}
+          <div style={{ marginTop: 18, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'nowrap' }}>
+            <ProgressBar value={progress} style={{ flex: 1, maxWidth: 220, minWidth: 80 }} />
+            <Nm style={{ fontSize: 12, color: 'var(--ink-2)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+              {progress} %
+            </Nm>
+          </div>
+        </div>
 
-const PrioBloc = ({
-  rang, e, dominant, matieres, notes, prep, openNotes, onNotesClick,
-}: {
-  rang: string
-  e: Echeance
-  dominant?: boolean
-  matieres: Matiere[]
-  notes: NotesDroit[]
-  prep: Record<string, number>
-  openNotes: boolean
-  onNotesClick: (code: string) => void
-}) => {
-  const m = matieres.find((mat) => mat.code === e.matiereCode)
-  const d = daysUntil(parseDate(e.date))
-  const prepVal = prep[e.id] ?? 0
-  const restant = 100 - prepVal
-  const heures = heuresRestantes(e, prep)
-  const notesCount = notes.filter((n) => n.matiere === e.matiereCode).length
-
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', gap: 10,
-      paddingRight: 20, borderRight: '1px solid var(--paper-2)',
-      opacity: dominant ? 1 : 0.78,
-    }}>
-      <Lbl style={{ color: dominant ? 'var(--terra)' : 'var(--ink-3)' }}>{rang}</Lbl>
-      <div>
-        <span style={{
-          fontFamily: 'var(--font-serif)', fontSize: dominant ? 22 : 18, fontWeight: 500,
-          color: 'var(--ink)', lineHeight: 1.2, letterSpacing: '-0.005em',
-        }}>{m?.court} · {e.type.toLowerCase()}</span>
-      </div>
-      <p style={{
-        fontFamily: 'var(--font-serif)', fontStyle: 'italic',
-        fontSize: dominant ? 15 : 14, color: 'var(--ink-2)', margin: 0, lineHeight: 1.55, maxWidth: '40ch',
-      }}>
-        Il te reste{' '}
-        <span style={{ fontStyle: 'normal', fontWeight: 600, color: dominant ? 'var(--terra)' : 'var(--ink)' }}>{restant} %</span>
-        {' '}à finir en{' '}
-        <span style={{ fontStyle: 'normal', fontWeight: 600, color: dominant ? 'var(--terra)' : 'var(--ink)' }}>{d} j</span>
-        {' '}— environ{' '}
-        <span style={{ fontStyle: 'normal', fontWeight: 600, color: 'var(--ink)' }}>{heures} h</span>
-        {' '}de travail.
-      </p>
-      <div style={{ display: 'flex', gap: 6, marginTop: 'auto' }}>
-        <button
-          onClick={() => onNotesClick(e.matiereCode)}
-          style={{ ...ghostBtn, ...(openNotes ? { borderColor: 'var(--terra)', color: 'var(--terra)' } : {}) }}>
-          <BookOpen size={12} />notes ({notesCount})
-        </button>
-        <button style={ghostBtn}>
-          <Library size={12} />biblio
-        </button>
-      </div>
-    </div>
-  )
-}
-
-const PrioritesSuggerees = ({
-  surLeFeu, matieres, notes, prep,
-}: {
-  surLeFeu: Echeance[]
-  matieres: Matiere[]
-  notes: NotesDroit[]
-  prep: Record<string, number>
-}) => {
-  const [openNotesFor, setOpenNotesFor] = useState<string | null>(null)
-  const p1 = surLeFeu[0]
-  const p2 = surLeFeu[1]
-  const heuresTotal = surLeFeu.slice(0, 3).reduce((n, e) => n + heuresRestantes(e, prep), 0)
-  const today = new Date()
-
-  const handleNotesClick = (code: string) =>
-    setOpenNotesFor((prev) => (prev === code ? null : code))
-
-  return (
-    <header style={{ marginBottom: 24 }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6 }}>
-        <Scale size={13} style={{ color: 'var(--ink-3)' }} />
-        <Lbl style={{ whiteSpace: 'nowrap' }}>
-          {`droit · ${dayLabel(today)} · semaine ${weekNum(today)}`}
-        </Lbl>
-      </div>
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20,
-        background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 16,
-        padding: '20px 24px', alignItems: 'stretch',
-      }}>
-        {p1 && (
-          <PrioBloc
-            rang="priorité" e={p1} dominant matieres={matieres} notes={notes} prep={prep}
-            openNotes={openNotesFor === p1.matiereCode} onNotesClick={handleNotesClick}
-          />
+        {/* Right: distribution dynamique */}
+        {dist.length > 0 && (
+          <div style={{ borderLeft: '1px solid var(--paper-2)', paddingLeft: 24, minWidth: 0 }}>
+            <Lbl style={{ display: 'block', marginBottom: 12, color: 'var(--ink-3)' }}>
+              Répartition suggérée
+            </Lbl>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {dist.map((d, i) => (
+                <div key={i} style={{ display: 'flex', gap: 12, alignItems: 'baseline', minWidth: 0 }}>
+                  <span style={{
+                    fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
+                    letterSpacing: '0.06em', textTransform: 'uppercase',
+                    whiteSpace: 'nowrap', flexShrink: 0, width: 76,
+                  }}>{d.slot}</span>
+                  <span style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
+                    flex: 1, minWidth: 0, overflow: 'hidden',
+                    textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>{d.label}</span>
+                  <Nm style={{ fontSize: 12, color: 'var(--ink-2)', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {d.duration}
+                  </Nm>
+                </div>
+              ))}
+            </div>
+          </div>
         )}
-        {p2 && (
-          <PrioBloc
-            rang="puis" e={p2} matieres={matieres} notes={notes} prep={prep}
-            openNotes={openNotesFor === p2.matiereCode} onNotesClick={handleNotesClick}
-          />
-        )}
-        <Distribution surLeFeu={surLeFeu} heuresTotal={heuresTotal} />
       </div>
-
-      {openNotesFor && (
-        <NotesDrawer
-          matiereCode={openNotesFor}
-          notes={notes.filter((n) => n.matiere === openNotesFor)}
-          matieres={matieres}
-          onClose={() => setOpenNotesFor(null)}
-        />
-      )}
-    </header>
+    </section>
   )
 }
 
-// ─── Section 2 : SurLeFeu ────────────────────────────────────────────────────
+// ─── SubtaskRow ───────────────────────────────────────────────────────────────
 
-const EcheanceForm = ({
-  matieres, onClose,
-}: { matieres: Matiere[]; onClose: () => void }) => {
-  const addEcheance = useDroitStore((s) => s.addEcheance)
-  const [titre, setTitre] = useState('')
-  const [matiereCode, setMatiereCode] = useState(matieres[0]?.code ?? '')
-  const [type, setType] = useState<TypeEcheance>('Partiel')
-  const [date, setDate] = useState('')
-  const [poids, setPoids] = useState<'lourd' | 'moyen'>('moyen')
-
-  const handleSubmit = () => {
-    if (!titre.trim() || !date) return
-    addEcheance({ titre: titre.trim(), matiereCode, type, date, poids, detail: '' })
-    onClose()
-  }
-
-  return (
-    <div style={{
-      background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10,
-      padding: '14px 16px', marginBottom: 10,
-    }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr repeat(4, auto)', gap: 8, marginBottom: 10, alignItems: 'end' }}>
-        <input
-          value={titre} onChange={(e) => setTitre(e.target.value)}
-          placeholder="Titre de l'échéance" style={inpStyle} autoFocus
-          onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); if (e.key === 'Escape') onClose() }}
-        />
-        <select value={matiereCode} onChange={(e) => setMatiereCode(e.target.value)} style={{ ...inpStyle, width: 'auto' }}>
-          {matieres.map((m) => <option key={m.code} value={m.code}>{m.court}</option>)}
-        </select>
-        <select value={type} onChange={(e) => setType(e.target.value as TypeEcheance)} style={{ ...inpStyle, width: 'auto' }}>
-          {TYPES_ECHEANCE.map((t) => <option key={t}>{t}</option>)}
-        </select>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} style={{ ...inpStyle, width: 'auto' }} />
-        <select value={poids} onChange={(e) => setPoids(e.target.value as 'lourd' | 'moyen')} style={{ ...inpStyle, width: 'auto' }}>
-          <option value="moyen">Moyen</option>
-          <option value="lourd">Lourd</option>
-        </select>
-      </div>
-      <div style={{ display: 'flex', gap: 6 }}>
-        <button onClick={handleSubmit} style={btnPrimary}>Ajouter</button>
-        <button onClick={onClose} style={btnSecondary}>Annuler</button>
-      </div>
-    </div>
-  )
-}
-
-const FireRow = ({
-  e, matieres, prep,
-}: { e: Echeance; matieres: Matiere[]; prep: Record<string, number> }) => {
+const SubtaskRow = ({
+  subtask, onToggle, onRemove,
+}: { subtask: SousTache; onToggle: () => void; onRemove: () => void }) => {
   const [hover, setHover] = useState(false)
-  const setPrep = useDroitStore((s) => s.setPrep)
-  const m = matieres.find((mat) => mat.code === e.matiereCode)
-  const d = daysUntil(parseDate(e.date))
-  const prepVal = prep[e.id] ?? 0
-  const heures = heuresRestantes(e, prep)
-  const date = parseDate(e.date)
-  const day = String(date.getDate()).padStart(2, '0')
-  const mo = MONTH_SHORT[date.getMonth()]
-  const isCritical = d <= 7 && prepVal < 70
-
-  const handleDelta = (delta: number) =>
-    setPrep(e.id, Math.min(100, Math.max(0, prepVal + delta)))
-
   return (
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'grid', gridTemplateColumns: '56px 90px minmax(0, 1fr) 170px 84px',
-        gap: 14, alignItems: 'center', padding: '14px 16px',
-        background: 'var(--paper-1)', borderRadius: 10,
-        border: `1px solid ${hover ? 'var(--ink-4)' : isCritical ? '#DEB89C' : 'var(--paper-2)'}`,
-        transition: 'border-color var(--dur) var(--ease)',
-      }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
-        <Num style={{ fontSize: 20, fontWeight: 500, color: isCritical ? 'var(--terra)' : 'var(--ink)', lineHeight: 1 }}>
-          {day}
-        </Num>
-        <Num style={{ fontSize: 11, color: isCritical ? 'var(--terra)' : 'var(--ink-2)', textTransform: 'uppercase' }}>
-          {mo}
-        </Num>
-      </div>
-      <TypeBadge type={e.type} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-        <span style={{
-          fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{e.titre}</span>
-        <Lbl style={{ fontSize: 9.5 }}>{m?.court}</Lbl>
-      </div>
-      {/* Prep interactive */}
-      <div>
-        <PrepBar value={prepVal} accent={isCritical ? 'var(--terra)' : 'var(--ink-2)'} />
-        {hover && (
-          <div style={{ display: 'flex', gap: 4, marginTop: 5, justifyContent: 'flex-end' }}>
-            <button
-              onClick={(ev) => { ev.stopPropagation(); handleDelta(-10) }}
-              style={{ ...smallStepBtn, opacity: prepVal <= 0 ? 0.4 : 1 }}>
-              −10 %
-            </button>
-            <button
-              onClick={(ev) => { ev.stopPropagation(); handleDelta(+10) }}
-              style={{ ...smallStepBtn, opacity: prepVal >= 100 ? 0.4 : 1 }}>
-              +10 %
-            </button>
-          </div>
-        )}
-      </div>
-      <div style={{ justifySelf: 'end', display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
-        <Num style={{ fontSize: 13, fontWeight: 500, color: isCritical ? 'var(--terra)' : 'var(--ink)' }}>
-          J-{d}
-        </Num>
-        <Num style={{ fontSize: 11, color: 'var(--ink-3)' }}>~{heures} h</Num>
-      </div>
-    </div>
-  )
-}
-
-const SurLeFeu = ({
-  items, matieres, prep,
-}: { items: Echeance[]; matieres: Matiere[]; prep: Record<string, number> }) => {
-  const [showForm, setShowForm] = useState(false)
-  const hint = items.length > 0
-    ? `${items.length} échéance${items.length > 1 ? 's' : ''} active${items.length > 1 ? 's' : ''}`
-    : undefined
-
-  return (
-    <section style={{ marginBottom: 32 }}>
-      <SectionHead label="Sur le feu" hint={hint}>
-        <button onClick={() => setShowForm(!showForm)} style={{ ...btnPrimary, padding: '5px 10px', fontSize: 12 }}>
-          <Plus size={12} /> Échéance
-        </button>
-      </SectionHead>
-      {showForm && <EcheanceForm matieres={matieres} onClose={() => setShowForm(false)} />}
-      {items.length > 0 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {items.map((e) => (
-            <FireRow key={e.id} e={e} matieres={matieres} prep={prep} />
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-// ─── Section 3 : SuiviGlobal ─────────────────────────────────────────────────
-
-const MatiereDot = ({ m }: { m: Matiere }) => {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-  const updateMatierePrep = useDroitStore((s) => s.updateMatierePrep)
-
-  useEffect(() => {
-    if (!open) return
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [open])
-
-  const status = m.prep >= 70 ? 'ok' : m.prep >= 45 ? 'mid' : 'low'
-  const color = status === 'ok' ? 'var(--sage)' : status === 'mid' ? 'var(--ink-3)' : 'var(--terra)'
-  const symbol = status === 'ok' ? '✓' : status === 'low' ? '!' : '·'
-
-  return (
-    <div ref={ref} style={{ position: 'relative' }}>
-      <div
-        onClick={() => setOpen(!open)}
-        style={{
-          display: 'inline-flex', alignItems: 'center', gap: 6, cursor: 'pointer',
-          padding: '2px 6px', borderRadius: 6,
-          background: open ? 'var(--paper-2)' : 'transparent',
-          transition: 'background var(--dur) var(--ease)',
-        }}>
-        <span style={{
-          width: 14, height: 14, borderRadius: 999, background: color,
-          color: 'var(--paper-1)', display: 'inline-grid', placeItems: 'center',
-          fontFamily: 'var(--font-mono)', fontSize: 9, fontWeight: 600,
-        }}>{symbol}</span>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>{m.court}</span>
-        <Num style={{ fontSize: 11, color: 'var(--ink-3)' }}>{m.prep}%</Num>
-      </div>
-
-      {open && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 20,
-          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-          borderRadius: 8, padding: '10px 12px',
-          boxShadow: '0 6px 20px -8px rgba(58,46,34,.18)',
-          minWidth: 170,
-        }}>
-          <Lbl style={{ display: 'block', marginBottom: 8 }}>{m.nom}</Lbl>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <button
-              onClick={() => updateMatierePrep(m.code, m.prep - 5)}
-              style={{ ...smallStepBtn, opacity: m.prep <= 0 ? 0.4 : 1 }}>
-              −5 %
-            </button>
-            <Num style={{ flex: 1, textAlign: 'center', fontSize: 14, fontWeight: 500 }}>{m.prep} %</Num>
-            <button
-              onClick={() => updateMatierePrep(m.code, m.prep + 5)}
-              style={{ ...smallStepBtn, opacity: m.prep >= 100 ? 0.4 : 1 }}>
-              +5 %
-            </button>
-          </div>
-          <input
-            type="range" min={0} max={100} step={5} value={m.prep}
-            onChange={(e) => updateMatierePrep(m.code, Number(e.target.value))}
-            style={{ width: '100%', accentColor: 'var(--terra)', cursor: 'pointer' }}
-          />
-        </div>
-      )}
-    </div>
-  )
-}
-
-const SuiviGlobal = ({ matieres }: { matieres: Matiere[] }) => {
-  const sorted = [...matieres].sort((a, b) => a.prep - b.prep)
-  return (
-    <section style={{ marginBottom: 32 }}>
-      <div style={{
-        display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px',
-        background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-        borderRadius: 10, flexWrap: 'wrap',
-      }}>
-        <Lbl style={{ flexShrink: 0 }}>suivi global</Lbl>
-        <span style={{ width: 1, height: 18, background: 'var(--paper-2)' }} />
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 14, flex: 1 }}>
-          {sorted.map((m) => <MatiereDot key={m.code} m={m} />)}
-        </div>
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-          cliquer pour ajuster
-        </span>
-      </div>
-    </section>
-  )
-}
-
-// ─── Section 4 : Memoire ─────────────────────────────────────────────────────
-
-const JalonItem = ({ j }: { j: JalonType }) => {
-  const colors = {
-    fait:       { dot: 'var(--sage)',    text: 'var(--ink)' },
-    'en cours': { dot: 'var(--terra)',   text: 'var(--ink)' },
-    'à faire':  { dot: 'var(--paper-3)', text: 'var(--ink-3)' },
-  }
-  const c = colors[j.etat]
-  return (
-    <div style={{
-      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
-      position: 'relative', zIndex: 1,
-    }}>
-      <div style={{
-        width: 12, height: 12, borderRadius: 999, background: c.dot,
-        border: '3px solid var(--paper-1)',
-      }} />
+      style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '6px 0' }}
+    >
+      <Checkbox checked={subtask.done} onChange={onToggle} />
       <span style={{
-        fontFamily: 'var(--font-sans)', fontSize: 11.5, color: c.text,
-        textAlign: 'center', lineHeight: 1.3, fontWeight: j.etat === 'en cours' ? 500 : 400,
-      }}>{j.label}</span>
-      <Num style={{ fontSize: 10, color: 'var(--ink-3)' }}>{j.date}</Num>
-    </div>
-  )
-}
-
-const Memoire = ({ memoire }: { memoire: MemoireType }) => {
-  const [showAll, setShowAll] = useState(false)
-  const [editing, setEditing] = useState(false)
-  const [draftPages, setDraftPages] = useState(memoire.pagesEcrites)
-  const [draftRdv, setDraftRdv] = useState(memoire.prochaineReunion)
-  const updateMemoire = useDroitStore((s) => s.updateMemoire)
-
-  useEffect(() => {
-    setDraftPages(memoire.pagesEcrites)
-    setDraftRdv(memoire.prochaineReunion)
-  }, [memoire.pagesEcrites, memoire.prochaineReunion])
-
-  const handleSave = () => {
-    updateMemoire({ pagesEcrites: Number(draftPages), prochaineReunion: draftRdv })
-    setEditing(false)
-  }
-
-  const j = memoire.jalonCourant
-  const d = daysUntil(parseDate(j.date))
-  const pct = Math.round((memoire.pagesEcrites / memoire.pagesTotal) * 100)
-
-  return (
-    <section style={{ marginBottom: 32 }}>
-      <SectionHead label="Mémoire" hint="suivi propre">
-        <button
-          onClick={() => setEditing(!editing)}
-          style={{ ...btnSecondary, fontSize: 12, padding: '4px 10px' }}>
-          {editing ? 'Fermer' : 'Modifier'}
-        </button>
-      </SectionHead>
-      <div style={{
-        background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-        borderRadius: 12, padding: '20px 24px',
-      }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 240px', gap: 28, alignItems: 'center' }}>
-          <div>
-            <Lbl style={{ marginBottom: 4, display: 'block' }}>
-              prochain jalon · directeur {memoire.directeur}
-            </Lbl>
-            <div style={{
-              fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500,
-              color: 'var(--ink)', lineHeight: 1.2, letterSpacing: '-0.005em', marginBottom: 8,
-            }}>{j.label}</div>
-            <p style={{
-              fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15,
-              color: 'var(--ink-2)', margin: 0, lineHeight: 1.4,
-            }}>
-              J-<Num style={{ fontStyle: 'normal', fontWeight: 500, color: 'var(--ink)' }}>{d}</Num>
-              {' · '}
-              <Num style={{ fontStyle: 'normal', fontWeight: 500, color: 'var(--ink)' }}>
-                {memoire.pagesEcrites}/{memoire.pagesTotal}
-              </Num>
-              {' pages écrites · prochain RDV '}{memoire.prochaineReunion}.
-            </p>
-          </div>
-          <div style={{
-            background: 'var(--paper-2)', borderRadius: 10, padding: '12px 14px',
-            display: 'flex', flexDirection: 'column', gap: 6,
-          }}>
-            <Lbl style={{ fontSize: 9.5 }}>rédaction</Lbl>
-            <Num style={{ fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 500, color: 'var(--ink)', lineHeight: 1 }}>
-              {pct} <span style={{ fontSize: 14, color: 'var(--ink-3)' }}>%</span>
-            </Num>
-            <div style={{ height: 3, background: 'var(--paper-3)', borderRadius: 999, overflow: 'hidden' }}>
-              <div style={{ height: '100%', width: `${pct}%`, background: 'var(--ink)', transition: 'width 200ms ease' }} />
-            </div>
-          </div>
-        </div>
-
-        {/* Formulaire d'édition inline */}
-        {editing && (
-          <div style={{
-            marginTop: 16, paddingTop: 16, borderTop: '1px dashed var(--paper-2)',
-            display: 'grid', gridTemplateColumns: '160px 1fr', gap: 10, alignItems: 'end',
-          }}>
-            <label style={{ display: 'grid', gap: 4 }}>
-              <Lbl>Pages écrites</Lbl>
-              <input
-                type="number" value={draftPages} min={0} max={memoire.pagesTotal}
-                onChange={(e) => setDraftPages(Number(e.target.value))}
-                style={inpStyle}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
-              />
-            </label>
-            <label style={{ display: 'grid', gap: 4 }}>
-              <Lbl>Prochain RDV</Lbl>
-              <input
-                value={draftRdv} onChange={(e) => setDraftRdv(e.target.value)}
-                style={inpStyle} placeholder="ex : lun. 18 mai · 10h00"
-                onKeyDown={(e) => { if (e.key === 'Enter') handleSave(); if (e.key === 'Escape') setEditing(false) }}
-              />
-            </label>
-            <div style={{ display: 'flex', gap: 6, gridColumn: '1 / -1' }}>
-              <button onClick={handleSave} style={btnPrimary}>Enregistrer</button>
-              <button onClick={() => setEditing(false)} style={btnSecondary}>Annuler</button>
-            </div>
-          </div>
-        )}
-
-        <button
-          onClick={() => setShowAll(!showAll)}
-          style={{
-            marginTop: 16, background: 'transparent', border: 0, cursor: 'pointer',
-            fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-3)',
-            padding: 0, display: 'inline-flex', alignItems: 'center', gap: 4,
-          }}>
-          {showAll ? '▾' : '▸'} {showAll ? 'masquer' : 'voir'} les {memoire.jalonsTous.length} jalons
-        </button>
-
-        {showAll && (
-          <div style={{
-            marginTop: 14, paddingTop: 14, borderTop: '1px dashed var(--paper-2)',
-            display: 'grid',
-            gridTemplateColumns: `repeat(${memoire.jalonsTous.length}, 1fr)`,
-            gap: 8, position: 'relative',
-          }}>
-            <div style={{
-              position: 'absolute', left: 8, right: 8, top: 14 + 7,
-              height: 1, background: 'var(--paper-2)', zIndex: 0,
-            }} />
-            {memoire.jalonsTous.map((jl, i) => <JalonItem key={i} j={jl} />)}
-          </div>
-        )}
-      </div>
-    </section>
-  )
-}
-
-// ─── Section 5 : ApresUrgent ─────────────────────────────────────────────────
-
-const CompactRow = ({
-  e, last, matieres,
-}: { e: Echeance; last: boolean; matieres: Matiere[] }) => {
-  const m = matieres.find((mat) => mat.code === e.matiereCode)
-  const d = daysUntil(parseDate(e.date))
-  const date = parseDate(e.date)
-  const day = String(date.getDate()).padStart(2, '0')
-  const mo = MONTH_SHORT[date.getMonth()]
-
-  return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '60px 90px 1fr 80px',
-      gap: 16, alignItems: 'center', padding: '10px 4px',
-      borderBottom: last ? 'none' : '1px solid var(--paper-2)',
-      opacity: 0.85,
-    }}>
-      <Num style={{ fontSize: 12, color: 'var(--ink-2)' }}>{day} {mo}</Num>
-      <TypeBadge type={e.type} />
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0 }}>
-        <span style={{
-          fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{e.titre}</span>
-        <Lbl style={{ fontSize: 9.5 }}>{m?.court}</Lbl>
-      </div>
-      <Num style={{ fontSize: 12, color: 'var(--ink-3)', justifySelf: 'end' }}>J-{d}</Num>
-    </div>
-  )
-}
-
-const ApresUrgent = ({
-  items, matieres,
-}: { items: Echeance[]; matieres: Matiere[] }) => {
-  const [open, setOpen] = useState(false)
-  if (items.length === 0) return null
-
-  return (
-    <section style={{ marginBottom: 32 }}>
+        flex: 1,
+        fontFamily: 'var(--font-sans)', fontSize: 14,
+        color: subtask.done ? 'var(--ink-3)' : 'var(--ink)',
+        textDecoration: subtask.done ? 'line-through' : 'none',
+        textDecorationColor: 'var(--ink-4)',
+      }}>{subtask.label}</span>
       <button
-        onClick={() => setOpen(!open)}
+        onClick={onRemove}
         style={{
-          width: '100%', textAlign: 'left',
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          background: 'transparent', border: 0, cursor: 'pointer', padding: '8px 0',
-          borderTop: '1px solid var(--paper-2)',
-          borderBottom: open ? '1px solid var(--paper-2)' : undefined,
-          marginBottom: open ? 14 : 0,
-        }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
-            {open ? '▾' : '▸'} Au-delà
-          </span>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-            {items.length} échéance{items.length > 1 ? 's' : ''} sans alerte immédiate
-          </span>
-        </div>
+          opacity: hover ? 0.6 : 0,
+          background: 'transparent', border: 0, cursor: 'pointer',
+          padding: 4, color: 'var(--ink-3)',
+          transition: 'opacity 180ms ease',
+          display: 'flex', alignItems: 'center',
+        }}
+        aria-label="Supprimer la sous-tâche"
+      >
+        <X size={14} />
       </button>
-      {open && (
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          {items.map((e, i) => (
-            <CompactRow key={e.id} e={e} last={i === items.length - 1} matieres={matieres} />
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-// ─── Section 6 : Referentiel ─────────────────────────────────────────────────
-
-const TAG_TONES: Record<string, 'terra' | 'sauge' | 'default'> = {
-  Important:     'terra',
-  'À réviser':   'default',
-  Jurisprudence: 'sauge',
-  Doctrine:      'default',
-}
-
-const NoteRow = ({
-  n, last, matieres,
-}: { n: NotesDroit; last: boolean; matieres: Matiere[] }) => {
-  const m = matieres.find((mat) => mat.code === n.matiere)
-  return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '90px 1fr 180px',
-      gap: 16, padding: '12px 16px', alignItems: 'center',
-      borderBottom: last ? 'none' : '1px solid var(--paper-2)', cursor: 'pointer',
-    }}>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-        <Num style={{ fontSize: 11.5 }}>{n.date}</Num>
-        <Lbl style={{ fontSize: 9 }}>{m?.court}</Lbl>
-      </div>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{
-          fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 500, color: 'var(--ink)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{n.titre}</span>
-        <span style={{
-          fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
-          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-        }}>{n.extrait}</span>
-      </div>
-      <div style={{ display: 'flex', gap: 4, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
-        {n.tags.map((tag) => (
-          <Badge key={tag} tone={TAG_TONES[tag] ?? 'default'}>{tag}</Badge>
-        ))}
-      </div>
     </div>
   )
 }
 
-const NotesList = ({
-  notes, matieres,
-}: { notes: NotesDroit[]; matieres: Matiere[] }) => {
-  const addNote = useDroitStore((s) => s.addNote)
-  const [filter, setFilter] = useState('toutes')
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({
-    matiere: matieres[0]?.code ?? '',
-    titre: '', extrait: '', tags: [] as string[],
-  })
+// ─── ProgressSlider ───────────────────────────────────────────────────────────
 
-  const codes = ['toutes', ...Array.from(new Set(notes.map((n) => n.matiere)))]
-  const filtered = filter === 'toutes' ? notes : notes.filter((n) => n.matiere === filter)
-
-  const toggleTag = (tag: string) =>
-    setForm((f) => ({ ...f, tags: f.tags.includes(tag) ? f.tags.filter((t) => t !== tag) : [...f.tags, tag] }))
-
-  const handleAdd = () => {
-    if (!form.titre.trim()) return
-    addNote({ ...form, titre: form.titre.trim(), extrait: form.extrait.trim(), date: todayStr() })
-    setForm({ matiere: matieres[0]?.code ?? '', titre: '', extrait: '', tags: [] })
-    setShowForm(false)
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        {codes.map((c) => (
-          <Chip key={c} active={filter === c} onClick={() => setFilter(c)}>
-            {c === 'toutes' ? 'Toutes' : matieres.find((m) => m.code === c)?.court ?? c}
-          </Chip>
-        ))}
-        <button
-          onClick={() => setShowForm(!showForm)}
-          style={{ ...btnPrimary, padding: '4px 10px', fontSize: 12, marginLeft: 'auto' }}>
-          <Plus size={11} /> Note
-        </button>
-      </div>
-
-      {showForm && (
-        <div style={{
-          background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10,
-          padding: '14px 16px', marginBottom: 10, display: 'grid', gap: 8,
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: 8 }}>
-            <select
-              value={form.matiere} onChange={(e) => setForm((f) => ({ ...f, matiere: e.target.value }))}
-              style={{ ...inpStyle, width: 'auto' }}>
-              {matieres.map((m) => <option key={m.code} value={m.code}>{m.court}</option>)}
-            </select>
-            <input
-              value={form.titre} onChange={(e) => setForm((f) => ({ ...f, titre: e.target.value }))}
-              placeholder="Titre de la note" style={inpStyle} autoFocus
-              onKeyDown={(e) => { if (e.key === 'Escape') setShowForm(false) }}
-            />
-          </div>
-          <textarea
-            value={form.extrait} onChange={(e) => setForm((f) => ({ ...f, extrait: e.target.value }))}
-            placeholder="Extrait ou résumé..." rows={2}
-            style={{ ...inpStyle, resize: 'vertical' as const }}
-          />
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-            {TAGS_DROIT.map((tag) => (
-              <TagToggle key={tag} tag={tag} active={form.tags.includes(tag)} onToggle={() => toggleTag(tag)} />
-            ))}
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleAdd} style={btnPrimary}>Ajouter</button>
-            <button onClick={() => setShowForm(false)} style={btnSecondary}>Annuler</button>
-          </div>
-        </div>
-      )}
-
-      <div style={{
-        background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-        borderRadius: 10, overflow: 'hidden',
-      }}>
-        {filtered.length === 0 ? (
-          <div style={{ padding: '20px 16px', fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14 }}>
-            Aucune note pour cette matière.
-          </div>
-        ) : (
-          filtered.map((n, i, a) => (
-            <NoteRow key={i} n={n} last={i === a.length - 1} matieres={matieres} />
-          ))
-        )}
-      </div>
+const ProgressSlider = ({ value, onChange }: { value: number; onChange: (v: number) => void }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '8px 0' }}>
+    <Lbl>Progression</Lbl>
+    <div style={{ flex: 1, display: 'flex', alignItems: 'center', height: 18 }}>
+      <input
+        type="range" min={0} max={100} step={5}
+        value={value}
+        onChange={(e) => onChange(Number(e.target.value))}
+        style={{ width: '100%', accentColor: 'var(--terra)' }}
+      />
     </div>
-  )
-}
-
-const BiblioRow = ({ it, last }: { it: { type: string; auteur: string; titre: string; meta: string }; last: boolean }) => {
-  const tones: Record<string, { bg: string; color: string }> = {
-    Manuel:  { bg: 'var(--paper-2)',    color: 'var(--ink-2)' },
-    Article: { bg: 'var(--paper-2)',    color: 'var(--ink-2)' },
-    Arrêt:   { bg: 'var(--sage-soft)', color: '#3F5A3C' },
-    Code:    { bg: 'var(--terra-soft)', color: '#6B2F14' },
-  }
-  const tt = tones[it.type] ?? tones.Manuel
-
-  return (
-    <div style={{
-      display: 'grid', gridTemplateColumns: '80px 1fr auto',
-      gap: 16, padding: '12px 16px', alignItems: 'center',
-      borderBottom: last ? 'none' : '1px solid var(--paper-2)', cursor: 'pointer',
-    }}>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em',
-        textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
-        background: tt.bg, color: tt.color, justifySelf: 'start',
-      }}>{it.type}</span>
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
-        <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14.5, fontWeight: 500, color: 'var(--ink)' }}>
-          {it.titre}
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, fontSize: 12 }}>
-          <span style={{ fontFamily: 'var(--font-sans)', color: 'var(--ink-2)' }}>{it.auteur}</span>
-          <span style={{ color: 'var(--ink-4)' }}>·</span>
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>{it.meta}</span>
-        </div>
-      </div>
-      <ExternalLink size={13} style={{ color: 'var(--ink-3)' }} />
-    </div>
-  )
-}
-
-const BiblioList = ({
-  biblio, matieres,
-}: { biblio: BiblioDroit[]; matieres: Matiere[] }) => {
-  const addBiblioItem = useDroitStore((s) => s.addBiblioItem)
-  const [active, setActive] = useState(biblio[0]?.matiere ?? '')
-  const [showForm, setShowForm] = useState(false)
-  const [form, setForm] = useState({ type: 'Manuel', auteur: '', titre: '', meta: '' })
-
-  const cur = biblio.find((g) => g.matiere === active) ?? biblio[0]
-
-  const handleAdd = () => {
-    if (!form.titre.trim() || !form.auteur.trim()) return
-    addBiblioItem(active, { ...form, titre: form.titre.trim(), auteur: form.auteur.trim(), meta: form.meta.trim() })
-    setForm({ type: 'Manuel', auteur: '', titre: '', meta: '' })
-    setShowForm(false)
-  }
-
-  return (
-    <div>
-      <div style={{ display: 'flex', gap: 6, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-        {biblio.map((g) => (
-          <Chip key={g.matiere} active={active === g.matiere} onClick={() => setActive(g.matiere)}>
-            {matieres.find((m) => m.code === g.matiere)?.court ?? g.matiere} · {g.items.length}
-          </Chip>
-        ))}
-        <button
-          onClick={() => setShowForm(!showForm)}
-          style={{ ...btnPrimary, padding: '4px 10px', fontSize: 12, marginLeft: 'auto' }}>
-          <Plus size={11} /> Référence
-        </button>
-      </div>
-
-      {showForm && (
-        <div style={{
-          background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 10,
-          padding: '14px 16px', marginBottom: 10, display: 'grid', gap: 8,
-        }}>
-          <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr 1fr auto', gap: 8 }}>
-            <select
-              value={form.type} onChange={(e) => setForm((f) => ({ ...f, type: e.target.value }))}
-              style={{ ...inpStyle, width: 'auto' }}>
-              {TYPES_BIBLIO.map((t) => <option key={t}>{t}</option>)}
-            </select>
-            <input
-              value={form.auteur} onChange={(e) => setForm((f) => ({ ...f, auteur: e.target.value }))}
-              placeholder="Auteur" style={inpStyle} autoFocus
-              onKeyDown={(e) => { if (e.key === 'Escape') setShowForm(false) }}
-            />
-            <input
-              value={form.titre} onChange={(e) => setForm((f) => ({ ...f, titre: e.target.value }))}
-              placeholder="Titre" style={inpStyle}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowForm(false) }}
-            />
-            <input
-              value={form.meta} onChange={(e) => setForm((f) => ({ ...f, meta: e.target.value }))}
-              placeholder="Référence (éd., revue…)" style={{ ...inpStyle, width: 'auto' }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleAdd(); if (e.key === 'Escape') setShowForm(false) }}
-            />
-          </div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            <button onClick={handleAdd} style={btnPrimary}>Ajouter</button>
-            <button onClick={() => setShowForm(false)} style={btnSecondary}>Annuler</button>
-          </div>
-        </div>
-      )}
-
-      {cur && (
-        <div style={{
-          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-          borderRadius: 10, overflow: 'hidden',
-        }}>
-          {cur.items.map((it, i, a) => (
-            <BiblioRow key={i} it={it} last={i === a.length - 1} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-const TabBtn = ({
-  active, onClick, children,
-}: { active: boolean; onClick: () => void; children: React.ReactNode }) => (
-  <button onClick={onClick} style={{
-    background: active ? 'var(--paper-1)' : 'transparent',
-    color: active ? 'var(--ink)' : 'var(--ink-2)',
-    border: 0, padding: '5px 12px', borderRadius: 6, cursor: 'pointer',
-    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: active ? 500 : 400,
-  }}>{children}</button>
+    <Nm style={{ fontSize: 13, color: 'var(--ink)', minWidth: 38, textAlign: 'right' }}>
+      {value} %
+    </Nm>
+  </div>
 )
 
-const Referentiel = ({
-  notes, biblio, matieres,
-}: { notes: NotesDroit[]; biblio: BiblioDroit[]; matieres: Matiere[] }) => {
-  const [tab, setTab] = useState<'notes' | 'biblio'>('notes')
-  const totalBiblio = biblio.reduce((n, m) => n + m.items.length, 0)
+// ─── TaskCard ─────────────────────────────────────────────────────────────────
+
+const TaskCard = ({
+  task, expanded, onToggleExpand,
+  onSubtaskToggle, onAddSubtask, onRemoveSubtask,
+  onProgressChange, onNoteChange, onDelete,
+}: {
+  task: Tache
+  expanded: boolean
+  onToggleExpand: () => void
+  onSubtaskToggle: (id: string) => void
+  onAddSubtask: (label: string) => void
+  onRemoveSubtask: (id: string) => void
+  onProgressChange: (v: number) => void
+  onNoteChange: (note: string) => void
+  onDelete: () => void
+}) => {
+  const progress = taskProgress(task)
+  const completed = progress >= 100
+  const dl = formatDeadline(task.deadline)
+  const urgent = dl && dl.diff < 3 && !completed
+  const overdue = dl && dl.diff < 0 && !completed
+
+  const [noteEditing, setNoteEditing] = useState(false)
+  const [noteDraft, setNoteDraft] = useState(task.note)
+  const [addingSubtask, setAddingSubtask] = useState(false)
+  const [newSubtaskLabel, setNewSubtaskLabel] = useState('')
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const subtaskInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    if (!noteEditing) setNoteDraft(task.note)
+  }, [task.note, noteEditing])
+
+  const handleAddSubtask = () => {
+    if (newSubtaskLabel.trim()) onAddSubtask(newSubtaskLabel.trim())
+    setNewSubtaskLabel('')
+    setAddingSubtask(false)
+  }
 
   return (
-    <section>
-      <SectionHead label="Référentiel" hint="consulté à la demande">
-        <div style={{
-          display: 'inline-flex', borderRadius: 8, padding: 2,
-          background: 'var(--paper-2)', gap: 2,
+    <div style={{
+      background: 'var(--paper-1)',
+      border: '1px solid var(--paper-2)',
+      borderRadius: 12,
+      opacity: completed ? 0.55 : 1,
+      transition: 'opacity 180ms ease',
+    }}>
+      {/* Header */}
+      <button
+        onClick={onToggleExpand}
+        style={{
+          width: '100%', display: 'flex', gap: 14, alignItems: 'flex-start',
+          padding: '14px 18px',
+          background: 'transparent', border: 0, cursor: 'pointer', textAlign: 'left',
+        }}
+      >
+        <span style={{
+          color: 'var(--ink-3)', display: 'inline-flex', flexShrink: 0, marginTop: 3,
+          transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)',
+          transition: 'transform 180ms ease',
         }}>
-          <TabBtn active={tab === 'notes'} onClick={() => setTab('notes')}>
-            Notes · {notes.length}
-          </TabBtn>
-          <TabBtn active={tab === 'biblio'} onClick={() => setTab('biblio')}>
-            Bibliographie · {totalBiblio}
-          </TabBtn>
+          <ChevronRight size={16} />
+        </span>
+
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, flexWrap: 'wrap', marginBottom: 8 }}>
+            <span style={{
+              fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500,
+              color: 'var(--ink)', lineHeight: 1.3,
+              textDecoration: completed ? 'line-through' : 'none',
+              textDecorationColor: 'var(--ink-4)',
+              letterSpacing: '-0.005em',
+            }}>{task.title}</span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
+              letterSpacing: '0.04em', whiteSpace: 'nowrap', flexShrink: 0, marginTop: 2,
+            }}>{task.matiere.toLowerCase()}</span>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap' }}>
+            {completed
+              ? (
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em',
+                  textTransform: 'uppercase', padding: '3px 8px', borderRadius: 4,
+                  background: 'var(--sage-soft)', color: 'var(--sage-deep)', fontWeight: 500,
+                  whiteSpace: 'nowrap',
+                }}>Terminé</span>
+              )
+              : <TypeBadge type={task.type} />
+            }
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.02em',
+              color: overdue ? 'var(--ink-3)' : urgent ? 'var(--terra)' : 'var(--ink-2)',
+              fontWeight: urgent ? 500 : 400, whiteSpace: 'nowrap',
+            }}>{dl ? dl.label : '—'}</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <ProgressBar value={progress} style={{ width: 100 }} />
+              <Nm style={{ fontSize: 12, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+                {progress} %
+              </Nm>
+            </div>
+          </div>
         </div>
-      </SectionHead>
-      {tab === 'notes'
-        ? <NotesList notes={notes} matieres={matieres} />
-        : <BiblioList biblio={biblio} matieres={matieres} />
-      }
-    </section>
+      </button>
+
+      {/* Body */}
+      {expanded && (
+        <div style={{ padding: '4px 18px 16px 52px', borderTop: '1px solid var(--paper-2)' }}>
+
+          {/* Subtasks or slider */}
+          {task.subtasks.length > 0 ? (
+            <div style={{ paddingTop: 10 }}>
+              {task.subtasks.map((s) => (
+                <SubtaskRow
+                  key={s.id}
+                  subtask={s}
+                  onToggle={() => onSubtaskToggle(s.id)}
+                  onRemove={() => onRemoveSubtask(s.id)}
+                />
+              ))}
+              {addingSubtask ? (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
+                  <div style={{ width: 14, flexShrink: 0 }} />
+                  <input
+                    ref={subtaskInputRef}
+                    autoFocus
+                    value={newSubtaskLabel}
+                    onChange={(e) => setNewSubtaskLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddSubtask()
+                      if (e.key === 'Escape') { setAddingSubtask(false); setNewSubtaskLabel('') }
+                    }}
+                    placeholder="Nouvelle sous-tâche…"
+                    style={{
+                      flex: 1, border: 0, outline: 'none', background: 'transparent',
+                      fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
+                      padding: '2px 0',
+                    }}
+                  />
+                  <button
+                    onClick={handleAddSubtask}
+                    style={{
+                      background: 'transparent', border: 0, cursor: 'pointer',
+                      color: 'var(--terra)', padding: 4, display: 'flex', alignItems: 'center',
+                    }}
+                    aria-label="Valider"
+                  >
+                    <Plus size={13} />
+                  </button>
+                  <button
+                    onClick={() => { setAddingSubtask(false); setNewSubtaskLabel('') }}
+                    style={{
+                      background: 'transparent', border: 0, cursor: 'pointer',
+                      color: 'var(--ink-3)', padding: 4, display: 'flex', alignItems: 'center',
+                    }}
+                    aria-label="Annuler"
+                  >
+                    <X size={13} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setAddingSubtask(true)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 6,
+                    background: 'transparent', border: 0, cursor: 'pointer',
+                    padding: '8px 0 4px', marginTop: 4,
+                    fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)',
+                  }}
+                >
+                  <Plus size={13} />
+                  <span>Sous-tâche</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <ProgressSlider
+              value={task.manualProgress ?? 0}
+              onChange={onProgressChange}
+            />
+          )}
+
+          {/* Note */}
+          <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed var(--paper-2)' }}>
+            {noteEditing ? (
+              <input
+                autoFocus
+                value={noteDraft}
+                onChange={(e) => setNoteDraft(e.target.value)}
+                onBlur={() => { onNoteChange(noteDraft); setNoteEditing(false) }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { onNoteChange(noteDraft); setNoteEditing(false) }
+                  if (e.key === 'Escape') { setNoteDraft(task.note); setNoteEditing(false) }
+                }}
+                placeholder="une note pour t'en souvenir…"
+                style={{
+                  width: '100%', border: 0, outline: 'none', background: 'transparent',
+                  fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic',
+                  color: 'var(--ink)', padding: 2,
+                }}
+              />
+            ) : (
+              <button
+                onClick={() => setNoteEditing(true)}
+                style={{
+                  background: 'transparent', border: 0, cursor: 'text',
+                  padding: 2, textAlign: 'left',
+                  fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic',
+                  color: task.note ? 'var(--ink-3)' : 'var(--ink-4)',
+                }}
+              >
+                {task.note || 'note…'}
+              </button>
+            )}
+          </div>
+
+          {/* Delete */}
+          <div style={{
+            display: 'flex', justifyContent: 'flex-end', alignItems: 'center',
+            gap: 8, marginTop: 10,
+          }}>
+            {confirmDelete ? (
+              <>
+                <span style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)',
+                }}>Supprimer ?</span>
+                <button
+                  onClick={onDelete}
+                  style={{
+                    background: 'var(--danger)', color: 'var(--paper-1)', border: 0,
+                    borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+                  }}
+                >Oui</button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{
+                    background: 'transparent', border: '1px solid var(--paper-2)',
+                    borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
+                  }}
+                >Annuler</button>
+              </>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--danger)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-3)')}
+                style={{
+                  background: 'transparent', border: 0, cursor: 'pointer',
+                  padding: '4px 8px', borderRadius: 6,
+                  fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)',
+                  display: 'inline-flex', alignItems: 'center', gap: 6,
+                  transition: 'color 180ms ease',
+                }}
+              >
+                <Trash2 size={12} />
+                <span>Supprimer la tâche</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── AddTaskForm ──────────────────────────────────────────────────────────────
+
+const AddTaskForm = ({
+  onSubmit, onCancel,
+}: {
+  onSubmit: (t: Omit<Tache, 'id' | 'createdAt' | 'subtasks' | 'estimation' | 'manualProgress'> & { deadline: string | null }) => void
+  onCancel: () => void
+}) => {
+  const [title, setTitle] = useState('')
+  const [matiere, setMatiere] = useState('')
+  const [type, setType] = useState<Tache['type']>('Partiel')
+  const [deadline, setDeadline] = useState('')
+  const [note, setNote] = useState('')
+
+  const field: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
+    background: 'var(--paper)', border: '1px solid var(--paper-2)',
+    borderRadius: 8, padding: '8px 12px', outline: 'none',
+    width: '100%', boxSizing: 'border-box',
+    transition: 'border-color 180ms ease',
+  }
+  const lbl: React.CSSProperties = {
+    display: 'block', marginBottom: 6,
+    fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em',
+    textTransform: 'uppercase', color: 'var(--ink-3)',
+  }
+
+  const handleSubmit = () => {
+    if (!title.trim()) return
+    const fmt = deadline ? deadline.split('-').reverse().join('.') : null
+    onSubmit({
+      title: title.trim(),
+      matiere: matiere.trim() || '—',
+      type,
+      deadline: fmt,
+      note: note.trim(),
+    })
+  }
+
+  return (
+    <div style={{
+      background: 'var(--paper-1)',
+      border: '1px dashed var(--ink-4)',
+      borderRadius: 12,
+      padding: '20px 22px',
+    }}>
+      <Lbl style={{ display: 'block', marginBottom: 14 }}>Nouvelle tâche</Lbl>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1.5fr 1fr 0.9fr 0.9fr',
+        gap: 12, marginBottom: 12,
+      }}>
+        <div>
+          <label style={lbl}>Titre</label>
+          <input
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="ex. Droit des sociétés"
+            style={field}
+            autoFocus
+            onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--ink)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+          />
+        </div>
+        <div>
+          <label style={lbl}>Matière</label>
+          <input
+            value={matiere}
+            onChange={(e) => setMatiere(e.target.value)}
+            placeholder="ex. Droit fiscal"
+            style={field}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--ink)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+          />
+        </div>
+        <div>
+          <label style={lbl}>Type</label>
+          <select
+            value={type}
+            onChange={(e) => setType(e.target.value as Tache['type'])}
+            style={{ ...field, cursor: 'pointer', appearance: 'none' }}
+          >
+            <option>Partiel</option>
+            <option>Exposé</option>
+            <option>Rendu</option>
+            <option>Mémoire</option>
+            <option>Autre</option>
+          </select>
+        </div>
+        <div>
+          <label style={lbl}>
+            Deadline{' '}
+            <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--ink-4)' }}>opt.</span>
+          </label>
+          <input
+            type="date"
+            value={deadline}
+            onChange={(e) => setDeadline(e.target.value)}
+            style={{ ...field, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+          />
+        </div>
+      </div>
+
+      <div style={{ marginBottom: 16 }}>
+        <label style={lbl}>
+          Note{' '}
+          <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--ink-4)' }}>opt.</span>
+        </label>
+        <input
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          placeholder="un repère pour s'y retrouver…"
+          style={{ ...field, fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}
+          onFocus={(e) => (e.target.style.borderColor = 'var(--ink)')}
+          onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+        />
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <button
+          onClick={onCancel}
+          style={{
+            background: 'transparent', border: 0, cursor: 'pointer',
+            padding: '6px 12px',
+            fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', borderRadius: 8,
+          }}
+        >Annuler</button>
+        <button
+          onClick={handleSubmit}
+          style={{
+            background: 'var(--terra)', color: 'var(--paper-1)', border: 0,
+            borderRadius: 8, padding: '6px 14px',
+            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+          }}
+        >Ajouter la tâche</button>
+      </div>
+    </div>
   )
 }
 
 // ─── DroitPage ────────────────────────────────────────────────────────────────
 
 export function DroitPage() {
-  const matieres  = useDroitStore((s) => s.matieres)
-  const echeances = useDroitStore((s) => s.echeances)
-  const prep      = useDroitStore((s) => s.prep)
-  const notes     = useDroitStore((s) => s.notes)
-  const biblio    = useDroitStore((s) => s.biblio)
-  const memoire   = useDroitStore((s) => s.memoire)
+  const taches               = useDroitStore((s) => s.taches)
+  const addTache             = useDroitStore((s) => s.addTache)
+  const deleteTache          = useDroitStore((s) => s.deleteTache)
+  const updateNote           = useDroitStore((s) => s.updateNote)
+  const toggleSousTache      = useDroitStore((s) => s.toggleSousTache)
+  const addSousTache         = useDroitStore((s) => s.addSousTache)
+  const removeSousTache      = useDroitStore((s) => s.removeSousTache)
+  const setProgressionManuelle = useDroitStore((s) => s.setProgressionManuelle)
 
-  const upcoming = [...echeances]
-    .filter((e) => daysUntil(parseDate(e.date)) >= 0)
-    .sort((a, b) => parseDate(a.date).getTime() - parseDate(b.date).getTime())
+  const [expandedId, setExpandedId] = useState<string | null>('t1')
+  const [addOpen, setAddOpen] = useState(false)
 
-  const surLeFeu = upcoming
-    .filter((e) => isOnFire(e, prep))
-    .sort((a, b) => urgencyScore(b, prep) - urgencyScore(a, prep))
+  const priorityTask = useMemo(() => {
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+    const candidates = taches
+      .filter((t) => taskProgress(t) < 100 && t.deadline)
+      .map((t) => ({ t, diff: daysBetween(today, parseDateFR(t.deadline)!) }))
+      .filter(({ diff }) => diff >= 0)
+    candidates.sort((a, b) => a.diff - b.diff)
+    return candidates[0]?.t ?? null
+  }, [taches])
 
-  const apresUrgent = upcoming.filter((e) => !isOnFire(e, prep))
+  const handleAdd = (data: Omit<Tache, 'id' | 'createdAt' | 'subtasks' | 'estimation' | 'manualProgress'> & { deadline: string | null }) => {
+    addTache({ ...data, estimation: '', subtasks: [], manualProgress: 0 })
+    setAddOpen(false)
+  }
+
+  const activeCount = taches.filter((t) => taskProgress(t) < 100).length
+
+  const weekLabel = (() => {
+    const d = new Date()
+    return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}`
+  })()
 
   return (
-    <div style={{ padding: '24px 48px 80px', maxWidth: 1100, margin: '0 auto' }}>
-      {/* 1 — Priorités suggérées */}
-      <PrioritesSuggerees surLeFeu={surLeFeu} matieres={matieres} notes={notes} prep={prep} />
-      {/* 2 — Sur le feu */}
-      <SurLeFeu items={surLeFeu} matieres={matieres} prep={prep} />
-      {/* 3 — Suivi global */}
-      <SuiviGlobal matieres={matieres} />
-      {/* 4 — Mémoire */}
-      <Memoire memoire={memoire} />
-      {/* 5 — Après l'urgent */}
-      <ApresUrgent items={apresUrgent} matieres={matieres} />
-      {/* 6 — Référentiel */}
-      <Referentiel notes={notes} biblio={biblio} matieres={matieres} />
+    <div style={{ padding: '32px 48px 64px', maxWidth: 1100, margin: '0 auto' }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 36 }}>
+        <Lbl>droit · master 2 · {weekLabel}</Lbl>
+        <h1 style={{
+          fontFamily: 'var(--font-serif)', fontSize: 44, fontWeight: 500,
+          color: 'var(--ink)', letterSpacing: '-0.01em',
+          margin: '6px 0 10px', lineHeight: 1.1,
+        }}>Tâches.</h1>
+        <p style={{
+          fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17,
+          color: 'var(--ink-2)', margin: 0, maxWidth: '60ch', lineHeight: 1.4,
+        }}>« Ce qui est urgent rarement, ce qui compte presque toujours. »</p>
+      </div>
+
+      {/* Priorité du soir */}
+      {priorityTask && <EveningPriority task={priorityTask} />}
+
+      {/* Liste */}
+      <section>
+        <div style={{
+          display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+          marginBottom: 14,
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+            <h2 style={{
+              fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 500,
+              color: 'var(--ink)', letterSpacing: '-0.01em', margin: 0,
+            }}>Tâches</h2>
+            <Nm style={{ fontSize: 13, color: 'var(--ink-3)' }}>
+              {activeCount} en cours · {taches.length} au total
+            </Nm>
+          </div>
+          {!addOpen && (
+            <button
+              onClick={() => setAddOpen(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'var(--terra)', color: 'var(--paper-1)', border: 0,
+                borderRadius: 8, padding: '6px 12px',
+                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, cursor: 'pointer',
+              }}
+            >
+              <Plus size={14} />Tâche
+            </button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {taches.map((t) => (
+            <TaskCard
+              key={t.id}
+              task={t}
+              expanded={expandedId === t.id}
+              onToggleExpand={() => setExpandedId(expandedId === t.id ? null : t.id)}
+              onSubtaskToggle={(sid) => toggleSousTache(t.id, sid)}
+              onAddSubtask={(label) => addSousTache(t.id, label)}
+              onRemoveSubtask={(sid) => removeSousTache(t.id, sid)}
+              onProgressChange={(v) => setProgressionManuelle(t.id, v)}
+              onNoteChange={(n) => updateNote(t.id, n)}
+              onDelete={() => deleteTache(t.id)}
+            />
+          ))}
+
+          {addOpen && (
+            <div style={{ marginTop: 8 }}>
+              <AddTaskForm onSubmit={handleAdd} onCancel={() => setAddOpen(false)} />
+            </div>
+          )}
+        </div>
+      </section>
     </div>
   )
 }
