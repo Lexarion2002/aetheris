@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { ChevronRight, Plus, X, Trash2 } from 'lucide-react'
 import { useDroitStore } from '../store/droitStore'
 import type { Tache, SousTache } from '../store/droitStore'
@@ -301,19 +301,18 @@ const TaskCard = ({
 
   const [noteEditing, setNoteEditing] = useState(false)
   const [noteDraft, setNoteDraft] = useState(task.note)
-  const [addingSubtask, setAddingSubtask] = useState(false)
-  const [newSubtaskLabel, setNewSubtaskLabel] = useState('')
+  const [addingSub, setAddingSub] = useState(false)
+  const [subDraft, setSubDraft] = useState('')
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const subtaskInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!noteEditing) setNoteDraft(task.note)
   }, [task.note, noteEditing])
 
-  const handleAddSubtask = () => {
-    if (newSubtaskLabel.trim()) onAddSubtask(newSubtaskLabel.trim())
-    setNewSubtaskLabel('')
-    setAddingSubtask(false)
+  const commitSub = () => {
+    if (subDraft.trim()) onAddSubtask(subDraft.trim())
+    setSubDraft('')
+    setAddingSub(false)
   }
 
   return (
@@ -386,8 +385,8 @@ const TaskCard = ({
       {expanded && (
         <div style={{ padding: '4px 18px 16px 52px', borderTop: '1px solid var(--paper-2)' }}>
 
-          {/* Subtasks or slider */}
-          {task.subtasks.length > 0 ? (
+          {/* Sous-tâches existantes */}
+          {task.subtasks.length > 0 && (
             <div style={{ paddingTop: 10 }}>
               {task.subtasks.map((s) => (
                 <SubtaskRow
@@ -397,66 +396,53 @@ const TaskCard = ({
                   onRemove={() => onRemoveSubtask(s.id)}
                 />
               ))}
-              {addingSubtask ? (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' }}>
-                  <div style={{ width: 14, flexShrink: 0 }} />
-                  <input
-                    ref={subtaskInputRef}
-                    autoFocus
-                    value={newSubtaskLabel}
-                    onChange={(e) => setNewSubtaskLabel(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') handleAddSubtask()
-                      if (e.key === 'Escape') { setAddingSubtask(false); setNewSubtaskLabel('') }
-                    }}
-                    placeholder="Nouvelle sous-tâche…"
-                    style={{
-                      flex: 1, border: 0, outline: 'none', background: 'transparent',
-                      fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
-                      padding: '2px 0',
-                    }}
-                  />
-                  <button
-                    onClick={handleAddSubtask}
-                    style={{
-                      background: 'transparent', border: 0, cursor: 'pointer',
-                      color: 'var(--terra)', padding: 4, display: 'flex', alignItems: 'center',
-                    }}
-                    aria-label="Valider"
-                  >
-                    <Plus size={13} />
-                  </button>
-                  <button
-                    onClick={() => { setAddingSubtask(false); setNewSubtaskLabel('') }}
-                    style={{
-                      background: 'transparent', border: 0, cursor: 'pointer',
-                      color: 'var(--ink-3)', padding: 4, display: 'flex', alignItems: 'center',
-                    }}
-                    aria-label="Annuler"
-                  >
-                    <X size={13} />
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setAddingSubtask(true)}
-                  style={{
-                    display: 'inline-flex', alignItems: 'center', gap: 6,
-                    background: 'transparent', border: 0, cursor: 'pointer',
-                    padding: '8px 0 4px', marginTop: 4,
-                    fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)',
-                  }}
-                >
-                  <Plus size={13} />
-                  <span>Sous-tâche</span>
-                </button>
-              )}
             </div>
-          ) : (
+          )}
+
+          {/* Slider (tâches sans sous-tâches, hors mode ajout) */}
+          {task.subtasks.length === 0 && !addingSub && (
             <ProgressSlider
               value={task.manualProgress ?? 0}
               onChange={onProgressChange}
             />
+          )}
+
+          {/* Input inline ajout sous-tâche */}
+          {addingSub && (
+            <input
+              autoFocus
+              value={subDraft}
+              onChange={(e) => setSubDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') commitSub()
+                if (e.key === 'Escape') { setSubDraft(''); setAddingSub(false) }
+              }}
+              onBlur={() => { if (!subDraft.trim()) setAddingSub(false) }}
+              placeholder="Nouvelle sous-tâche…"
+              style={{
+                display: 'block', width: '100%', marginTop: 6,
+                background: 'transparent', border: 0, outline: 'none',
+                borderBottom: '1px solid var(--ink-4)',
+                fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
+                padding: '4px 2px',
+              }}
+            />
+          )}
+
+          {/* Bouton + Sous-tâche (toujours visible quand non en cours d'ajout) */}
+          {!addingSub && (
+            <button
+              onClick={() => setAddingSub(true)}
+              style={{
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+                background: 'transparent', border: 0, cursor: 'pointer',
+                padding: '8px 0 4px', marginTop: task.subtasks.length > 0 ? 4 : 0,
+                fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)',
+              }}
+            >
+              <Plus size={13} />
+              <span>Sous-tâche</span>
+            </button>
           )}
 
           {/* Note */}

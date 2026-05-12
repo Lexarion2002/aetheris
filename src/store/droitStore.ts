@@ -30,6 +30,7 @@ export interface DroitStore {
   addSousTache: (tacheId: string, label: string) => void
   removeSousTache: (tacheId: string, sousTacheId: string) => void
   setProgressionManuelle: (tacheId: string, value: number) => void
+  setHasHydrated: (v: boolean) => void
 }
 
 // ─── Données initiales ────────────────────────────────────────────────────────
@@ -179,5 +180,15 @@ export const useDroitStore = createPersistedStore<DroitStore>(
             : t,
         ),
       })),
+
+    // Appelé par persistenceManager après rehydratation.
+    // Si Supabase/localStorage ne contient aucune donnée, on amorce avec les defaults.
+    setHasHydrated: (v) =>
+      set((s) => {
+        if (v && s.taches.length === 0) {
+          return { taches: DEFAULT_TACHES }
+        }
+        return {}
+      }),
   }),
 )
