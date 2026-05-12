@@ -1,8 +1,5 @@
 import { useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import {
-  Calendar,
-  Feather,
   Check,
   MessageSquare,
   Plus,
@@ -105,6 +102,22 @@ const btnGhost: React.CSSProperties = {
   fontWeight: 400,
 }
 
+const selectCustom: React.CSSProperties = {
+  appearance: 'none',
+  background: 'var(--paper)',
+  border: '1px solid var(--paper-2)',
+  borderRadius: 8,
+  padding: '8px 36px 8px 12px',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 14,
+  color: 'var(--ink)',
+  cursor: 'pointer',
+  outline: 'none',
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12' fill='none' stroke='%23A08B72' stroke-width='1.5' stroke-linecap='round'%3E%3Cpolyline points='3%2C5 6%2C8 9%2C5'/%3E%3C%2Fsvg%3E")`,
+  backgroundRepeat: 'no-repeat',
+  backgroundPosition: 'right 10px center',
+}
+
 // ─── GenreBadge ───────────────────────────────────────────────────────────────
 
 function GenreBadge({ genre }: { genre: Genre }) {
@@ -186,7 +199,6 @@ function Section({
 // ─── FocusHeader ──────────────────────────────────────────────────────────────
 
 function FocusHeader({ active, today }: { active: NouvelleEnCours | null; today: Date }) {
-  const navigate = useNavigate()
   const semaine = getSemaineISO(today)
   const jourFR = today.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
 
@@ -199,7 +211,7 @@ function FocusHeader({ active, today }: { active: NouvelleEnCours | null; today:
           fontSize: 42,
           fontWeight: 400,
           color: 'var(--ink)',
-          margin: '8px 0 12px',
+          margin: '8px 0 0',
           letterSpacing: '-0.01em',
         }}
       >
@@ -208,27 +220,18 @@ function FocusHeader({ active, today }: { active: NouvelleEnCours | null; today:
       {active?.synopsis && (
         <p
           style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: 15,
+            fontFamily: 'var(--font-serif)',
+            fontStyle: 'italic',
+            fontSize: 18,
             color: 'var(--ink-2)',
-            margin: '0 0 20px',
-            maxWidth: 560,
-            lineHeight: 1.6,
+            margin: '12px 0 0',
+            maxWidth: '54ch',
+            lineHeight: 1.45,
           }}
         >
           {active.synopsis}
         </p>
       )}
-      <div style={{ display: 'flex', gap: 10 }}>
-        <button style={btnSecondary} onClick={() => navigate('/week')}>
-          <Calendar size={15} />
-          Voir la semaine
-        </button>
-        <button style={btnPrimary}>
-          <Feather size={15} />
-          Ouvrir le draft
-        </button>
-      </div>
     </div>
   )
 }
@@ -274,11 +277,13 @@ function PrioriteSoir({
   today,
   avancerEtape,
   ajouterNote,
+  finaliser,
 }: {
   active: NouvelleEnCours
   today: Date
   avancerEtape: (id: string) => void
   ajouterNote: (id: string, note: string) => void
+  finaliser: (id: string, note: string) => void
 }) {
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
@@ -385,10 +390,17 @@ function PrioriteSoir({
           </div>
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button style={btnPrimary} onClick={() => avancerEtape(active.id)}>
-              <Check size={14} />
-              Marquer étape suivante
-            </button>
+            {active.stage === 'final' ? (
+              <button style={btnPrimary} onClick={() => finaliser(active.id, '')}>
+                <Check size={14} />
+                Marquer comme terminée
+              </button>
+            ) : (
+              <button style={btnPrimary} onClick={() => avancerEtape(active.id)}>
+                <Check size={14} />
+                Marquer étape suivante
+              </button>
+            )}
             <button
               style={btnSecondary}
               onClick={() => setNoteOpen((v) => !v)}
@@ -521,56 +533,174 @@ function PipelineCard({ item }: { item: NouvelleEnCours }) {
 
 // ─── PipelineSection ──────────────────────────────────────────────────────────
 
-function PipelineSection({ pipeline }: { pipeline: NouvelleEnCours[] }) {
+function PipelineSection({
+  pipeline,
+  ajouterNouvelle,
+}: {
+  pipeline: NouvelleEnCours[]
+  ajouterNouvelle: (data: { title: string; genre: Genre; synopsis: string; deadline: string }) => void
+}) {
+  const [formOpen, setFormOpen] = useState(false)
+  const [formTitle, setFormTitle] = useState('')
+  const [formGenre, setFormGenre] = useState<Genre>('realiste')
+  const [formSynopsis, setFormSynopsis] = useState('')
+  const [formDeadline, setFormDeadline] = useState('')
+
+  const handleSubmit = () => {
+    if (!formTitle.trim()) return
+    const deadline = formDeadline
+      ? formDeadline.split('-').reverse().join('.')
+      : ''
+    ajouterNouvelle({
+      title: formTitle.trim(),
+      genre: formGenre,
+      synopsis: formSynopsis.trim(),
+      deadline,
+    })
+    setFormTitle(''); setFormGenre('realiste'); setFormSynopsis(''); setFormDeadline('')
+    setFormOpen(false)
+  }
+
+  const fieldStyle: React.CSSProperties = {
+    background: 'var(--paper)',
+    border: '1px solid var(--paper-2)',
+    borderRadius: 8,
+    padding: '8px 12px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 14,
+    color: 'var(--ink)',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
+  }
+
   return (
     <Section
-      kicker={<Lbl>Pipeline · {pipeline.length} nouvelles</Lbl>}
+      kicker={<Lbl>Pipeline · {pipeline.length} nouvelle{pipeline.length !== 1 ? 's' : ''}</Lbl>}
       title="En cours"
       hint="Toutes tes nouvelles en mouvement"
       action={
-        <button style={btnGhost}>
-          <ArrowUpDown size={14} />
-          Réordonner
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button style={btnGhost}>
+            <ArrowUpDown size={14} />
+            Réordonner
+          </button>
+          <button
+            style={{ ...btnPrimary, fontSize: 13, padding: '6px 12px' }}
+            onClick={() => setFormOpen((v) => !v)}
+          >
+            <Plus size={13} />
+            Nouvelle
+          </button>
+        </div>
       }
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(5, 1fr)',
-          gap: 16,
-        }}
-      >
+      {formOpen && (
+        <div
+          style={{
+            background: 'var(--paper-1)',
+            border: '1px dashed var(--ink-4)',
+            borderRadius: 12,
+            padding: '20px 24px',
+            marginBottom: 20,
+          }}
+        >
+          <Lbl style={{ display: 'block', marginBottom: 14 }}>Nouvelle nouvelle</Lbl>
+          <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6 }}><Lbl>Titre</Lbl></label>
+              <input
+                style={fieldStyle}
+                placeholder="ex. La chambre du fond"
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit() }}
+                autoFocus
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6 }}><Lbl>Genre</Lbl></label>
+              <select
+                style={{ ...selectCustom, width: '100%', boxSizing: 'border-box' }}
+                value={formGenre}
+                onChange={(e) => setFormGenre(e.target.value as Genre)}
+              >
+                <option value="realiste">Réaliste</option>
+                <option value="noire">Noire</option>
+                <option value="fantastique">Fantastique</option>
+              </select>
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6 }}>
+                <Lbl>Synopsis <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--ink-4)' }}>opt.</span></Lbl>
+              </label>
+              <input
+                style={{ ...fieldStyle, fontStyle: 'italic' }}
+                placeholder="En une phrase…"
+                value={formSynopsis}
+                onChange={(e) => setFormSynopsis(e.target.value)}
+              />
+            </div>
+            <div>
+              <label style={{ display: 'block', marginBottom: 6 }}>
+                <Lbl>Deadline <span style={{ textTransform: 'none', letterSpacing: 0, color: 'var(--ink-4)' }}>opt.</span></Lbl>
+              </label>
+              <input
+                type="date"
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', fontSize: 13 }}
+                value={formDeadline}
+                onChange={(e) => setFormDeadline(e.target.value)}
+              />
+            </div>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+            <button style={btnGhost} onClick={() => setFormOpen(false)}>Annuler</button>
+            <button style={{ ...btnPrimary, fontSize: 13, padding: '6px 14px' }} onClick={handleSubmit}>
+              Ajouter
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 16 }}>
         {STAGES.map((stage) => {
           const items = pipeline.filter((n) => n.stage === stage.key)
           return (
             <div key={stage.key}>
               <div
                 style={{
-                  display: 'flex',
-                  alignItems: 'baseline',
-                  gap: 6,
-                  marginBottom: 12,
+                  minHeight: 48,
                   paddingBottom: 8,
                   borderBottom: '1px solid var(--paper-2)',
+                  marginBottom: 12,
                 }}
               >
-                <span
+                <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between' }}>
+                  <span
+                    style={{
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                      letterSpacing: '0.08em',
+                      textTransform: 'uppercase',
+                      color: 'var(--ink)',
+                      fontWeight: 600,
+                    }}
+                  >
+                    {stage.label}
+                  </span>
+                  <Nm style={{ fontSize: 11, color: 'var(--ink-3)' }}>{items.length}</Nm>
+                </div>
+                <div
                   style={{
-                    fontFamily: 'var(--font-mono)',
-                    fontSize: 11,
-                    letterSpacing: '0.08em',
-                    textTransform: 'uppercase',
-                    color: 'var(--ink)',
-                    fontWeight: 500,
+                    fontFamily: 'var(--font-serif)',
+                    fontStyle: 'italic',
+                    fontSize: 12,
+                    color: 'var(--ink-3)',
+                    marginTop: 3,
                   }}
                 >
-                  {stage.label}
-                </span>
-                <Lbl style={{ fontSize: 10 }}>{stage.hint}</Lbl>
-                <Nm style={{ fontSize: 11, marginLeft: 'auto', color: 'var(--ink-3)' }}>
-                  {items.length}
-                </Nm>
+                  {stage.hint}
+                </div>
               </div>
               {items.map((item) => (
                 <PipelineCard key={item.id} item={item} />
@@ -664,11 +794,13 @@ function FicheDetaillee({
   today,
   avancerEtape,
   ajouterNote,
+  finaliser,
 }: {
   active: NouvelleEnCours
   today: Date
   avancerEtape: (id: string) => void
   ajouterNote: (id: string, note: string) => void
+  finaliser: (id: string, note: string) => void
 }) {
   const [noteOpen, setNoteOpen] = useState(false)
   const [noteText, setNoteText] = useState('')
@@ -752,10 +884,17 @@ function FicheDetaillee({
           <StageBar currentStage={active.stage} />
 
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button style={btnPrimary} onClick={() => avancerEtape(active.id)}>
-              <Check size={14} />
-              Marquer étape suivante
-            </button>
+            {active.stage === 'final' ? (
+              <button style={btnPrimary} onClick={() => finaliser(active.id, '')}>
+                <Check size={14} />
+                Marquer comme terminée
+              </button>
+            ) : (
+              <button style={btnPrimary} onClick={() => avancerEtape(active.id)}>
+                <Check size={14} />
+                Marquer étape suivante
+              </button>
+            )}
             <button style={btnSecondary} onClick={() => setNoteOpen((v) => !v)}>
               <MessageSquare size={14} />
               Ajouter une note
@@ -1054,7 +1193,7 @@ function Carnet({
           />
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
             <select
-              style={{ ...inputStyle, width: 'auto', flex: 1 }}
+              style={{ ...selectCustom, flex: 1 }}
               value={formGenre}
               onChange={(e) => setFormGenre(e.target.value as Genre)}
             >
@@ -1094,6 +1233,8 @@ export function EcriturePage() {
   const avancerEtape = useEcritureStore((s) => s.avancerEtape)
   const ajouterNote = useEcritureStore((s) => s.ajouterNote)
   const ajouterIdee = useEcritureStore((s) => s.ajouterIdee)
+  const ajouterNouvelle = useEcritureStore((s) => s.ajouterNouvelle)
+  const finaliser = useEcritureStore((s) => s.finaliser)
 
   const today = useMemo(() => new Date(), [])
   const active = useMemo(() => getNouvelleActive(pipeline), [pipeline])
@@ -1114,10 +1255,11 @@ export function EcriturePage() {
           today={today}
           avancerEtape={avancerEtape}
           ajouterNote={ajouterNote}
+          finaliser={finaliser}
         />
       )}
 
-      <PipelineSection pipeline={pipeline} />
+      <PipelineSection pipeline={pipeline} ajouterNouvelle={ajouterNouvelle} />
 
       {active && (
         <FicheDetaillee
@@ -1125,6 +1267,7 @@ export function EcriturePage() {
           today={today}
           avancerEtape={avancerEtape}
           ajouterNote={ajouterNote}
+          finaliser={finaliser}
         />
       )}
 

@@ -52,6 +52,7 @@ interface EcritureStore {
   ajouterNote: (id: string, contenu: string) => void
   updateMots: (id: string, mots: number) => void
   ajouterIdee: (idee: Omit<Idee, 'id' | 'age'>) => void
+  ajouterNouvelle: (data: { title: string; genre: Genre; synopsis: string; deadline: string }) => void
   finaliser: (id: string, note: string) => void
   setHasHydrated: (v: boolean) => void
 }
@@ -105,6 +106,26 @@ export const useEcritureStore = createPersistedStore<EcritureStore>(
       set((s) => ({
         ideas: [{ ...idee, id: crypto.randomUUID(), age: 0 }, ...s.ideas],
       })),
+
+    ajouterNouvelle: (data) =>
+      set((s) => {
+        const numero = s.pipeline.reduce((max, n) => Math.max(max, n.numero), 0) + 1
+        const nouvelle: NouvelleEnCours = {
+          id: crypto.randomUUID(),
+          stage: 'idee',
+          title: data.title,
+          genre: data.genre,
+          synopsis: data.synopsis,
+          startedAt: todayDDMM(),
+          daysInStage: 0,
+          deadline: data.deadline,
+          motsCouches: 0,
+          objectifMots: 1200,
+          numero,
+          active: false,
+        }
+        return { pipeline: [...s.pipeline, nouvelle] }
+      }),
 
     finaliser: (id, note) => {
       const item = get().pipeline.find((n) => n.id === id)
