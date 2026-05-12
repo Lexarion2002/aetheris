@@ -4,36 +4,16 @@ import { SemaineEnCours } from './SemaineEnCours'
 import { Bibliotheque } from './Bibliotheque'
 import { Statistiques } from './Statistiques'
 import type { TabKey } from './EcritureHeader'
-import type { NouvelleActuelle, NouvellePassee, SemaineStats, GenreStats } from './data'
-import { CURRENT, PAST, WEEKS, GENRES } from './data'
+import { useEcritureHebdoStore } from '../../store/ecritureHebdoStore'
 
 export function EcriturePage() {
-  const [tab, setTab]         = useState<TabKey>('semaine')
-  const [current, setCurrent] = useState<NouvelleActuelle | null>(CURRENT)
-  const [past, setPast]       = useState<NouvellePassee[]>(PAST)
-  const [weeks, setWeeks]     = useState<SemaineStats[]>(WEEKS)
-  const [genres, setGenres]   = useState<GenreStats[]>(GENRES)
+  const [tab, setTab] = useState<TabKey>('semaine')
 
-  function commencer(data: { titre: string; genre: string; synopsis: string; objectif: number }) {
-    const n = past.length + 1
-    setCurrent({
-      n,
-      titre: data.titre,
-      genre: data.genre,
-      synopsis: data.synopsis,
-      jours_restants: 7,
-      objectif: data.objectif,
-      ecrits: 0,
-      sessions: [],
-      fragments: { idees: [], alternatives: [] },
-    })
-    setWeeks(prev => [...prev, { n, mots: 0, etat: 'en cours' }])
-    setGenres(prev => {
-      const existing = prev.find(g => g.nom === data.genre)
-      if (existing) return prev.map(g => g.nom === data.genre ? { ...g, n: g.n + 1 } : g)
-      return [...prev, { nom: data.genre, n: 1 }]
-    })
-  }
+  const current   = useEcritureHebdoStore(s => s.current)
+  const past      = useEcritureHebdoStore(s => s.past)
+  const weeks     = useEcritureHebdoStore(s => s.weeks)
+  const genres    = useEcritureHebdoStore(s => s.genres)
+  const commencer = useEcritureHebdoStore(s => s.commencer)
 
   return (
     <div>
