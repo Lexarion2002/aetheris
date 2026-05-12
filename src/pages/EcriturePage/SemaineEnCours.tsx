@@ -1,12 +1,39 @@
-import { Plus, X, Check } from 'lucide-react'
-import { Label, Num, Badge, Btn } from './primitives'
+import { Plus } from 'lucide-react'
+import { Label, Btn } from './primitives'
+import { CURRENT } from './data'
 import { StatChip } from './components/StatChip'
 import { SessionRow } from './components/SessionRow'
 import { FragmentCard } from './components/FragmentCard'
-import { CURRENT } from './data'
 
 export function SemaineEnCours() {
   const c = CURRENT
+
+  if (!c) {
+    return (
+      <div style={{
+        paddingTop: 64,
+        paddingBottom: 64,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 20,
+        textAlign: 'center',
+      }}>
+        <p style={{
+          fontFamily: 'var(--font-serif)',
+          fontStyle: 'italic',
+          fontSize: 20,
+          color: 'var(--ink-2)',
+          margin: 0,
+          lineHeight: 1.5,
+        }}>Aucune nouvelle en cours cette semaine.</p>
+        <Btn variant="primary" style={{ fontSize: 14, padding: '10px 20px' }}>
+          <Plus size={16} />Commencer la semaine #01
+        </Btn>
+      </div>
+    )
+  }
+
   const pct = Math.round((c.ecrits / c.objectif) * 100)
   const totalMots = c.sessions.reduce((s, x) => s + x.mots, 0)
   const totalSessions = c.sessions.length
@@ -17,13 +44,7 @@ export function SemaineEnCours() {
       {/* ── Hero ──────────────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
-          <Num style={{ fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-            NOUVELLE #{String(c.n).padStart(2, '0')}
-          </Num>
-          <span style={{ color: 'var(--ink-4)' }}>·</span>
           <Label>semaine du 12 au 18 avril</Label>
-          <span style={{ color: 'var(--ink-4)' }}>·</span>
-          <Badge tone="terra">{c.genre}</Badge>
         </div>
         <h2 style={{
           fontFamily: 'var(--font-serif)',
@@ -65,18 +86,18 @@ export function SemaineEnCours() {
             fontWeight: 500,
             color: 'var(--terra)',
             letterSpacing: '0.04em',
-          }}>DIM. 18 AVR · J−{c.jours_restants}</span>
+          }}>J−{c.jours_restants}</span>
         </div>
       </div>
 
       {/* ── Progression ───────────────────────────────────────────────────────── */}
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
-          <Num style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>
-            <span style={{ color: 'var(--terra)' }}>4 200</span>
-            <span style={{ color: 'var(--ink-3)' }}> / 6 000 mots</span>
-          </Num>
-          <Num style={{ fontSize: 12, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>{pct}%</Num>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>
+            <span style={{ color: 'var(--terra)' }}>{c.ecrits.toLocaleString('fr-FR')}</span>
+            <span style={{ color: 'var(--ink-3)' }}> / {c.objectif.toLocaleString('fr-FR')} mots</span>
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>{pct}%</span>
         </div>
         <div style={{ height: 4, width: '100%', borderRadius: 999, background: 'var(--paper-2)', overflow: 'hidden' }}>
           <div style={{
@@ -92,8 +113,6 @@ export function SemaineEnCours() {
       {/* ── Stat chips ────────────────────────────────────────────────────────── */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 40 }}>
         <StatChip n={totalSessions} unit="sessions" />
-        <StatChip n="4 h 20" unit="d'écriture" />
-        <StatChip n="968" unit="mots / heure" />
       </div>
 
       {/* ── Journal des sessions ──────────────────────────────────────────────── */}
@@ -101,21 +120,33 @@ export function SemaineEnCours() {
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 12 }}>
           <Label>Journal de la semaine</Label>
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)' }}>
-            {totalSessions} sessions · {totalMots.toLocaleString('fr-FR').replace(',', ' ')} mots
+            {totalSessions} sessions · {totalMots.toLocaleString('fr-FR')} mots
           </span>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {c.sessions.map((s, i) => <SessionRow key={i} {...s} />)}
-        </div>
+        {c.sessions.length === 0 ? (
+          <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--ink-3)', margin: 0 }}>
+            Aucune session enregistrée pour l'instant.
+          </p>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {c.sessions.map((s, i) => <SessionRow key={i} {...s} />)}
+          </div>
+        )}
       </section>
 
       {/* ── Fragments ─────────────────────────────────────────────────────────── */}
       <section style={{ marginBottom: 48 }}>
         <Label style={{ display: 'block', marginBottom: 12 }}>Fragments — carnet d'à-côté</Label>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
-          {c.fragments.idees.map((f, i)        => <FragmentCard key={`i${i}`} kind="idee" {...f} />)}
-          {c.fragments.alternatives.map((f, i) => <FragmentCard key={`a${i}`} kind="alt"  {...f} />)}
-        </div>
+        {c.fragments.idees.length === 0 && c.fragments.alternatives.length === 0 ? (
+          <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--ink-3)', margin: 0 }}>
+            Aucun fragment pour l'instant.
+          </p>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 12 }}>
+            {c.fragments.idees.map((f, i)        => <FragmentCard key={`i${i}`} kind="idee" {...f} />)}
+            {c.fragments.alternatives.map((f, i) => <FragmentCard key={`a${i}`} kind="alt"  {...f} />)}
+          </div>
+        )}
       </section>
 
       {/* ── Post-mortem ───────────────────────────────────────────────────────── */}
@@ -141,27 +172,6 @@ export function SemaineEnCours() {
           Ce qui a marché. Ce qui a coincé. Ce que je garde pour la prochaine.
           <br />
           <span style={{ fontSize: 14, color: 'var(--ink-4)' }}>(3 questions, 3 réponses courtes — pas de roman.)</span>
-        </div>
-
-        <div style={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          marginTop: 20,
-          gap: 16,
-          flexWrap: 'wrap',
-        }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
-            Reste {(c.objectif - c.ecrits).toLocaleString('fr-FR').replace(',', ' ')} mots et trois jours. Tu y es.
-          </span>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Btn variant="secondary" style={{ padding: '10px 16px' }}>
-              <X size={14} />Abandonner
-            </Btn>
-            <Btn variant="primary" style={{ padding: '10px 16px', background: 'var(--sage-deep)' }}>
-              <Check size={14} />Marquer comme terminée
-            </Btn>
-          </div>
         </div>
       </section>
     </div>

@@ -8,7 +8,22 @@ export function Statistiques() {
   const term  = WEEKS.filter(w => w.etat === 'terminée').length
   const aban  = WEEKS.filter(w => w.etat === 'abandonnée').length
   const totalMots = WEEKS.filter(w => w.etat !== 'en cours').reduce((s, w) => s + w.mots, 0)
-  const moyenne = Math.round(totalMots / (total - 1))
+  const finis = total > 1 ? total - 1 : 1
+  const moyenne = finis > 0 ? Math.round(totalMots / finis) : 0
+
+  if (total === 0) {
+    return (
+      <div style={{ paddingTop: 64, paddingBottom: 64, textAlign: 'center' }}>
+        <p style={{
+          fontFamily: 'var(--font-serif)',
+          fontStyle: 'italic',
+          fontSize: 20,
+          color: 'var(--ink-2)',
+          margin: 0,
+        }}>Les statistiques apparaîtront au fil des semaines.</p>
+      </div>
+    )
+  }
 
   return (
     <div style={{ paddingTop: 36, paddingBottom: 64 }}>
