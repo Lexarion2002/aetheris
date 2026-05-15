@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useBookStore } from '../store/bookStore'
 import type { BookCritique, BookAttente, BookEnCours, BookType, BookSource } from '../store/bookStore'
 
@@ -769,6 +769,11 @@ function EnCoursSection({ onFinish, onEdit, onStartNew }: EnCoursSectionProps) {
 
 type SortKey = 'note' | 'date' | 'titre' | 'auteur'
 
+const BOOK_CAROUSEL_GAP  = 16
+const BOOK_CAROUSEL_COLS = 3
+const BOOK_CAROUSEL_ROWS = 2
+const BOOK_ARROW_W       = 36
+
 function BibliothequeSection({ onEdit }: { onEdit: (l: BookCritique) => void }) {
   const bibliotheque = useBookStore((s) => s.bibliotheque)
   const genresPerso  = useBookStore((s) => s.genresPerso)
@@ -778,6 +783,11 @@ function BibliothequeSection({ onEdit }: { onEdit: (l: BookCritique) => void }) 
   const [filterType,    setFilterType]    = useState<BookType | ''>('')
   const [filterNoteMin, setFilterNoteMin] = useState(0)
   const [search,        setSearch]        = useState('')
+  const [canPrev,       setCanPrev]       = useState(false)
+  const [canNext,       setCanNext]       = useState(false)
+  const [colWidth,      setColWidth]      = useState(300)
+  const wrapRef   = useRef<HTMLDivElement>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const filtered = bibliotheque
     .filter((b) => !filterGenre || b.genres.includes(filterGenre))
@@ -790,6 +800,43 @@ function BibliothequeSection({ onEdit }: { onEdit: (l: BookCritique) => void }) 
       if (sort === 'auteur') return a.auteur.localeCompare(b.auteur)
       return b.dateLecture.localeCompare(a.dateLecture)
     })
+
+  const measure = () => {
+    if (!wrapRef.current) return
+    const availW = wrapRef.current.clientWidth - (BOOK_ARROW_W + 8) * 2
+    setColWidth(Math.floor((availW - (BOOK_CAROUSEL_COLS - 1) * BOOK_CAROUSEL_GAP) / BOOK_CAROUSEL_COLS))
+  }
+
+  const updateArrows = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanPrev(el.scrollLeft > 4)
+    setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }
+
+  useEffect(() => {
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
+
+  useEffect(() => { updateArrows() }, [filtered.length, colWidth])
+
+  const pageWidth = BOOK_CAROUSEL_COLS * colWidth + (BOOK_CAROUSEL_COLS - 1) * BOOK_CAROUSEL_GAP
+
+  const scrollByPage = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * (pageWidth + BOOK_CAROUSEL_GAP), behavior: 'smooth' })
+  }
+
+  const arrowBtnStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: BOOK_ARROW_W, height: BOOK_ARROW_W, borderRadius: '50%',
+    border: '1px solid var(--paper-2)',
+    background: 'var(--paper-1)', color: 'var(--ink)',
+    cursor: 'pointer', flexShrink: 0,
+    fontFamily: 'var(--font-sans)', fontSize: 16,
+    transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+  }
 
   const selectCls = 'rounded-[var(--r-md)] px-3 py-1.5 text-xs outline-none transition-colors bg-[var(--bg-elev)] border border-[var(--border)] text-[var(--fg-muted)]'
 
@@ -830,8 +877,38 @@ function BibliothequeSection({ onEdit }: { onEdit: (l: BookCritique) => void }) 
       ) : filtered.length === 0 ? (
         <p style={{ color: 'var(--fg-subtle)', fontSize: 14, fontStyle: 'italic' }}>Aucun livre ne correspond aux filtres.</p>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 4 }}>
-          {filtered.map((livre) => <BookCard key={livre.id} livre={livre} onEdit={() => onEdit(livre)} />)}
+        <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => scrollByPage(-1)}
+            disabled={!canPrev}
+            style={{ ...arrowBtnStyle, opacity: canPrev ? 1 : 0.3, pointerEvents: canPrev ? 'auto' : 'none' }}
+          >←</button>
+
+          <style>{`.book-carousel::-webkit-scrollbar { display: none }`}</style>
+          <div
+            ref={scrollRef}
+            onScroll={updateArrows}
+            className="book-carousel"
+            style={{
+              flex: 1, overflowX: 'auto', overflowY: 'hidden',
+              display: 'grid',
+              gridTemplateRows: `repeat(${BOOK_CAROUSEL_ROWS}, auto)`,
+              gridAutoFlow: 'column',
+              gridAutoColumns: colWidth,
+              gap: BOOK_CAROUSEL_GAP,
+              scrollbarWidth: 'none',
+            }}
+          >
+            {filtered.map((livre) => (
+              <BookCard key={livre.id} livre={livre} onEdit={() => onEdit(livre)} />
+            ))}
+          </div>
+
+          <button
+            onClick={() => scrollByPage(1)}
+            disabled={!canNext}
+            style={{ ...arrowBtnStyle, opacity: canNext ? 1 : 0.3, pointerEvents: canNext ? 'auto' : 'none' }}
+          >→</button>
         </div>
       )}
     </section>
