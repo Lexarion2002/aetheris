@@ -352,9 +352,10 @@ function AlbumCard({ album, onEdit, onDelete }: {
 
 // ─── BibliothequeSection ──────────────────────────────────────────────────────
 
-const CAROUSEL_ITEM_W = 200
-const CAROUSEL_GAP    = 20
-const CAROUSEL_PAGE   = 6
+const CAROUSEL_GAP  = 20
+const CAROUSEL_COLS = 3
+const CAROUSEL_ROWS = 2
+const ARROW_W       = 36
 
 function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => void; onNew: () => void }) {
   const bibliotheque   = useMusicStore(s => s.bibliotheque)
@@ -364,6 +365,8 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
   const [searchQ,   setSearchQ]   = useState('')
   const [canPrev,   setCanPrev]   = useState(false)
   const [canNext,   setCanNext]   = useState(false)
+  const [colWidth,  setColWidth]  = useState(280)
+  const wrapRef   = useRef<HTMLDivElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   const sorted = [...bibliotheque]
@@ -389,6 +392,12 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
 
   const usedTags = Array.from(new Set(bibliotheque.flatMap(a => a.tags)))
 
+  const measure = () => {
+    if (!wrapRef.current) return
+    const availW = wrapRef.current.clientWidth - (ARROW_W + 8) * 2
+    setColWidth(Math.floor((availW - (CAROUSEL_COLS - 1) * CAROUSEL_GAP) / CAROUSEL_COLS))
+  }
+
   const updateArrows = () => {
     const el = scrollRef.current
     if (!el) return
@@ -397,18 +406,22 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
   }
 
   useEffect(() => {
-    updateArrows()
-  }, [sorted.length])
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
 
-  const pageWidth = CAROUSEL_PAGE * (CAROUSEL_ITEM_W + CAROUSEL_GAP)
+  useEffect(() => { updateArrows() }, [sorted.length, colWidth])
 
-  const scrollBy = (dir: 1 | -1) => {
-    scrollRef.current?.scrollBy({ left: dir * pageWidth, behavior: 'smooth' })
+  const pageWidth = CAROUSEL_COLS * colWidth + (CAROUSEL_COLS - 1) * CAROUSEL_GAP
+
+  const scrollByPage = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * (pageWidth + CAROUSEL_GAP), behavior: 'smooth' })
   }
 
   const arrowBtnStyle: React.CSSProperties = {
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    width: 36, height: 36, borderRadius: '50%',
+    width: ARROW_W, height: ARROW_W, borderRadius: '50%',
     border: '1px solid var(--paper-2)',
     background: 'var(--paper-1)', color: 'var(--ink)',
     cursor: 'pointer', flexShrink: 0,
@@ -444,9 +457,9 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
           {bibliotheque.length === 0 ? 'Aucune critique encore. Commence par écouter un album.' : 'Rien ne correspond.'}
         </div>
       ) : (
-        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <div ref={wrapRef} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button
-            onClick={() => scrollBy(-1)}
+            onClick={() => scrollByPage(-1)}
             disabled={!canPrev}
             style={{ ...arrowBtnStyle, opacity: canPrev ? 1 : 0.3, pointerEvents: canPrev ? 'auto' : 'none' }}
           >←</button>
@@ -457,25 +470,27 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
             onScroll={updateArrows}
             className="biblio-carousel"
             style={{
-              display: 'flex', gap: CAROUSEL_GAP, flex: 1,
-              overflowX: 'auto', scrollBehavior: 'smooth',
+              flex: 1, overflowX: 'auto', overflowY: 'hidden',
+              display: 'grid',
+              gridTemplateRows: `repeat(${CAROUSEL_ROWS}, auto)`,
+              gridAutoFlow: 'column',
+              gridAutoColumns: colWidth,
+              gap: CAROUSEL_GAP,
               scrollbarWidth: 'none',
-              paddingBottom: 4,
             }}
           >
             {sorted.map((album, idx) => (
-              <div key={album.id || `grid-${idx}`} style={{ flexShrink: 0, width: CAROUSEL_ITEM_W }}>
-                <AlbumCard
-                  album={album}
-                  onEdit={onEdit}
-                  onDelete={id => { if (window.confirm('Supprimer cet album ?')) deleteCritique(id) }}
-                />
-              </div>
+              <AlbumCard
+                key={album.id || `grid-${idx}`}
+                album={album}
+                onEdit={onEdit}
+                onDelete={id => { if (window.confirm('Supprimer cet album ?')) deleteCritique(id) }}
+              />
             ))}
           </div>
 
           <button
-            onClick={() => scrollBy(1)}
+            onClick={() => scrollByPage(1)}
             disabled={!canNext}
             style={{ ...arrowBtnStyle, opacity: canNext ? 1 : 0.3, pointerEvents: canNext ? 'auto' : 'none' }}
           >→</button>
