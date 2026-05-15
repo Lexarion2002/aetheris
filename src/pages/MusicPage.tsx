@@ -352,12 +352,19 @@ function AlbumCard({ album, onEdit, onDelete }: {
 
 // ─── BibliothequeSection ──────────────────────────────────────────────────────
 
+const CAROUSEL_ITEM_W = 200
+const CAROUSEL_GAP    = 20
+const CAROUSEL_PAGE   = 6
+
 function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => void; onNew: () => void }) {
   const bibliotheque   = useMusicStore(s => s.bibliotheque)
   const deleteCritique = useMusicStore(s => s.deleteCritique)
   const [sort,      setSort]      = useState<SortMode>('sortie_desc')
   const [tagFilter, setTagFilter] = useState<AlbumTag | ''>('')
   const [searchQ,   setSearchQ]   = useState('')
+  const [canPrev,   setCanPrev]   = useState(false)
+  const [canNext,   setCanNext]   = useState(false)
+  const scrollRef = useRef<HTMLDivElement>(null)
 
   const sorted = [...bibliotheque]
     .filter(a => {
@@ -381,6 +388,33 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
     })
 
   const usedTags = Array.from(new Set(bibliotheque.flatMap(a => a.tags)))
+
+  const updateArrows = () => {
+    const el = scrollRef.current
+    if (!el) return
+    setCanPrev(el.scrollLeft > 4)
+    setCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }
+
+  useEffect(() => {
+    updateArrows()
+  }, [sorted.length])
+
+  const pageWidth = CAROUSEL_PAGE * (CAROUSEL_ITEM_W + CAROUSEL_GAP)
+
+  const scrollBy = (dir: 1 | -1) => {
+    scrollRef.current?.scrollBy({ left: dir * pageWidth, behavior: 'smooth' })
+  }
+
+  const arrowBtnStyle: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 36, height: 36, borderRadius: '50%',
+    border: '1px solid var(--paper-2)',
+    background: 'var(--paper-1)', color: 'var(--ink)',
+    cursor: 'pointer', flexShrink: 0,
+    fontFamily: 'var(--font-sans)', fontSize: 16,
+    transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+  }
 
   return (
     <section style={{ marginTop: 56 }}>
@@ -410,15 +444,41 @@ function BibliothequeSection({ onEdit, onNew }: { onEdit: (a: AlbumCritique) => 
           {bibliotheque.length === 0 ? 'Aucune critique encore. Commence par écouter un album.' : 'Rien ne correspond.'}
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 28 }}>
-          {sorted.map((album, idx) => (
-            <AlbumCard
-              key={album.id || `grid-${idx}`}
-              album={album}
-              onEdit={onEdit}
-              onDelete={id => { if (window.confirm('Supprimer cet album ?')) deleteCritique(id) }}
-            />
-          ))}
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <button
+            onClick={() => scrollBy(-1)}
+            disabled={!canPrev}
+            style={{ ...arrowBtnStyle, opacity: canPrev ? 1 : 0.3, pointerEvents: canPrev ? 'auto' : 'none' }}
+          >←</button>
+
+          <style>{`.biblio-carousel::-webkit-scrollbar { display: none }`}</style>
+          <div
+            ref={scrollRef}
+            onScroll={updateArrows}
+            className="biblio-carousel"
+            style={{
+              display: 'flex', gap: CAROUSEL_GAP, flex: 1,
+              overflowX: 'auto', scrollBehavior: 'smooth',
+              scrollbarWidth: 'none',
+              paddingBottom: 4,
+            }}
+          >
+            {sorted.map((album, idx) => (
+              <div key={album.id || `grid-${idx}`} style={{ flexShrink: 0, width: CAROUSEL_ITEM_W }}>
+                <AlbumCard
+                  album={album}
+                  onEdit={onEdit}
+                  onDelete={id => { if (window.confirm('Supprimer cet album ?')) deleteCritique(id) }}
+                />
+              </div>
+            ))}
+          </div>
+
+          <button
+            onClick={() => scrollBy(1)}
+            disabled={!canNext}
+            style={{ ...arrowBtnStyle, opacity: canNext ? 1 : 0.3, pointerEvents: canNext ? 'auto' : 'none' }}
+          >→</button>
         </div>
       )}
     </section>
