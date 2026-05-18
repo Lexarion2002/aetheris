@@ -472,8 +472,12 @@ export function TodayPage() {
 // ─── ObjectivesSidebar ────────────────────────────────────────────────────────
 
 function ObjectivesSidebar() {
-  const objectives = useStore((s) => s.objectives.filter((o) => !o.archived && o.progress < 100))
-  const milestones = useStore((s) => s.milestones)
+  const allObjectives = useStore((s) => s.objectives)
+  const milestones    = useStore((s) => s.milestones)
+  const objectives    = useMemo(
+    () => allObjectives.filter((o) => !o.archived && o.progress < 100),
+    [allObjectives],
+  )
 
   if (objectives.length === 0) return null
 

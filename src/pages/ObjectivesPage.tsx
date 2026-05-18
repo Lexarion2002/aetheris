@@ -49,7 +49,8 @@ function Sparkline({ data }: { data: ProgressEntry[] }) {
 // ─── MilestonePanel ───────────────────────────────────────────────────────────
 
 function MilestonePanel({ obj }: { obj: Objective }) {
-  const milestones       = useStore((s) => s.milestones.filter((m) => m.objectiveId === obj.id))
+  const allMilestones    = useStore((s) => s.milestones)
+  const milestones       = useMemo(() => allMilestones.filter((m) => m.objectiveId === obj.id), [allMilestones, obj.id])
   const domains          = useStore((s) => s.domains)
   const addMilestone     = useStore((s) => s.addMilestone)
   const toggleMilestone  = useStore((s) => s.toggleMilestone)
@@ -182,7 +183,8 @@ function MilestonePanel({ obj }: { obj: Objective }) {
 function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective) => void }) {
   const domains          = useStore((s) => s.domains)
   const tasks            = useStore((s) => s.tasks)
-  const milestones       = useStore((s) => s.milestones.filter((m) => m.objectiveId === obj.id))
+  const allMilestones2   = useStore((s) => s.milestones)
+  const milestones       = useMemo(() => allMilestones2.filter((m) => m.objectiveId === obj.id), [allMilestones2, obj.id])
   const archiveObjective = useStore((s) => s.archiveObjective)
   const deleteObjective  = useStore((s) => s.deleteObjective)
 
