@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine, Scale, Music } from 'lucide-react'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine, Scale, Music, Dumbbell } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -289,6 +289,21 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
             <span className="truncate">Écriture</span>
           </NavLink>
         )}
+        {/* Sport — page standalone */}
+        <NavLink to="/sport" onClick={onNavigate}
+          className={({ isActive }) =>
+            [
+              'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
+              'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
+              isActive
+                ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
+                : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
+            ].join(' ')
+          }
+        >
+          <Dumbbell size={14} className="shrink-0" />
+          <span className="truncate">Sport</span>
+        </NavLink>
         {!hasLawDomain && (
           <NavLink to="/droit" onClick={onNavigate}
             className={({ isActive }) =>

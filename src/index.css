@@ -365,3 +365,18 @@ body.theme-light .recharts-wrapper {
   to   { opacity: 1; transform: translateY(0); }
 }
 .cuisine-section-anim { animation: cuisine-section-in 280ms var(--ease); }
+
+/* ─── Sport page ─────────────────────────────────────────── */
+@keyframes sportFade {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sportCardEnter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+@keyframes sportOverlayIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sportPanelIn {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(0); }
+}

@@ -30,6 +30,7 @@ const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ 
 const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => ({ default: m.CabinetPage })))
 const EcriturePage      = lazy(() => import('./pages/EcriturePage').then((m) => ({ default: m.EcriturePage })))
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
+const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -151,6 +152,7 @@ export default function App() {
           <Route path="cabinet" element={<Suspense fallback={<PageLoader />}><CabinetPage /></Suspense>} />
           <Route path="ecriture" element={<Suspense fallback={<PageLoader />}><EcriturePage /></Suspense>} />
           <Route path="droit" element={<Suspense fallback={<PageLoader />}><DroitPage /></Suspense>} />
+          <Route path="sport" element={<Suspense fallback={<PageLoader />}><SportView /></Suspense>} />
         </Route>
       </Routes>
     </BrowserRouter>
