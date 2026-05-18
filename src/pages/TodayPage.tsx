@@ -1,0 +1,516 @@
+import { useMemo, useState } from 'react'
+import { useStore } from '../store'
+import { useDroitStore } from '../store/droitStore'
+import { useWritingStore } from '../store/writingStore'
+import { useSportStore } from '../store/sportStore'
+import { useCareerStore } from '../store/careerStore'
+import type { Task } from '../types'
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const todayIso = () => new Date().toISOString().split('T')[0]
+
+const DAYS_FR  = ['Dimanche', 'Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi']
+const MONTHS_FR = ['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre']
+
+function fmtToday(): string {
+  const d = new Date()
+  return `${DAYS_FR[d.getDay()]} ${d.getDate()} ${MONTHS_FR[d.getMonth()]}`
+}
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface CandidateItem {
+  sourceType:  'task' | 'droit' | 'ecriture' | 'sport' | 'career'
+  sourceId:    string
+  label:       string
+  sublabel?:   string
+  domainGroup: string
+  timeEstimate?: number
+  objectiveId?: string
+}
+
+// ─── Adapters ─────────────────────────────────────────────────────────────────
+
+function adaptDroit(taches: ReturnType<typeof useDroitStore>['taches'], plannedTaskIds: Set<string>): CandidateItem[] {
+  const items: CandidateItem[] = []
+  for (const t of taches) {
+    const progress = t.subtasks.length > 0
+      ? Math.round((t.subtasks.filter((s) => s.done).length / t.subtasks.length) * 100)
+      : (t.manualProgress ?? 0)
+    if (progress >= 100) continue
+    if (t.subtasks.length > 0) {
+      for (const st of t.subtasks.filter((s) => !s.done)) {
+        if (!plannedTaskIds.has(st.id)) {
+          items.push({ sourceType: 'droit', sourceId: st.id, label: st.label, sublabel: t.matiere, domainGroup: 'Droit' })
+        }
+      }
+    } else if (!plannedTaskIds.has(t.id)) {
+      items.push({ sourceType: 'droit', sourceId: t.id, label: t.title, sublabel: t.matiere, domainGroup: 'Droit' })
+    }
+  }
+  return items
+}
+
+function adaptEcriture(stories: ReturnType<typeof useWritingStore>['stories'], plannedTaskIds: Set<string>): CandidateItem[] {
+  return stories
+    .filter((s) => s.status === 'active' && !plannedTaskIds.has(s.id))
+    .map((s) => ({ sourceType: 'ecriture' as const, sourceId: s.id, label: `Écriture — ${s.title}`, domainGroup: 'Écriture' }))
+}
+
+function adaptSport(historique: ReturnType<typeof useSportStore>['historique'], plannedTaskIds: Set<string>): CandidateItem[] {
+  const today = todayIso()
+  const hasToday = historique.some((h) => h.date === today)
+  if (hasToday || plannedTaskIds.has('sport-today')) return []
+  return [{ sourceType: 'sport' as const, sourceId: 'sport-today', label: 'Séance sport', domainGroup: 'Sport' }]
+}
+
+function adaptCareer(missions: ReturnType<typeof useCareerStore>['missions'], plannedTaskIds: Set<string>): CandidateItem[] {
+  return missions
+    .filter((m) => m.stade !== 'rendu' && !plannedTaskIds.has(m.id))
+    .slice(0, 3)
+    .map((m) => ({ sourceType: 'career' as const, sourceId: m.id, label: m.titre, sublabel: m.client ?? undefined, domainGroup: 'Carrière' }))
+}
+
+// ─── TaskRow ──────────────────────────────────────────────────────────────────
+
+function TaskRow({ task, objective, onToggle, onUnplan }: {
+  task:      Task
+  objective: string | null
+  onToggle:  () => void
+  onUnplan:  () => void
+}) {
+  const [hover, setHover] = useState(false)
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px',
+        borderBottom: '1px solid var(--paper-2)',
+        transition: 'background 120ms ease',
+      }}
+    >
+      <button
+        onClick={onToggle}
+        role="checkbox"
+        aria-checked={task.status === 'done'}
+        style={{
+          width: 14, height: 14, flexShrink: 0, padding: 0,
+          border: `1px solid ${task.status === 'done' ? 'var(--terra)' : 'var(--ink-4)'}`,
+          background: task.status === 'done' ? 'var(--terra)' : 'transparent',
+          borderRadius: 3, cursor: 'pointer', display: 'grid', placeItems: 'center',
+          transition: 'background 180ms, border-color 180ms',
+        }}
+      >
+        {task.status === 'done' && (
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"
+            stroke="var(--paper-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="2,6.5 5,9 10,3" />
+          </svg>
+        )}
+      </button>
+
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          <span style={{
+            fontFamily: 'var(--font-serif)', fontSize: 16,
+            color: task.status === 'done' ? 'var(--ink-3)' : 'var(--ink)',
+            textDecoration: task.status === 'done' ? 'line-through' : 'none',
+            textDecorationColor: 'var(--ink-4)',
+          }}>{task.title}</span>
+          {objective && (
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', flexShrink: 0 }}>
+              {objective}
+            </span>
+          )}
+        </div>
+        {task.timeEstimate && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+            {task.timeEstimate}m
+          </span>
+        )}
+      </div>
+
+      <button
+        onClick={onUnplan}
+        aria-label="Retirer du planning"
+        style={{
+          opacity: hover ? 0.6 : 0, background: 'transparent', border: 0,
+          cursor: 'pointer', padding: 4, color: 'var(--ink-3)',
+          fontSize: 18, lineHeight: 1, transition: 'opacity 180ms',
+        }}
+      >×</button>
+    </div>
+  )
+}
+
+// ─── ExternalRow ──────────────────────────────────────────────────────────────
+
+function ExternalRow({ label, sublabel, done, onToggle, onRemove, last }: {
+  label: string; sublabel?: string; done: boolean
+  onToggle: () => void; onRemove: () => void; last: boolean
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px',
+        borderBottom: last ? 'none' : '1px solid var(--paper-2)',
+      }}
+    >
+      <button
+        onClick={onToggle}
+        style={{
+          width: 14, height: 14, flexShrink: 0, padding: 0,
+          border: `1px solid ${done ? 'var(--terra)' : 'var(--ink-4)'}`,
+          background: done ? 'var(--terra)' : 'transparent',
+          borderRadius: 3, cursor: 'pointer', display: 'grid', placeItems: 'center',
+          transition: 'background 180ms, border-color 180ms',
+        }}
+      >
+        {done && (
+          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"
+            stroke="var(--paper-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="2,6.5 5,9 10,3" />
+          </svg>
+        )}
+      </button>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <span style={{
+          fontFamily: 'var(--font-serif)', fontSize: 16,
+          color: done ? 'var(--ink-3)' : 'var(--ink)',
+          textDecoration: done ? 'line-through' : 'none',
+          textDecorationColor: 'var(--ink-4)',
+        }}>{label}</span>
+        {sublabel && (
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic', color: 'var(--ink-3)', marginTop: 2 }}>{sublabel}</div>
+        )}
+      </div>
+      <button
+        onClick={onRemove}
+        style={{
+          opacity: hover ? 0.6 : 0, background: 'transparent', border: 0,
+          cursor: 'pointer', padding: 4, color: 'var(--ink-3)',
+          fontSize: 18, lineHeight: 1, transition: 'opacity 180ms',
+        }}
+      >×</button>
+    </div>
+  )
+}
+
+// ─── QuickAddPanel ────────────────────────────────────────────────────────────
+
+interface ExternalEntry {
+  sourceType: CandidateItem['sourceType']
+  sourceId:   string
+  label:      string
+  sublabel?:  string
+  done:       boolean
+}
+
+interface PlannerState {
+  externalItems: ExternalEntry[]
+}
+
+// ─── TodayPage ────────────────────────────────────────────────────────────────
+
+export function TodayPage() {
+  const tasks        = useStore((s) => s.tasks)
+  const objectives   = useStore((s) => s.objectives)
+  const setTaskStatus = useStore((s) => s.setTaskStatus)
+  const updateTask   = useStore((s) => s.updateTask)
+
+  const droit   = useDroitStore()
+  const writing = useWritingStore()
+  const sport   = useSportStore()
+  const career  = useCareerStore()
+
+  const today = todayIso()
+
+  // Tasks du store principal planifiées pour aujourd'hui
+  const plannedTasks = useMemo(
+    () => tasks.filter((t) => t.plannedDate === today && t.status !== 'cancelled'),
+    [tasks, today],
+  )
+
+  // Entrées externes (stores domaine) — état local de session
+  const [externalItems, setExternalItems] = useState<ExternalEntry[]>([])
+  const [panelOpen, setPanelOpen] = useState(false)
+
+  const plannedTaskIds = useMemo(
+    () => new Set([...plannedTasks.map((t) => t.id), ...externalItems.map((e) => e.sourceId)]),
+    [plannedTasks, externalItems],
+  )
+
+  // Candidats multi-sources
+  const candidates = useMemo((): CandidateItem[] => [
+    ...adaptDroit(droit.taches, plannedTaskIds),
+    ...adaptEcriture(writing.stories, plannedTaskIds),
+    ...adaptSport(sport.historique, plannedTaskIds),
+    ...adaptCareer(career.missions, plannedTaskIds),
+  ], [droit.taches, writing.stories, sport.historique, career.missions, plannedTaskIds])
+
+  // Tâches du store principal non encore planifiées pour aujourd'hui
+  const taskCandidates = useMemo(
+    () => tasks.filter((t) =>
+      !t.plannedDate &&
+      t.status !== 'done' &&
+      t.status !== 'cancelled'
+    ).slice(0, 30),
+    [tasks],
+  )
+
+  const groupedCandidates = useMemo(() => {
+    const groups: Record<string, CandidateItem[]> = {}
+    for (const item of candidates) {
+      if (!groups[item.domainGroup]) groups[item.domainGroup] = []
+      groups[item.domainGroup].push(item)
+    }
+    return groups
+  }, [candidates])
+
+  const addExternal = (item: CandidateItem) => {
+    setExternalItems((prev) => [...prev, { ...item, done: false }])
+  }
+
+  const addTask = (t: Task) => {
+    updateTask(t.id, { plannedDate: today })
+  }
+
+  const unplanTask = (id: string) => {
+    updateTask(id, { plannedDate: null })
+  }
+
+  const toggleExternal = (sourceId: string) => {
+    setExternalItems((prev) => prev.map((e) => e.sourceId === sourceId ? { ...e, done: !e.done } : e))
+  }
+
+  const removeExternal = (sourceId: string) => {
+    setExternalItems((prev) => prev.filter((e) => e.sourceId !== sourceId))
+  }
+
+  const allItems = [...plannedTasks, ...externalItems]
+  const doneCount = plannedTasks.filter((t) => t.status === 'done').length + externalItems.filter((e) => e.done).length
+  const totalCount = allItems.length
+
+  return (
+    <div style={{ padding: '8px 0 80px' }}>
+
+      {/* ── Header ─────────────────────────────────────────────────────────── */}
+      <header style={{ marginBottom: 48 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 14 }}>
+          Aujourd'hui
+        </div>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 'clamp(32px, 4vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.015em', color: 'var(--ink)' }}>
+            {fmtToday()}
+          </div>
+          {totalCount > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingBottom: 4, flexShrink: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{doneCount}</span>
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink-3)', fontStyle: 'italic' }}>sur</span>
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{totalCount}</span>
+              </div>
+              <div style={{ width: 140, height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
+                <div style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%`, height: '100%', background: 'var(--sage)', transition: 'width 320ms ease' }} />
+              </div>
+            </div>
+          )}
+        </div>
+      </header>
+
+      {/* ── Liste des items ─────────────────────────────────────────────────── */}
+      <section style={{ marginBottom: 40 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 24, color: 'var(--ink)', margin: 0 }}>
+            Planning du jour
+          </h2>
+          <button
+            onClick={() => setPanelOpen(!panelOpen)}
+            style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+              background: panelOpen ? 'var(--paper-2)' : 'var(--terra)',
+              color: panelOpen ? 'var(--ink-2)' : 'var(--paper-1)',
+              border: 0, borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
+              transition: 'background 180ms, color 180ms',
+            }}
+          >
+            + Planifier
+          </button>
+        </div>
+
+        {/* Panel de sélection */}
+        {panelOpen && (
+          <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '16px 20px', marginBottom: 16 }}>
+
+            {/* Tâches génériques */}
+            {taskCandidates.length > 0 && (
+              <div style={{ marginBottom: 16 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
+                  Tâches
+                </div>
+                {taskCandidates.map((t) => {
+                  const obj = objectives.find((o) => o.id === t.objectiveId)
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => addTask(t)}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--paper-2)')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                      style={{
+                        display: 'flex', flexDirection: 'column', gap: 2,
+                        width: '100%', textAlign: 'left', background: 'transparent',
+                        border: 0, cursor: 'pointer', padding: '6px 8px', borderRadius: 6,
+                        transition: 'background 120ms',
+                      }}
+                    >
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)' }}>{t.title}</span>
+                      {obj && (
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-3)' }}>{obj.title}</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+
+            {/* Sources domaine */}
+            {Object.entries(groupedCandidates).map(([group, items]) => (
+              <div key={group} style={{ marginBottom: 12 }}>
+                <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 8 }}>
+                  {group}
+                </div>
+                {items.map((item) => (
+                  <button
+                    key={item.sourceId}
+                    onClick={() => addExternal(item)}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--paper-2)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+                    style={{
+                      display: 'flex', flexDirection: 'column', gap: 2,
+                      width: '100%', textAlign: 'left', background: 'transparent',
+                      border: 0, cursor: 'pointer', padding: '6px 8px', borderRadius: 6,
+                      transition: 'background 120ms',
+                    }}
+                  >
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)' }}>{item.label}</span>
+                    {item.sublabel && (
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-3)' }}>{item.sublabel}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            ))}
+
+            {taskCandidates.length === 0 && Object.keys(groupedCandidates).length === 0 && (
+              <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14, margin: 0 }}>
+                Tout est planifié.
+              </p>
+            )}
+
+            <div style={{ marginTop: 12, borderTop: '1px solid var(--paper-2)', paddingTop: 12 }}>
+              <button
+                onClick={() => setPanelOpen(false)}
+                style={{ background: 'transparent', border: '1px solid var(--paper-2)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)' }}
+              >
+                Fermer
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Liste */}
+        {totalCount === 0 ? (
+          <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '24px 22px', fontFamily: 'var(--font-serif)', fontSize: 16, fontStyle: 'italic', color: 'var(--ink-3)' }}>
+            Rien de planifié · commence par ajouter une tâche
+          </div>
+        ) : (
+          <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+            {plannedTasks.map((task) => {
+              const obj = objectives.find((o) => o.id === task.objectiveId)
+              return (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  objective={obj?.title ?? null}
+                  onToggle={() => setTaskStatus(task.id, task.status === 'done' ? 'todo' : 'done')}
+                  onUnplan={() => unplanTask(task.id)}
+                />
+              )
+            })}
+            {externalItems.map((item, i) => (
+              <ExternalRow
+                key={item.sourceId}
+                label={item.label}
+                sublabel={item.sublabel}
+                done={item.done}
+                onToggle={() => toggleExternal(item.sourceId)}
+                onRemove={() => removeExternal(item.sourceId)}
+                last={i === externalItems.length - 1 && plannedTasks.length === 0}
+              />
+            ))}
+            <div style={{ padding: '10px 18px', borderTop: '1px solid var(--paper-2)' }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
+                {doneCount} sur {totalCount} fait{doneCount > 1 ? 'es' : ''}
+              </span>
+            </div>
+          </div>
+        )}
+      </section>
+
+      {/* ── Objectifs actifs ───────────────────────────────────────────────── */}
+      <ObjectivesSidebar />
+    </div>
+  )
+}
+
+// ─── ObjectivesSidebar ────────────────────────────────────────────────────────
+
+function ObjectivesSidebar() {
+  const objectives = useStore((s) => s.objectives.filter((o) => !o.archived && o.progress < 100))
+  const milestones = useStore((s) => s.milestones)
+
+  if (objectives.length === 0) return null
+
+  return (
+    <section>
+      <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, color: 'var(--ink)', margin: '0 0 16px' }}>
+        Objectifs actifs
+      </h2>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+        {objectives.map((obj) => {
+          const ms      = milestones.filter((m) => m.objectiveId === obj.id)
+          const doneMs  = ms.filter((m) => m.done).length
+          const nextMs  = ms.filter((m) => !m.done).sort((a, b) => a.position - b.position)[0]
+          return (
+            <div key={obj.id} style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '14px 16px' }}>
+              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.3 }}>
+                {obj.title}
+              </div>
+              {ms.length > 0 && (
+                <div style={{ marginBottom: 8 }}>
+                  <div style={{ height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden', marginBottom: 4 }}>
+                    <div style={{ width: `${ms.length > 0 ? (doneMs / ms.length) * 100 : 0}%`, height: '100%', background: 'var(--terra)', transition: 'width 320ms' }} />
+                  </div>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
+                    {doneMs}/{ms.length} jalons
+                  </span>
+                </div>
+              )}
+              {nextMs && (
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                  Prochain : {nextMs.title}
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
+}

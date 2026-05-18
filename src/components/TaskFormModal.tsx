@@ -5,8 +5,11 @@ import type { Task, Priority, TaskStatus } from '../types'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  domainId: string
-  task?: Task
+  domainId:       string
+  task?:          Task
+  objectiveId?:   string   // pré-rempli depuis ObjectivesPage
+  milestoneId?:   string   // pré-rempli depuis un jalon
+  plannedDate?:   string   // pré-rempli depuis TodayPage
   onClose: () => void
 }
 
@@ -36,10 +39,11 @@ const TIME_PRESETS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function TaskFormModal({ domainId, task, onClose }: Props) {
+export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId, milestoneId: prefillMilestoneId, plannedDate: prefillPlannedDate, onClose }: Props) {
   const addTask       = useStore((s) => s.addTask)
   const updateTask    = useStore((s) => s.updateTask)
   const allObjectives = useStore((s) => s.objectives)
+  const allMilestones = useStore((s) => s.milestones)
   const objectives    = useMemo(
     () => allObjectives.filter((o) => o.domainId === domainId && !o.archived),
     [allObjectives, domainId],
@@ -50,8 +54,15 @@ export function TaskFormModal({ domainId, task, onClose }: Props) {
   const [status,       setStatus]       = useState<TaskStatus>(task?.status ?? 'todo')
   const [timeEstimate, setTimeEstimate] = useState<string>(task?.timeEstimate != null ? String(task.timeEstimate) : '')
   const [dueDate,      setDueDate]      = useState(task?.dueDate?.slice(0, 10) ?? '')
+  const [plannedDate,  setPlannedDate]  = useState(task?.plannedDate?.slice(0, 10) ?? prefillPlannedDate ?? '')
   const [notes,        setNotes]        = useState(task?.notes ?? '')
-  const [objectiveId,  setObjectiveId]  = useState<string>(task?.objectiveId ?? '')
+  const [objectiveId,  setObjectiveId]  = useState<string>(task?.objectiveId ?? prefillObjectiveId ?? '')
+  const [milestoneId,  setMilestoneId]  = useState<string>(task?.milestoneId ?? prefillMilestoneId ?? '')
+
+  const milestonesForObjective = useMemo(
+    () => objectiveId ? allMilestones.filter((m) => m.objectiveId === objectiveId && !m.done) : [],
+    [allMilestones, objectiveId],
+  )
 
   const titleRef = useRef<HTMLInputElement>(null)
   const isEdit = !!task
@@ -78,8 +89,10 @@ export function TaskFormModal({ domainId, task, onClose }: Props) {
       status,
       timeEstimate: timeEstimate ? parseInt(timeEstimate, 10) : null,
       dueDate:      dueDate || null,
+      plannedDate:  plannedDate || null,
       notes:        notes || undefined,
       objectiveId:  objectiveId || undefined,
+      milestoneId:  milestoneId || undefined,
     }
 
     if (isEdit) updateTask(task.id, payload)
@@ -185,15 +198,26 @@ export function TaskFormModal({ domainId, task, onClose }: Props) {
             </div>
           </div>
 
-          {/* Due date */}
-          <div>
-            <label className="mb-2 block text-xs font-medium text-zinc-500">Échéance</label>
-            <input
-              type="date"
-              value={dueDate}
-              onChange={(e) => setDueDate(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]"
-            />
+          {/* Dates row */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="mb-2 block text-xs font-medium text-zinc-500">Planifier pour</label>
+              <input
+                type="date"
+                value={plannedDate}
+                onChange={(e) => setPlannedDate(e.target.value)}
+                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-xs font-medium text-zinc-500">Échéance dure</label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]"
+              />
+            </div>
           </div>
 
           {/* Objectif lié */}
@@ -223,6 +247,25 @@ export function TaskFormModal({ domainId, task, onClose }: Props) {
                   )
                 })}
               </div>
+            </div>
+          )}
+
+          {/* Jalon lié */}
+          {milestonesForObjective.length > 0 && (
+            <div>
+              <label className="mb-2 block text-xs font-medium text-zinc-500">Jalon associé</label>
+              <select
+                value={milestoneId}
+                onChange={(e) => setMilestoneId(e.target.value)}
+                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors"
+              >
+                <option value="">Aucun</option>
+                {milestonesForObjective.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.title}{m.targetDate ? ` · ${new Date(m.targetDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}` : ''}
+                  </option>
+                ))}
+              </select>
             </div>
           )}
 

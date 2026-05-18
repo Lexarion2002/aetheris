@@ -31,6 +31,7 @@ const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => (
 const EcriturePage      = lazy(() => import('./pages/EcriturePage').then((m) => ({ default: m.EcriturePage })))
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
 const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
+const TodayPage         = lazy(() => import('./pages/TodayPage').then((m) => ({ default: m.TodayPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -136,6 +137,7 @@ export default function App() {
         {/* ── App (requires onboarding) ─────────────────────────────────────── */}
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
           <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="today"     element={<Suspense fallback={<PageLoader />}><TodayPage /></Suspense>} />
           <Route path="domain/:id" element={<Suspense fallback={<PageLoader />}><DomainView /></Suspense>} />
           <Route path="focus" element={<Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>} />
           <Route path="objectives" element={<Suspense fallback={<PageLoader />}><ObjectivesPage /></Suspense>} />

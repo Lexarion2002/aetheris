@@ -24,11 +24,25 @@ export interface Task {
   status: TaskStatus
   priority: Priority
   timeEstimate: number | null  // minutes
-  dueDate: string | null       // ISO date string
+  dueDate: string | null       // ISO date — échéance dure
+  plannedDate: string | null   // ISO date — jour où on prévoit de la faire
   notes?: string
-  objectiveId?: string         // lien optionnel vers un objectif
+  objectiveId?: string         // lien vers un objectif
+  milestoneId?: string         // lien vers un jalon
   createdAt: string
   updatedAt: string
+}
+
+// ─── Milestone ────────────────────────────────────────────────────────────────
+
+export interface Milestone {
+  id:          string
+  objectiveId: string
+  title:       string
+  targetDate:  string | null   // YYYY-MM-DD
+  done:        boolean
+  position:    number          // ordre d'affichage
+  createdAt:   string
 }
 
 // ─── SubTask ──────────────────────────────────────────────────────────────────

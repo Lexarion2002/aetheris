@@ -1,7 +1,7 @@
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
 import { createPersistedStore } from '../lib/persistenceManager'
-import type { Domain, Task, SubTask, Objective, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
+import type { Domain, Task, SubTask, Objective, Milestone, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -13,6 +13,7 @@ export interface AetherisData {
   tasks:              Task[]
   subtasks?:          SubTask[]
   objectives:         Objective[]
+  milestones?:        Milestone[]
   expenses:           Expense[]
   timeSessions:       TimeSession[]
   budgets:            DomainBudget[]
@@ -32,6 +33,7 @@ interface AetherisState {
   tasks:        Task[]
   subtasks:     SubTask[]
   objectives:   Objective[]
+  milestones:   Milestone[]
   expenses:     Expense[]
   timeSessions: TimeSession[]
   budgets:      DomainBudget[]
@@ -67,6 +69,13 @@ interface AetherisState {
   deleteObjective: (id: string) => void
   setObjectiveProgress: (id: string, progress: number) => void
   archiveObjective: (id: string, archived: boolean) => void
+  recomputeObjectiveProgress: (objectiveId: string) => void
+
+  // Milestone actions
+  addMilestone: (milestone: Omit<Milestone, 'id' | 'createdAt'>) => Milestone
+  updateMilestone: (id: string, updates: Partial<Omit<Milestone, 'id' | 'createdAt'>>) => void
+  deleteMilestone: (id: string) => void
+  toggleMilestone: (id: string) => void
 
   // Expense actions
   addExpense: (expense: Omit<Expense, 'id' | 'createdAt'>) => Expense
@@ -138,6 +147,7 @@ export const useStore = createPersistedStore<AetherisState>(
       tasks:        [],
       subtasks:     [],
       objectives:   [],
+      milestones:   [],
       expenses:     [],
       timeSessions:    [],
       budgets:         [],
@@ -171,6 +181,7 @@ export const useStore = createPersistedStore<AetherisState>(
           tasks:              data.tasks              ?? [],
           subtasks:           data.subtasks           ?? [],
           objectives:         data.objectives         ?? [],
+          milestones:         data.milestones         ?? [],
           expenses:           data.expenses           ?? [],
           timeSessions:       data.timeSessions       ?? [],
           budgets:            data.budgets            ?? [],
@@ -192,6 +203,7 @@ export const useStore = createPersistedStore<AetherisState>(
           tasks:              [],
           subtasks:           [],
           objectives:         [],
+          milestones:         [],
           expenses:           [],
           timeSessions:       [],
           budgets:            [],
@@ -318,9 +330,9 @@ export const useStore = createPersistedStore<AetherisState>(
       deleteObjective: (id) =>
         set((s) => ({
           objectives: s.objectives.filter((o) => o.id !== id),
-          // Unlink tasks that referenced this objective
+          milestones: s.milestones.filter((m) => m.objectiveId !== id),
           tasks: s.tasks.map((t) =>
-            t.objectiveId === id ? { ...t, objectiveId: undefined, updatedAt: now() } : t,
+            t.objectiveId === id ? { ...t, objectiveId: undefined, milestoneId: undefined, updatedAt: now() } : t,
           ),
         })),
 
@@ -344,6 +356,66 @@ export const useStore = createPersistedStore<AetherisState>(
             o.id === id ? { ...o, archived, updatedAt: now() } : o,
           ),
         })),
+
+      recomputeObjectiveProgress: (objectiveId) =>
+        set((s) => {
+          const ms = s.milestones.filter((m) => m.objectiveId === objectiveId)
+          if (ms.length === 0) return {}
+          const doneCount = ms.filter((m) => m.done).length
+          const progress  = Math.round((doneCount / ms.length) * 100)
+          return {
+            objectives: s.objectives.map((o) => {
+              if (o.id !== objectiveId) return o
+              return {
+                ...o,
+                progress,
+                progressHistory: trackProgress(o.progressHistory, progress),
+                updatedAt: now(),
+              }
+            }),
+          }
+        }),
+
+      // ── Milestone ────────────────────────────────────────────────────────────
+
+      addMilestone: (milestone) => {
+        const newM: Milestone = { id: nanoid(), createdAt: now(), ...milestone }
+        set((s) => ({ milestones: [...s.milestones, newM] }))
+        return newM
+      },
+
+      updateMilestone: (id, updates) =>
+        set((s) => ({
+          milestones: s.milestones.map((m) => m.id === id ? { ...m, ...updates } : m),
+        })),
+
+      deleteMilestone: (id) =>
+        set((s) => ({
+          milestones: s.milestones.filter((m) => m.id !== id),
+          tasks: s.tasks.map((t) =>
+            t.milestoneId === id ? { ...t, milestoneId: undefined, updatedAt: now() } : t,
+          ),
+        })),
+
+      toggleMilestone: (id) =>
+        set((s) => {
+          const ms       = s.milestones.map((m) => m.id === id ? { ...m, done: !m.done } : m)
+          const target   = ms.find((m) => m.id === id)
+          if (!target) return { milestones: ms }
+          const objMs    = ms.filter((m) => m.objectiveId === target.objectiveId)
+          const doneCount = objMs.filter((m) => m.done).length
+          const progress  = Math.round((doneCount / objMs.length) * 100)
+          const objectives = s.objectives.map((o) => {
+            if (o.id !== target.objectiveId) return o
+            return {
+              ...o,
+              progress,
+              progressHistory: trackProgress(o.progressHistory, progress),
+              updatedAt: now(),
+            }
+          })
+          return { milestones: ms, objectives }
+        }),
 
       // ── Expense ─────────────────────────────────────────────────────────────
 

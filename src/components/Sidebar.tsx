@@ -135,9 +135,21 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
       {/* ── Navigation principale ───────────────────────────────────────────────── */}
       <div className="space-y-0.5">
         {sectionLabel('Navigation')}
+        <NavLink to="/today" onClick={onNavigate} className={linkCls}>
+          <span className="text-xs w-4 text-center">◎</span>
+          Aujourd'hui
+        </NavLink>
         <NavLink to="/dashboard" end onClick={onNavigate} className={linkCls}>
           <span className="text-xs w-4 text-center">⊹</span>
           Dashboard
+        </NavLink>
+        <NavLink to="/objectives" onClick={onNavigate} className={linkCls}>
+          <span className="text-xs w-4 text-center">◈</span>
+          Objectifs
+        </NavLink>
+        <NavLink to="/week" onClick={onNavigate} className={linkCls}>
+          <span className="text-xs w-4 text-center">▦</span>
+          Semaine
         </NavLink>
       </div>
 
@@ -328,10 +340,6 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
       {/* ── Autres ─────────────────────────────────────────────────────────────── */}
       <div className="mt-4 border-t border-[var(--border)] pt-4 space-y-0.5">
         {sectionLabel('Autres')}
-        <NavLink to="/week" onClick={onNavigate} className={linkCls}>
-          <span className="text-xs w-4 text-center">▦</span>
-          Semaine
-        </NavLink>
         <NavLink to="/analytics" onClick={onNavigate} className={linkCls}>
           <span className="text-xs w-4 text-center">◈</span>
           Analytics

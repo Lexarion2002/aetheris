@@ -1,8 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import { useStore } from '../store'
 import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import { ObjectiveFormModal } from '../components/ObjectiveFormModal'
-import type { Objective, ProgressEntry } from '../types'
+import { TaskFormModal } from '../components/TaskFormModal'
+import type { Objective, Milestone, ProgressEntry } from '../types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -45,19 +46,149 @@ function Sparkline({ data }: { data: ProgressEntry[] }) {
   )
 }
 
+// ─── MilestonePanel ───────────────────────────────────────────────────────────
+
+function MilestonePanel({ obj }: { obj: Objective }) {
+  const milestones       = useStore((s) => s.milestones.filter((m) => m.objectiveId === obj.id))
+  const domains          = useStore((s) => s.domains)
+  const addMilestone     = useStore((s) => s.addMilestone)
+  const toggleMilestone  = useStore((s) => s.toggleMilestone)
+  const deleteMilestone  = useStore((s) => s.deleteMilestone)
+
+  const [newTitle,    setNewTitle]    = useState('')
+  const [newDate,     setNewDate]     = useState('')
+  const [adding,      setAdding]      = useState(false)
+  const [taskModal,   setTaskModal]   = useState<{ milestoneId: string } | null>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+
+  const domain = domains.find((d) => d.id === obj.domainId)
+  const sorted = [...milestones].sort((a, b) => a.position - b.position)
+
+  const submitNew = () => {
+    if (!newTitle.trim()) return
+    const position = milestones.length > 0 ? Math.max(...milestones.map((m) => m.position)) + 1 : 0
+    addMilestone({ objectiveId: obj.id, title: newTitle.trim(), targetDate: newDate || null, done: false, position })
+    setNewTitle('')
+    setNewDate('')
+    setAdding(false)
+  }
+
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-wider text-zinc-600">Jalons</p>
+        {!adding && (
+          <button
+            onClick={() => { setAdding(true); setTimeout(() => inputRef.current?.focus(), 50) }}
+            className="text-[10px] text-zinc-600 hover:text-teal-400 transition-colors"
+          >
+            + ajouter
+          </button>
+        )}
+      </div>
+
+      {sorted.map((m) => (
+        <div key={m.id} className="group/ms flex items-center gap-2">
+          <button
+            onClick={() => toggleMilestone(m.id)}
+            className={[
+              'h-3.5 w-3.5 shrink-0 rounded border transition-colors flex items-center justify-center',
+              m.done ? 'border-teal-500 bg-teal-500/30' : 'border-zinc-600 hover:border-teal-500',
+            ].join(' ')}
+          >
+            {m.done && (
+              <svg viewBox="0 0 10 10" width="8" height="8" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                <polyline points="1.5,5.5 4,8 8.5,2" />
+              </svg>
+            )}
+          </button>
+          <span className={['flex-1 text-xs leading-snug', m.done ? 'line-through text-zinc-600' : 'text-zinc-300'].join(' ')}>
+            {m.title}
+          </span>
+          {m.targetDate && (
+            <span className="text-[10px] text-zinc-600 shrink-0 tabular-nums">
+              {new Date(m.targetDate).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+            </span>
+          )}
+          <div className="flex items-center gap-0.5 opacity-0 group-hover/ms:opacity-100 transition-opacity">
+            {!m.done && domain && (
+              <button
+                onClick={() => setTaskModal({ milestoneId: m.id })}
+                className="rounded p-0.5 text-zinc-600 hover:text-teal-400 transition-colors"
+                title="Créer une tâche pour ce jalon"
+              >
+                <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={() => deleteMilestone(m.id)}
+              className="rounded p-0.5 text-zinc-700 hover:text-red-400 transition-colors"
+            >
+              <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+      ))}
+
+      {sorted.length === 0 && !adding && (
+        <p className="text-[10px] text-zinc-700 italic">Aucun jalon · découpe cet objectif en étapes concrètes</p>
+      )}
+
+      {adding && (
+        <div className="space-y-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 p-2">
+          <input
+            ref={inputRef}
+            value={newTitle}
+            onChange={(e) => setNewTitle(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') submitNew(); if (e.key === 'Escape') setAdding(false) }}
+            placeholder="Titre du jalon…"
+            className="w-full rounded border border-zinc-700/60 bg-zinc-800/50 px-2 py-1 text-xs text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+          />
+          <input
+            type="date"
+            value={newDate}
+            onChange={(e) => setNewDate(e.target.value)}
+            className="w-full rounded border border-zinc-700/60 bg-zinc-800/50 px-2 py-1 text-xs text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]"
+          />
+          <div className="flex gap-1.5">
+            <button onClick={submitNew} className="rounded px-2 py-1 text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors">
+              Ajouter
+            </button>
+            <button onClick={() => { setAdding(false); setNewTitle(''); setNewDate('') }} className="rounded px-2 py-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+              Annuler
+            </button>
+          </div>
+        </div>
+      )}
+
+      {taskModal && domain && (
+        <TaskFormModal
+          domainId={domain.id}
+          objectiveId={obj.id}
+          milestoneId={taskModal.milestoneId}
+          onClose={() => setTaskModal(null)}
+        />
+      )}
+    </div>
+  )
+}
+
 // ─── FullObjectiveCard ────────────────────────────────────────────────────────
 
 function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective) => void }) {
-  const domains         = useStore((s) => s.domains)
-  const tasks           = useStore((s) => s.tasks)
+  const domains          = useStore((s) => s.domains)
+  const tasks            = useStore((s) => s.tasks)
+  const milestones       = useStore((s) => s.milestones.filter((m) => m.objectiveId === obj.id))
   const archiveObjective = useStore((s) => s.archiveObjective)
   const deleteObjective  = useStore((s) => s.deleteObjective)
-  const setObjectiveProgress = useStore((s) => s.setObjectiveProgress)
 
-  const [showSlider,  setShowSlider]  = useState(false)
-  const [localProg,   setLocalProg]   = useState(obj.progress)
   const [showHistory, setShowHistory] = useState(false)
   const [confirmDel,  setConfirmDel]  = useState(false)
+  const [showTaskModal, setShowTaskModal] = useState(false)
 
   const domain      = domains.find((d) => d.id === obj.domainId)
   const colors      = domain ? getDomainColors(domain.color) : null
@@ -69,10 +200,13 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
   const pColor = progressColor(obj.progress)
   const pText  = progressText(obj.progress)
 
-  const saveProgress = () => {
-    setObjectiveProgress(obj.id, localProg)
-    setShowSlider(false)
-  }
+  // Progress : calculé depuis les jalons si présents, sinon depuis les tâches
+  const doneMs = milestones.filter((m) => m.done).length
+  const progressLabel = milestones.length > 0
+    ? `${doneMs}/${milestones.length} jalons`
+    : linkedTasks.length > 0
+    ? `${doneTasks}/${linkedTasks.length} tâches`
+    : null
 
   const sortedHistory = [...(obj.progressHistory ?? [])].sort((a, b) => a.date.localeCompare(b.date))
 
@@ -134,14 +268,13 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
           </div>
         )}
 
-        {/* Progress bar + sparkline */}
+        {/* Progress bar */}
         <div>
           <div className="mb-1.5 flex items-center justify-between gap-2">
             <div className="flex items-center gap-2">
-              <button onClick={() => { setLocalProg(obj.progress); setShowSlider(!showSlider) }}
-                className={['text-sm font-bold tabular-nums transition-colors', pText, 'hover:opacity-80'].join(' ')}>
+              <span className={['text-sm font-bold tabular-nums', pText].join(' ')}>
                 {obj.progress}%
-              </button>
+              </span>
               {sortedHistory.length >= 2 && (
                 <button onClick={() => setShowHistory(!showHistory)}
                   className={['transition-colors', showHistory ? 'text-teal-400' : 'text-zinc-700 hover:text-teal-500'].join(' ')}>
@@ -149,44 +282,22 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
                 </button>
               )}
             </div>
-            {linkedTasks.length > 0 && (
-              <span className="text-xs text-zinc-600 tabular-nums">
-                {doneTasks}/{linkedTasks.length} tâches
-              </span>
+            {progressLabel && (
+              <span className="text-xs text-zinc-600 tabular-nums">{progressLabel}</span>
             )}
           </div>
           <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
             <div className={['h-full rounded-full transition-all duration-500', pColor].join(' ')} style={{ width: `${obj.progress}%` }} />
           </div>
-
-          {/* Inline slider */}
-          {showSlider && (
-            <div className="mt-2 space-y-2">
-              <div className="flex items-center gap-2">
-                <input type="range" min="0" max="100" step="5" value={localProg}
-                  onChange={(e) => setLocalProg(Number(e.target.value))} className="flex-1 accent-teal-500" />
-                <span className="w-9 text-right text-xs font-medium tabular-nums text-zinc-300">{localProg}%</span>
-              </div>
-              <div className="flex gap-2">
-                <button onClick={saveProgress} className="rounded px-2.5 py-1 text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors">Mettre à jour</button>
-                <button onClick={() => setShowSlider(false)} className="rounded px-2.5 py-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Annuler</button>
-              </div>
-            </div>
-          )}
         </div>
 
         {/* Progress history */}
         {showHistory && sortedHistory.length > 0 && (
           <div className="rounded-lg border border-zinc-800 bg-zinc-900/60 p-2.5 space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5">Historique d'avancement</p>
+            <p className="text-[10px] uppercase tracking-wider text-zinc-600 mb-1.5">Historique</p>
             {sortedHistory.map((entry, i) => {
-              const prev    = i > 0 ? sortedHistory[i - 1].value : 0
-              const delta   = entry.value - prev
-              const deltaEl = delta > 0
-                ? <span className="text-green-400">+{delta}%</span>
-                : delta < 0
-                ? <span className="text-red-400">{delta}%</span>
-                : null
+              const prev  = i > 0 ? sortedHistory[i - 1].value : 0
+              const delta = entry.value - prev
               return (
                 <div key={entry.date} className="flex items-center justify-between text-xs">
                   <span className="text-zinc-500">
@@ -197,7 +308,11 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
                       <div className={['h-full rounded-full', progressColor(entry.value)].join(' ')} style={{ width: `${entry.value}%` }} />
                     </div>
                     <span className="w-8 text-right tabular-nums font-medium text-zinc-300">{entry.value}%</span>
-                    {i > 0 && <span className="w-10 text-right text-[10px] tabular-nums">{deltaEl}</span>}
+                    {i > 0 && delta !== 0 && (
+                      <span className={['w-10 text-right text-[10px] tabular-nums', delta > 0 ? 'text-green-400' : 'text-red-400'].join(' ')}>
+                        {delta > 0 ? '+' : ''}{delta}%
+                      </span>
+                    )}
                   </div>
                 </div>
               )
@@ -205,38 +320,26 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
           </div>
         )}
 
-        {/* Linked tasks */}
-        {linkedTasks.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-[10px] uppercase tracking-wider text-zinc-600">Tâches liées</p>
-            {linkedTasks.slice(0, 3).map((t) => (
-              <div key={t.id} className="flex items-center gap-2 text-xs">
-                <div className={['h-1.5 w-1.5 rounded-full flex-shrink-0',
-                  t.status === 'done'        ? 'bg-green-400' :
-                  t.status === 'in_progress' ? 'bg-blue-400' : 'bg-zinc-500'
-                ].join(' ')} />
-                <span className={t.status === 'done' ? 'line-through text-zinc-600' : 'text-zinc-400'}>
-                  {t.title}
-                </span>
-              </div>
-            ))}
-            {linkedTasks.length > 3 && (
-              <p className="text-[10px] text-zinc-600">+{linkedTasks.length - 3} autre{linkedTasks.length - 3 > 1 ? 's' : ''}</p>
-            )}
-          </div>
-        )}
+        {/* Milestones panel */}
+        {!obj.archived && <MilestonePanel obj={obj} />}
       </div>
 
       {/* Actions */}
       <div className="flex items-center justify-between border-t border-zinc-800/60 px-4 py-2.5 opacity-0 group-hover:opacity-100 transition-opacity">
-        <button onClick={() => archiveObjective(obj.id, !obj.archived)}
-          className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors">
-          {obj.archived ? (
-            <><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 10h18M3 10l4-4M3 10l4 4M21 14H3m18 0l-4-4m4 4l-4 4" /></svg> Restaurer</>
-          ) : (
-            <><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 8h14M5 8a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v0a2 2 0 01-2 2M5 8l1 12a2 2 0 002 2h8a2 2 0 002-2L19 8" /></svg> Archiver</>
+        <div className="flex items-center gap-1">
+          <button onClick={() => archiveObjective(obj.id, !obj.archived)}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors">
+            {obj.archived ? 'Restaurer' : 'Archiver'}
+          </button>
+          {!obj.archived && domain && (
+            <button
+              onClick={() => setShowTaskModal(true)}
+              className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs text-zinc-500 hover:bg-teal-500/10 hover:text-teal-400 transition-colors"
+            >
+              + tâche
+            </button>
           )}
-        </button>
+        </div>
         <div className="flex items-center gap-1">
           <button onClick={() => onEdit(obj)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors">
             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -257,6 +360,14 @@ function FullObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Object
           )}
         </div>
       </div>
+
+      {showTaskModal && domain && (
+        <TaskFormModal
+          domainId={domain.id}
+          objectiveId={obj.id}
+          onClose={() => setShowTaskModal(false)}
+        />
+      )}
     </div>
   )
 }
@@ -360,10 +471,7 @@ export function ObjectivesPage() {
     const overdue  = active.filter((o) =>
       o.targetDate && daysUntil(o.targetDate) < 0 && o.progress < 100
     )
-    const avgProg  = active.length > 0
-      ? Math.round(active.reduce((a, o) => a + o.progress, 0) / active.length)
-      : 0
-    return { total: active.length, achieved: achieved.length, overdue: overdue.length, avgProg }
+    return { total: active.length, achieved: achieved.length, overdue: overdue.length }
   }, [objectives])
 
   // ── Domains view groups ────────────────────────────────────────────────────
@@ -423,12 +531,11 @@ export function ObjectivesPage() {
       </div>
 
       {/* ── Stats ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2">
         {[
-          { label: 'Actifs',     value: stats.total,   accent: 'text-zinc-200' },
-          { label: 'Atteints',   value: stats.achieved, accent: 'text-green-400' },
-          { label: 'En retard',  value: stats.overdue,  accent: stats.overdue > 0 ? 'text-red-400' : 'text-zinc-600' },
-          { label: 'Progression moy.', value: `${stats.avgProg}%`, accent: progressText(stats.avgProg) },
+          { label: 'Actifs',    value: stats.total,    accent: 'text-zinc-200' },
+          { label: 'Atteints',  value: stats.achieved, accent: 'text-green-400' },
+          { label: 'En retard', value: stats.overdue,  accent: stats.overdue > 0 ? 'text-red-400' : 'text-zinc-600' },
         ].map((s) => (
           <div key={s.label} className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 px-4 py-3">
             <p className={['text-2xl font-bold tabular-nums leading-none', s.accent].join(' ')}>{s.value}</p>
