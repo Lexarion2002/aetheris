@@ -300,3 +300,53 @@ body.theme-light .recharts-surface,
 body.theme-light .recharts-wrapper {
   filter: invert(1) hue-rotate(180deg);
 }
+
+/* ─── Achats page animations ─────────────────────────────── */
+@keyframes reveal-up {
+  from { transform: translateY(10px); }
+  to   { transform: none; }
+}
+.reveal { animation: reveal-up 500ms var(--ease) both; }
+@media (prefers-reduced-motion: reduce) { .reveal { animation: none; } }
+
+@keyframes verdict-rise {
+  from { transform: translateY(28px); }
+  to   { transform: none; }
+}
+.verdict-word > span { display: inline-block; animation: verdict-rise 600ms var(--ease) both; }
+
+@keyframes panel-slide {
+  from { transform: translateX(40px); }
+  to   { transform: none; }
+}
+.verdict-panel { animation: panel-slide 320ms var(--ease) both; }
+
+.wish-card {
+  position: relative;
+  background: var(--paper-1);
+  border: 1px solid var(--paper-2);
+  border-radius: var(--r-lg);
+  padding: 20px 20px 16px;
+  transition: border-color var(--dur) var(--ease), transform var(--dur) var(--ease);
+  display: flex; flex-direction: column; gap: 14px;
+  cursor: default;
+}
+.wish-card:hover { border-color: var(--ink-4); box-shadow: var(--shadow-1); }
+.wish-card .decide-btn { opacity: 0; transition: opacity var(--dur) var(--ease); }
+.wish-card:hover .decide-btn { opacity: 1; }
+.wish-card .card-image-trigger { opacity: 0; transition: opacity var(--dur) var(--ease); }
+.wish-card:hover .card-image-trigger { opacity: 1; }
+.wish-card .card-image-trigger:focus-within { opacity: 1; }
+.card-image .card-image-ctl { opacity: 0; transition: opacity var(--dur) var(--ease); }
+.card-image:hover .card-image-ctl { opacity: 1; }
+
+.hist-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 130px 110px 110px;
+  gap: 16px;
+  align-items: baseline;
+  padding: 12px 4px;
+  border-bottom: 1px solid var(--paper-2);
+  transition: background var(--dur) var(--ease);
+}
+.hist-row:hover { background: var(--paper-1); }

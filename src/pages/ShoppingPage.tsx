@@ -1,80 +1,909 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { Plus, ArrowRight, X, Check, ImagePlus, Link2 } from 'lucide-react'
 import { useShoppingStore } from '../store/shoppingStore'
-import type { ShoppingItem, BoughtItem, ShoppingCategory, ShoppingPriority, ShoppingVerdict } from '../types'
+import { useStore } from '../store'
+import { computeMonthBalance } from '../utils/financeUtils'
+import type {
+  ShoppingItem,
+  BoughtItem,
+  ShoppingCategory,
+  ShoppingPriority,
+  ShoppingVerdict,
+} from '../types'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Constants ────────────────────────────────────────────────────────────────
 
 const PRIORITIES: ShoppingPriority[] = ['Envie', 'Besoin', 'Urgent']
-
+const VERDICTS: ShoppingVerdict[] = ['Satisfait', 'Mitigé', 'Déçu']
+const PRIORITY_LEVEL: Record<ShoppingPriority, number> = { Envie: 1, Besoin: 2, Urgent: 3 }
 const CAT_SWATCHES = [
   '#B5532A', '#EAD1BE', '#7E9A7A', '#D5DFD0',
   '#6B5B48', '#DFD2B5', '#A08B72', '#3A2E22',
 ]
-const VERDICTS:   ShoppingVerdict[]  = ['Satisfait', 'Mitigé', 'Déçu']
+const STORAGE_PREFIX = 'aetheris-wish-img-'
+const FRENCH_MONTHS = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc']
 
-const priorityChipStyle: Record<ShoppingPriority, React.CSSProperties> = {
-  Envie:  { background: 'var(--paper-2)',    color: 'var(--fg-muted)',   border: '1px solid var(--border)' },
-  Besoin: { background: 'var(--terra-soft)', color: 'var(--terra-deep)', border: '1px solid var(--terra)' },
-  Urgent: { background: 'rgba(155,58,28,.12)', color: 'var(--danger)',   border: '1px solid var(--danger)' },
-}
-
-const verdictChipStyle: Record<ShoppingVerdict, React.CSSProperties> = {
-  Satisfait: { background: 'var(--sage-soft)', color: 'var(--sage-deep)', border: '1px solid #B9C8B4' },
-  Mitigé:    { background: 'rgba(192,106,47,.12)', color: 'var(--warn)', border: '1px solid var(--warn)' },
-  Déçu:      { background: 'rgba(155,58,28,.12)', color: 'var(--danger)', border: '1px solid var(--danger)' },
-}
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmt = (n: number) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 
-const fmtDate = (iso: string) =>
-  new Date(iso).toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit', year: 'numeric' })
+const fmtDate = (iso: string) => {
+  const d = new Date(iso)
+  const dd = String(d.getDate()).padStart(2, '0')
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const yyyy = d.getFullYear()
+  return `${dd}.${mm}.${yyyy}`
+}
 
-// ─── ImagePlaceholder ─────────────────────────────────────────────────────────
+const today = () => new Date().toISOString().split('T')[0]
 
-function ImagePlaceholder() {
+const catOf = (categories: ShoppingCategory[], categoryId?: string) =>
+  categories.find((c) => c.id === categoryId) ?? { name: '—', color: 'var(--ink-4)' }
+
+interface Finance {
+  solde: number
+  marge: number
+  revenuMensuel: number
+}
+
+type VerdictKind = 'confortable' | 'faisable' | 'deconseille'
+
+interface VerdictResult {
+  kind: VerdictKind
+  headline: string
+  body: string
+  metrics: {
+    soldeAfter: number
+    margeAfter: number
+    epargne: number
+    epargnePct: number
+  }
+}
+
+function computeVerdict(price: number, finance: Finance): VerdictResult {
+  const { solde, marge, revenuMensuel } = finance
+  const epargne = marge - price
+  const ratioSolde = solde > 0 ? price / solde : 1
+  const epargnePct = revenuMensuel > 0 ? epargne / revenuMensuel : -1
+
+  let kind: VerdictKind
+  let headline: string
+  let body: string
+
+  if (ratioSolde <= 0.18 && epargnePct >= 0.15) {
+    kind = 'confortable'
+    headline = 'Confortable'
+    body = "Cet achat représente une part modérée de votre solde et laisse une épargne suffisante ce mois-ci."
+  } else if (ratioSolde <= 0.45 && epargne >= 0) {
+    kind = 'faisable'
+    headline = 'Faisable'
+    body = "Cet achat est possible mais entame une part notable de votre marge mensuelle. À vous de décider."
+  } else {
+    kind = 'deconseille'
+    headline = 'Déconseillé'
+    body = "Cet achat dépasse votre marge disponible ou représente une part trop importante de votre solde."
+  }
+
+  return {
+    kind,
+    headline,
+    body,
+    metrics: {
+      soldeAfter: solde - price,
+      margeAfter: marge - price,
+      epargne,
+      epargnePct,
+    },
+  }
+}
+
+const VERDICT_TONE: Record<VerdictKind, { color: string; bg: string; border: string }> = {
+  confortable:  { color: 'var(--sage-deep)',  bg: 'var(--sage-soft)',  border: '#B9C8B4' },
+  faisable:     { color: 'var(--terra-deep)', bg: 'var(--terra-soft)', border: '#DEB89C' },
+  deconseille:  { color: 'var(--danger)',     bg: '#F0DCCC',           border: '#E0B6A2' },
+}
+
+// ─── PriorityDots ─────────────────────────────────────────────────────────────
+
+function PriorityDots({ priority }: { priority: ShoppingPriority }) {
+  const level = PRIORITY_LEVEL[priority]
   return (
-    <div className="flex h-full w-full items-center justify-center" style={{ background: 'var(--paper-2)', color: 'var(--fg-subtle)' }}>
-      <svg className="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z" />
-      </svg>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 3, flexShrink: 0 }}>
+      {[3, 2, 1].map((i) => (
+        <div
+          key={i}
+          style={{
+            width: 12,
+            height: 2,
+            borderRadius: 2,
+            background: i <= level ? 'var(--terra)' : 'var(--paper-3)',
+          }}
+        />
+      ))}
     </div>
   )
 }
 
-// ─── ModalAddItem ─────────────────────────────────────────────────────────────
+// ─── IconBtn ──────────────────────────────────────────────────────────────────
 
-interface ModalAddItemProps {
-  initial?:   ShoppingItem
-  categories: ShoppingCategory[]
-  onSave:     (data: Omit<ShoppingItem, 'id' | 'createdAt'>) => void
-  onClose:    () => void
-  onNewCat:   (name: string, color: string) => ShoppingCategory
+function IconBtn({
+  onClick,
+  title,
+  children,
+}: {
+  onClick: (e: React.MouseEvent) => void
+  title?: string
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      style={{
+        width: 24,
+        height: 24,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 6,
+        border: 'none',
+        background: 'transparent',
+        color: 'var(--ink-3)',
+        cursor: 'pointer',
+        transition: 'color var(--dur) var(--ease), background var(--dur) var(--ease)',
+        padding: 0,
+      }}
+      onMouseEnter={(e) => {
+        const t = e.currentTarget as HTMLButtonElement
+        t.style.color = 'var(--terra)'
+        t.style.background = 'var(--paper-1)'
+      }}
+      onMouseLeave={(e) => {
+        const t = e.currentTarget as HTMLButtonElement
+        t.style.color = 'var(--ink-3)'
+        t.style.background = 'transparent'
+      }}
+    >
+      {children}
+    </button>
+  )
 }
 
-function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalAddItemProps) {
-  const [name,       setName]       = useState(initial?.name       ?? '')
-  const [brand,      setBrand]      = useState(initial?.brand      ?? '')
-  const [price,      setPrice]      = useState(initial?.price?.toString() ?? '')
-  const [imageUrl,   setImageUrl]   = useState(initial?.imageUrl   ?? '')
-  const [link,       setLink]       = useState(initial?.link       ?? '')
-  const [notes,      setNotes]      = useState(initial?.notes      ?? '')
-  const [categoryId, setCategoryId] = useState(initial?.categoryId ?? '')
-  const [priority,   setPriority]   = useState<ShoppingPriority>(initial?.priority ?? 'Envie')
-  const [newCatName,  setNewCatName]  = useState('')
-  const [newCatColor, setNewCatColor] = useState(CAT_SWATCHES[0])
-  const [showNewCat,  setShowNewCat]  = useState(false)
+// ─── CardImage ────────────────────────────────────────────────────────────────
+
+function CardImage({ itemId }: { itemId: string }) {
+  const storageKey = STORAGE_PREFIX + itemId
+  const [src, setSrc] = useState<string>(() => localStorage.getItem(storageKey) ?? '')
+  const [showUrl, setShowUrl] = useState(false)
+  const [url, setUrl] = useState('')
+  const [dragActive, setDragActive] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const handleImage = (file: File) => {
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail
+      if (detail) setSrc(detail)
+    }
+    window.addEventListener(`aetheris-img-${itemId}`, handler)
+    return () => window.removeEventListener(`aetheris-img-${itemId}`, handler)
+  }, [itemId])
+
+  const saveImage = useCallback((dataUrl: string) => {
+    localStorage.setItem(storageKey, dataUrl)
+    setSrc(dataUrl)
+    window.dispatchEvent(new CustomEvent(`aetheris-img-${itemId}`, { detail: dataUrl }))
+  }, [storageKey, itemId])
+
+  const handleFile = (file: File) => {
     const reader = new FileReader()
-    reader.onload = (e) => setImageUrl(e.target?.result as string)
+    reader.onload = (e) => {
+      const result = e.target?.result as string
+      if (result) saveImage(result)
+    }
     reader.readAsDataURL(file)
   }
 
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragActive(false)
+    const file = e.dataTransfer.files[0]
+    if (file && file.type.startsWith('image/')) handleFile(file)
+  }
+
+  const handleUrlSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!url.trim()) return
+    saveImage(url.trim())
+    setShowUrl(false)
+    setUrl('')
+  }
+
+  const removeImage = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    localStorage.removeItem(storageKey)
+    setSrc('')
+  }
+
+  if (src) {
+    return (
+      <div
+        className="card-image"
+        onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+        onDragLeave={() => setDragActive(false)}
+        onDrop={handleDrop}
+        style={{
+          margin: '-20px -20px 4px',
+          height: 160,
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
+          ...(dragActive ? { outline: '2px dashed var(--terra)', outlineOffset: -2 } : {}),
+        }}
+      >
+        <img
+          src={src}
+          alt=""
+          style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+        />
+        <div
+          className="card-image-ctl"
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            display: 'flex',
+            gap: 4,
+            background: 'rgba(251,246,234,0.85)',
+            borderRadius: 8,
+            padding: 4,
+          }}
+        >
+          <IconBtn onClick={removeImage} title="Supprimer l'image">
+            <X size={13} />
+          </IconBtn>
+          <IconBtn onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }} title="Changer d'image">
+            <ImagePlus size={13} />
+          </IconBtn>
+        </div>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+        />
+      </div>
+    )
+  }
+
+  return (
+    <div
+      onDragOver={(e) => { e.preventDefault(); setDragActive(true) }}
+      onDragLeave={() => setDragActive(false)}
+      onDrop={handleDrop}
+    >
+      <input
+        ref={fileRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
+      />
+      <div
+        className="card-image-trigger"
+        style={{
+          position: 'absolute',
+          top: 12,
+          right: 12,
+          display: 'flex',
+          gap: 4,
+          zIndex: 2,
+        }}
+      >
+        {showUrl ? (
+          <form
+            onSubmit={handleUrlSubmit}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              display: 'flex',
+              gap: 4,
+              background: 'var(--paper-1)',
+              border: '1px solid var(--paper-2)',
+              borderRadius: 8,
+              padding: '4px 6px',
+              boxShadow: 'var(--shadow-2)',
+            }}
+          >
+            <input
+              type="url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://…"
+              autoFocus
+              style={{
+                border: 'none',
+                outline: 'none',
+                background: 'transparent',
+                fontSize: 12,
+                width: 140,
+                color: 'var(--ink)',
+              }}
+            />
+            <button
+              type="submit"
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--terra)', padding: 0, display: 'flex', alignItems: 'center' }}
+            >
+              <Check size={13} />
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setShowUrl(false) }}
+              style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ink-3)', padding: 0, display: 'flex', alignItems: 'center' }}
+            >
+              <X size={13} />
+            </button>
+          </form>
+        ) : (
+          <div
+            style={{
+              background: 'var(--paper-1)',
+              border: '1px solid var(--paper-2)',
+              borderRadius: 8,
+              padding: 4,
+              display: 'flex',
+              gap: 4,
+              boxShadow: 'var(--shadow-1)',
+            }}
+          >
+            <IconBtn onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }} title="Ajouter une image">
+              <ImagePlus size={13} />
+            </IconBtn>
+            <IconBtn onClick={(e) => { e.stopPropagation(); setShowUrl(true) }} title="URL d'image">
+              <Link2 size={13} />
+            </IconBtn>
+          </div>
+        )}
+      </div>
+      {dragActive && (
+        <div
+          style={{
+            margin: '-20px -20px 4px',
+            height: 160,
+            borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
+            border: '2px dashed var(--terra)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--terra)',
+            fontSize: 13,
+            fontFamily: 'var(--font-sans)',
+          }}
+        >
+          Déposer l'image ici
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── WishCard ─────────────────────────────────────────────────────────────────
+
+interface WishCardProps {
+  item: ShoppingItem
+  categories: ShoppingCategory[]
+  index: number
+  onDecide: (item: ShoppingItem) => void
+  onDelete: () => void
+}
+
+function WishCard({ item, categories, index, onDecide, onDelete }: WishCardProps) {
+  const cat = catOf(categories, item.categoryId)
+
+  return (
+    <div className="reveal wish-card" style={{ animationDelay: `${index * 40}ms`, position: 'relative' }}>
+      <CardImage itemId={item.id} />
+
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+          <div
+            style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              background: cat.color,
+              flexShrink: 0,
+            }}
+          />
+          <span style={{ fontSize: 11, fontFamily: 'var(--font-sans)', color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {cat.name}
+          </span>
+        </div>
+        <PriorityDots priority={item.priority} />
+      </div>
+
+      {/* Title */}
+      <div>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.25 }}>
+          {item.name}
+        </div>
+        {item.brand && (
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-3)', marginTop: 3 }}>
+            {item.brand}
+          </div>
+        )}
+      </div>
+
+      {/* Notes */}
+      {item.notes && (
+        <div
+          style={{
+            borderLeft: '2px solid var(--paper-3)',
+            paddingLeft: 10,
+            fontFamily: 'var(--font-sans)',
+            fontSize: 13,
+            color: 'var(--ink-3)',
+            lineHeight: 1.5,
+          }}
+        >
+          {item.notes}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 'auto', gap: 8 }}>
+        <div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 19, color: 'var(--terra)', fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.01em' }}>
+            {fmt(item.price)}
+          </div>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', marginTop: 2 }}>
+            {fmtDate(item.createdAt)}
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          <button
+            type="button"
+            onClick={() => onDelete()}
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer',
+              color: 'var(--ink-4)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: 4,
+              borderRadius: 6,
+              transition: 'color var(--dur) var(--ease)',
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--danger)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-4)')}
+            title="Supprimer"
+          >
+            <X size={14} />
+          </button>
+
+          <button
+            type="button"
+            className="decide-btn"
+            onClick={() => onDecide(item)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: 'var(--terra)',
+              color: 'var(--paper-1)',
+              border: 'none',
+              borderRadius: 'var(--r-full)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              fontWeight: 500,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Décider
+            <ArrowRight size={13} />
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── RevealWord ───────────────────────────────────────────────────────────────
+
+function RevealWord({ word, color }: { word: string; color: string }) {
+  return (
+    <div className="verdict-word" style={{ display: 'flex', gap: 0 }}>
+      {word.split('').map((ch, i) => (
+        <span
+          key={i}
+          style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 48,
+            fontWeight: 500,
+            color,
+            lineHeight: 1,
+            animationDelay: `${i * 40}ms`,
+          }}
+        >
+          {ch === ' ' ? ' ' : ch}
+        </span>
+      ))}
+    </div>
+  )
+}
+
+// ─── EpargneGauge ─────────────────────────────────────────────────────────────
+
+function EpargneGauge({ pct, color }: { pct: number; color: string }) {
+  const circleRef = useRef<SVGCircleElement>(null)
+  const r = 28
+  const circumference = 2 * Math.PI * r
+  const clamped = Math.max(0, Math.min(1, pct / 0.4))
+
+  useEffect(() => {
+    if (!circleRef.current) return
+    const offset = circumference * (1 - clamped)
+    circleRef.current.style.strokeDashoffset = String(circumference)
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (circleRef.current) {
+          circleRef.current.style.transition = 'stroke-dashoffset 800ms var(--ease)'
+          circleRef.current.style.strokeDashoffset = String(offset)
+        }
+      })
+    })
+  }, [clamped, circumference])
+
+  return (
+    <svg width={72} height={72} viewBox="0 0 72 72">
+      <circle cx={36} cy={36} r={r} fill="none" stroke="var(--paper-2)" strokeWidth={4} />
+      <circle
+        ref={circleRef}
+        cx={36}
+        cy={36}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth={4}
+        strokeDasharray={circumference}
+        strokeDashoffset={circumference}
+        strokeLinecap="round"
+        transform="rotate(-90 36 36)"
+      />
+      <text x={36} y={40} textAnchor="middle" fill={color} fontSize={12} fontFamily="var(--font-mono)">
+        {Math.round(pct * 100)}%
+      </text>
+    </svg>
+  )
+}
+
+// ─── MetricRow ────────────────────────────────────────────────────────────────
+
+function MetricRow({
+  label,
+  before,
+  after,
+}: {
+  label: string
+  before: number
+  after: number
+}) {
+  const isPositive = after >= 0
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>{label}</span>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-3)', textDecoration: 'line-through' }}>{fmt(before)}</span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 16, color: isPositive ? 'var(--sage-deep)' : 'var(--danger)', fontWeight: 500 }}>{fmt(after)}</span>
+        </div>
+      </div>
+      <div style={{ height: 4, borderRadius: 2, background: 'var(--paper-2)', overflow: 'hidden' }}>
+        <div
+          style={{
+            height: '100%',
+            borderRadius: 2,
+            background: isPositive ? 'var(--sage)' : 'var(--danger)',
+            width: before !== 0 ? `${Math.max(0, Math.min(100, (after / Math.abs(before)) * 100))}%` : '0%',
+            transition: 'width 600ms var(--ease)',
+          }}
+        />
+      </div>
+    </div>
+  )
+}
+
+// ─── VerdictPanel ─────────────────────────────────────────────────────────────
+
+interface VerdictPanelProps {
+  item: ShoppingItem
+  finance: Finance
+  categories: ShoppingCategory[]
+  buyItem: (id: string, pricePaid: number, boughtDate: string, verdict: ShoppingVerdict) => void
+  onClose: () => void
+}
+
+function VerdictPanel({ item, finance, categories, buyItem, onClose }: VerdictPanelProps) {
+  const [confirming, setConfirming] = useState(false)
+  const [selectedVerdict, setSelectedVerdict] = useState<ShoppingVerdict>('Satisfait')
+
+  const verdict = useMemo(() => computeVerdict(item.price, finance), [item.price, finance])
+  const tone = VERDICT_TONE[verdict.kind]
+  const cat = catOf(categories, item.categoryId)
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
+  const handleConfirm = () => {
+    buyItem(item.id, item.price, today(), selectedVerdict)
+    onClose()
+  }
+
+  return (
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'stretch',
+        justifyContent: 'flex-end',
+      }}
+      onClick={onClose}
+    >
+      {/* Scrim */}
+      <div
+        style={{
+          position: 'absolute',
+          inset: 0,
+          background: 'rgba(58,46,34,0.35)',
+          backdropFilter: 'blur(2px)',
+        }}
+      />
+
+      {/* Panel */}
+      <div
+        className="verdict-panel"
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          position: 'relative',
+          width: 'min(560px, 92vw)',
+          background: 'var(--paper-1)',
+          borderLeft: '1px solid var(--paper-2)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+        }}
+      >
+        {/* Top bar */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 32px 0' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.12em' }}>
+            Analyse d'achat
+          </span>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ink-3)', display: 'flex', alignItems: 'center', padding: 4, borderRadius: 6 }}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Item info */}
+        <div style={{ padding: '20px 32px 0' }}>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 500, color: 'var(--ink)' }}>
+            {item.name}
+          </div>
+          {item.brand && (
+            <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontStyle: 'italic', color: 'var(--ink-3)', marginTop: 2 }}>
+              {item.brand}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 12 }}>
+            {item.categoryId && (
+              <span style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 5,
+                padding: '3px 10px',
+                borderRadius: 'var(--r-full)',
+                background: cat.color + '22',
+                fontSize: 11,
+                color: cat.color,
+                fontFamily: 'var(--font-sans)',
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: '50%', background: cat.color, display: 'inline-block' }} />
+                {cat.name}
+              </span>
+            )}
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 20, color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>
+              {fmt(item.price)}
+            </span>
+          </div>
+        </div>
+
+        {/* Verdict word */}
+        <div style={{ padding: '32px 32px 0', background: tone.bg, margin: '24px 0 0' }}>
+          <div style={{ paddingBottom: 24 }}>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: tone.color, textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8, opacity: 0.8 }}>
+              Verdict
+            </div>
+            <RevealWord word={verdict.headline} color={tone.color} />
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink-2)', lineHeight: 1.6, marginTop: 12 }}>
+              {verdict.body}
+            </p>
+          </div>
+        </div>
+
+        {/* Metrics */}
+        <div style={{ padding: '24px 32px', display: 'flex', flexDirection: 'column', gap: 20, flex: 1 }}>
+          <MetricRow label="Solde" before={finance.solde} after={verdict.metrics.soldeAfter} />
+          <MetricRow label="Marge mensuelle" before={finance.marge} after={verdict.metrics.margeAfter} />
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, marginTop: 4 }}>
+            <EpargneGauge pct={Math.max(0, verdict.metrics.epargnePct)} color={tone.color} />
+            <div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Épargne restante</div>
+              <div style={{ fontFamily: 'var(--font-mono)', fontSize: 18, color: verdict.metrics.epargne >= 0 ? 'var(--sage-deep)' : 'var(--danger)', marginTop: 4 }}>
+                {fmt(verdict.metrics.epargne)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer actions */}
+        <div style={{ padding: '20px 32px 32px', borderTop: '1px solid var(--paper-2)' }}>
+          {confirming ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
+                Quel est votre verdict ?
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                {VERDICTS.map((v) => {
+                  const vColor = v === 'Satisfait' ? 'var(--sage-deep)' : v === 'Mitigé' ? 'var(--terra-deep)' : 'var(--danger)'
+                  const vBg = v === 'Satisfait' ? 'var(--sage-soft)' : v === 'Mitigé' ? 'var(--terra-soft)' : '#F0DCCC'
+                  return (
+                    <button
+                      key={v}
+                      type="button"
+                      onClick={() => setSelectedVerdict(v)}
+                      style={{
+                        flex: 1,
+                        padding: '8px 0',
+                        border: `1px solid ${selectedVerdict === v ? vColor : 'var(--paper-2)'}`,
+                        borderRadius: 8,
+                        background: selectedVerdict === v ? vBg : 'transparent',
+                        color: selectedVerdict === v ? vColor : 'var(--ink-3)',
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: 13,
+                        cursor: 'pointer',
+                        transition: 'all var(--dur) var(--ease)',
+                      }}
+                    >
+                      {v}
+                    </button>
+                  )
+                })}
+              </div>
+              <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                <button
+                  type="button"
+                  onClick={() => setConfirming(false)}
+                  style={{
+                    flex: 1,
+                    padding: '10px 0',
+                    border: '1px solid var(--paper-2)',
+                    borderRadius: 8,
+                    background: 'transparent',
+                    color: 'var(--ink-3)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 14,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Retour
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirm}
+                  style={{
+                    flex: 2,
+                    padding: '10px 0',
+                    border: 'none',
+                    borderRadius: 8,
+                    background: 'var(--terra)',
+                    color: 'var(--paper-1)',
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 14,
+                    fontWeight: 500,
+                    cursor: 'pointer',
+                  }}
+                >
+                  Confirmer l'achat
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <button
+                type="button"
+                onClick={() => setConfirming(true)}
+                style={{
+                  padding: '12px 0',
+                  border: 'none',
+                  borderRadius: 8,
+                  background: 'var(--terra)',
+                  color: 'var(--paper-1)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  cursor: 'pointer',
+                }}
+              >
+                Confirmer l'achat
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                style={{
+                  padding: '12px 0',
+                  border: '1px solid var(--paper-2)',
+                  borderRadius: 8,
+                  background: 'transparent',
+                  color: 'var(--ink-3)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 14,
+                  cursor: 'pointer',
+                }}
+              >
+                Mettre de côté
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── AddItemPanel ─────────────────────────────────────────────────────────────
+
+interface AddItemPanelProps {
+  categories: ShoppingCategory[]
+  onAdd: (item: Omit<ShoppingItem, 'id' | 'createdAt'>) => void
+  onAddCategory: (name: string, color: string) => ShoppingCategory
+  onClose: () => void
+}
+
+function AddItemPanel({ categories, onAdd, onAddCategory, onClose }: AddItemPanelProps) {
+  const [name, setName] = useState('')
+  const [brand, setBrand] = useState('')
+  const [price, setPrice] = useState('')
+  const [priority, setPriority] = useState<ShoppingPriority>('Envie')
+  const [categoryId, setCategoryId] = useState('')
+  const [notes, setNotes] = useState('')
+  const [showNewCat, setShowNewCat] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatColor, setNewCatColor] = useState(CAT_SWATCHES[0])
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
   const handleCreateCat = () => {
     if (!newCatName.trim()) return
-    const cat = onNewCat(newCatName.trim(), newCatColor)
+    const cat = onAddCategory(newCatName.trim(), newCatColor)
     setCategoryId(cat.id)
     setNewCatName('')
     setShowNewCat(false)
@@ -83,925 +912,819 @@ function ModalAddItem({ initial, categories, onSave, onClose, onNewCat }: ModalA
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim() || !price) return
-    onSave({
-      name:       name.trim(),
-      brand:      brand.trim() || undefined,
-      price:      parseFloat(price),
-      imageUrl:   imageUrl || undefined,
-      link:       link.trim() || undefined,
-      notes:      notes.trim() || undefined,
-      categoryId: categoryId || undefined,
+    onAdd({
+      name: name.trim(),
+      brand: brand.trim() || undefined,
+      price: parseFloat(price),
       priority,
+      categoryId: categoryId || undefined,
+      notes: notes.trim() || undefined,
     })
     onClose()
   }
 
-  const inputCls = 'w-full rounded-[var(--r-md)] px-3 py-2 text-sm outline-none transition-colors bg-[var(--bg)] border border-[var(--border)] text-[var(--fg)] focus:border-[var(--terra)] placeholder:text-[var(--fg-subtle)]'
-  const labelCls = 'mb-1.5 block text-[var(--fs-sm)] text-[var(--fg-muted)]'
+  const inputStyle: React.CSSProperties = {
+    width: '100%',
+    border: '1px solid var(--paper-2)',
+    borderRadius: 8,
+    padding: '9px 12px',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 14,
+    color: 'var(--ink)',
+    background: 'var(--paper)',
+    outline: 'none',
+    transition: 'border-color var(--dur) var(--ease)',
+  }
+
+  const labelStyle: React.CSSProperties = {
+    display: 'block',
+    fontFamily: 'var(--font-sans)',
+    fontSize: 12,
+    color: 'var(--ink-3)',
+    textTransform: 'uppercase',
+    letterSpacing: '0.08em',
+    marginBottom: 6,
+  }
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(58,46,34,0.4)' }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 100,
+        display: 'flex',
+        alignItems: 'stretch',
+        justifyContent: 'flex-end',
+      }}
       onClick={onClose}
     >
+      <div style={{ position: 'absolute', inset: 0, background: 'rgba(58,46,34,0.35)', backdropFilter: 'blur(2px)' }} />
       <form
+        className="verdict-panel"
         onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg p-6 shadow-2xl flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
-        style={{ background: 'var(--bg-elev)', border: '1px solid var(--border)', borderRadius: 'var(--r-xl)' }}
+        style={{
+          position: 'relative',
+          width: 'min(480px, 92vw)',
+          background: 'var(--paper-1)',
+          borderLeft: '1px solid var(--paper-2)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+          padding: '24px 32px 40px',
+          gap: 20,
+        }}
       >
-        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
-          {initial ? "Modifier l'article" : 'Nouvel article'}
-        </h2>
-
-        {/* Image upload */}
-        <div>
-          <label className={labelCls}>Image</label>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden"
-            onChange={(e) => e.target.files?.[0] && handleImage(e.target.files[0])} />
-          {imageUrl ? (
-            <div className="relative w-full aspect-[3/1] rounded-xl overflow-hidden">
-              <img src={imageUrl} alt="" className="w-full h-full object-cover" />
-              <button type="button" onClick={() => setImageUrl('')}
-                className="absolute top-2 right-2 rounded-full p-1 transition-colors"
-                style={{ background: 'rgba(58,46,34,0.7)', color: 'var(--paper-1)' }}>
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <button type="button" onClick={() => fileRef.current?.click()}
-              className="flex w-full items-center justify-center gap-2 rounded-xl py-6 text-sm transition-colors"
-              style={{ border: '1px dashed var(--border)', color: 'var(--fg-muted)', background: 'transparent' }}>
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-              </svg>
-              Ajouter une image
-            </button>
-          )}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: 'var(--ink)' }}>
+            Nouvel article
+          </span>
+          <button type="button" onClick={onClose} style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ink-3)', display: 'flex', padding: 4 }}>
+            <X size={18} />
+          </button>
         </div>
 
-        {/* Nom + Marque */}
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className={labelCls}>Nom *</label>
-            <input value={name} onChange={(e) => setName(e.target.value)} required
-              className={inputCls} placeholder="Ex : Air Jordan 1" />
-          </div>
-          <div>
-            <label className={labelCls}>Marque</label>
-            <input value={brand} onChange={(e) => setBrand(e.target.value)}
-              className={inputCls} placeholder="Ex : Nike" />
-          </div>
+        {/* Nom */}
+        <div>
+          <label style={labelStyle}>Nom *</label>
+          <input
+            required
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="Ex : Air Jordan 1"
+            style={inputStyle}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--terra)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+          />
+        </div>
+
+        {/* Marque */}
+        <div>
+          <label style={labelStyle}>Marque</label>
+          <input
+            value={brand}
+            onChange={(e) => setBrand(e.target.value)}
+            placeholder="Ex : Nike"
+            style={{ ...inputStyle, fontStyle: brand ? 'italic' : 'normal' }}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--terra)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+          />
         </div>
 
         {/* Prix */}
         <div>
-          <label className={labelCls}>Prix (€) *</label>
-          <input type="number" min="0" step="0.01" value={price}
-            onChange={(e) => setPrice(e.target.value)} required
-            className={inputCls} placeholder="0" />
-        </div>
-
-        {/* Lien */}
-        <div>
-          <label className={labelCls}>Lien</label>
-          <input value={link} onChange={(e) => setLink(e.target.value)}
-            className={inputCls} placeholder="https://..." />
-        </div>
-
-        {/* Catégorie */}
-        <div>
-          <label className={labelCls}>Catégorie</label>
-          <div className="flex gap-2">
-            <select value={categoryId} onChange={(e) => setCategoryId(e.target.value)}
-              className={inputCls + ' flex-1'}>
-              <option value="">Aucune</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            <button type="button" onClick={() => setShowNewCat((v) => !v)}
-              className="rounded-[var(--r-md)] px-3 py-2 text-xs transition-colors"
-              style={{ border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'transparent', cursor: 'pointer' }}>
-              + Créer
-            </button>
-          </div>
-          {showNewCat && (
-            <div className="mt-3 space-y-2">
-              <input value={newCatName} onChange={(e) => setNewCatName(e.target.value)}
-                className={inputCls} placeholder="Nom de la catégorie" />
-              {/* Swatches design system */}
-              <div>
-                <p className="text-[11px] mb-1.5" style={{ color: 'var(--fg-muted)' }}>Couleur</p>
-                <div className="grid grid-cols-4 gap-2" style={{ width: 'fit-content' }}>
-                  {CAT_SWATCHES.map((color) => (
-                    <button
-                      key={color}
-                      type="button"
-                      onClick={() => setNewCatColor(color)}
-                      className="h-7 w-7 rounded-full transition-all"
-                      style={{
-                        backgroundColor: color,
-                        outline: newCatColor === color ? `2px solid var(--terra)` : '2px solid transparent',
-                        outlineOffset: 2,
-                        transform: newCatColor === color ? 'scale(1.15)' : 'scale(1)',
-                      }}
-                    />
-                  ))}
-                </div>
-              </div>
-              <div className="flex justify-end">
-                <button type="button" onClick={handleCreateCat}
-                  className="px-4 py-1.5 text-xs font-medium transition-colors"
-                  style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
-                  OK
-                </button>
-              </div>
-            </div>
-          )}
+          <label style={labelStyle}>Prix (€) *</label>
+          <input
+            required
+            type="number"
+            min="0"
+            step="0.01"
+            value={price}
+            onChange={(e) => setPrice(e.target.value)}
+            placeholder="0"
+            style={{ ...inputStyle, fontFamily: 'var(--font-mono)' }}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--terra)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+          />
         </div>
 
         {/* Priorité */}
         <div>
-          <label className={labelCls}>Priorité</label>
-          <div className="flex gap-2">
+          <label style={labelStyle}>Priorité</label>
+          <div style={{ display: 'flex', gap: 8 }}>
             {PRIORITIES.map((p) => (
-              <button key={p} type="button" onClick={() => setPriority(p)}
-                className="flex-1 rounded-[var(--r-md)] py-2 text-xs font-medium transition-colors"
-                style={priority === p
-                  ? { background: 'var(--terra-soft)', border: '1px solid var(--terra)', color: 'var(--terra-deep)', cursor: 'pointer' }
-                  : { background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--fg-muted)', cursor: 'pointer' }
-                }>
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPriority(p)}
+                style={{
+                  flex: 1,
+                  padding: '8px 0',
+                  border: `1px solid ${priority === p ? 'var(--terra)' : 'var(--paper-2)'}`,
+                  borderRadius: 8,
+                  background: priority === p ? 'var(--terra-soft)' : 'transparent',
+                  color: priority === p ? 'var(--terra-deep)' : 'var(--ink-3)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                  transition: 'all var(--dur) var(--ease)',
+                }}
+              >
                 {p}
               </button>
             ))}
           </div>
         </div>
 
+        {/* Catégorie */}
+        <div>
+          <label style={labelStyle}>Catégorie</label>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select
+              value={categoryId}
+              onChange={(e) => setCategoryId(e.target.value)}
+              style={{ ...inputStyle, flex: 1, appearance: 'none', cursor: 'pointer' }}
+            >
+              <option value="">Aucune</option>
+              {categories.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => setShowNewCat((v) => !v)}
+              style={{
+                padding: '8px 14px',
+                border: '1px solid var(--paper-2)',
+                borderRadius: 8,
+                background: 'transparent',
+                color: 'var(--ink-3)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 13,
+                cursor: 'pointer',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              + Créer
+            </button>
+          </div>
+          {showNewCat && (
+            <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 8, padding: 12, background: 'var(--paper)', borderRadius: 8, border: '1px solid var(--paper-2)' }}>
+              <input
+                value={newCatName}
+                onChange={(e) => setNewCatName(e.target.value)}
+                placeholder="Nom de la catégorie"
+                style={inputStyle}
+                onFocus={(e) => (e.target.style.borderColor = 'var(--terra)')}
+                onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+              />
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {CAT_SWATCHES.map((color) => (
+                  <button
+                    key={color}
+                    type="button"
+                    onClick={() => setNewCatColor(color)}
+                    style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: color,
+                      border: 'none',
+                      cursor: 'pointer',
+                      outline: newCatColor === color ? `2px solid var(--terra)` : '2px solid transparent',
+                      outlineOffset: 2,
+                      transform: newCatColor === color ? 'scale(1.15)' : 'scale(1)',
+                      transition: 'transform var(--dur) var(--ease)',
+                    }}
+                  />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={handleCreateCat}
+                style={{
+                  alignSelf: 'flex-end',
+                  padding: '6px 16px',
+                  background: 'var(--terra)',
+                  color: 'var(--paper-1)',
+                  border: 'none',
+                  borderRadius: 'var(--r-full)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  cursor: 'pointer',
+                }}
+              >
+                OK
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Notes */}
         <div>
-          <label className={labelCls}>Note personnelle</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-            className={inputCls + ' resize-none'}
-            placeholder="Pourquoi tu veux ça…" />
+          <label style={labelStyle}>Note personnelle</label>
+          <textarea
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            rows={3}
+            placeholder="Pourquoi tu veux ça…"
+            style={{ ...inputStyle, resize: 'none', lineHeight: 1.6 }}
+            onFocus={(e) => (e.target.style.borderColor = 'var(--terra)')}
+            onBlur={(e) => (e.target.style.borderColor = 'var(--paper-2)')}
+          />
         </div>
 
-        <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="flex-1 py-2 text-sm transition-colors"
-            style={{ border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'transparent', borderRadius: 'var(--r-md)', cursor: 'pointer' }}>
-            Annuler
-          </button>
-          <button type="submit"
-            className="flex-1 py-2 text-sm font-medium transition-colors"
-            style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
-            {initial ? 'Mettre à jour' : 'Ajouter'}
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
-// ─── ModalBuyItem ─────────────────────────────────────────────────────────────
-
-interface ModalBuyItemProps {
-  item:    ShoppingItem
-  onBuy:   (pricePaid: number, boughtDate: string, verdict: ShoppingVerdict) => void
-  onClose: () => void
-}
-
-function ModalBuyItem({ item, onBuy, onClose }: ModalBuyItemProps) {
-  const [pricePaid,  setPricePaid]  = useState(item.price.toString())
-  const [boughtDate, setBoughtDate] = useState(new Date().toISOString().split('T')[0])
-  const [verdict,    setVerdict]    = useState<ShoppingVerdict>('Satisfait')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onBuy(parseFloat(pricePaid), boughtDate, verdict)
-    onClose()
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
-      <form
-        onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl flex flex-col gap-4"
-      >
-        <h2 className="text-base font-semibold text-zinc-100">Valider l'achat</h2>
-
-        <div className="rounded-xl bg-zinc-800/60 p-3">
-          <p className="text-sm font-medium text-zinc-200">{item.name}</p>
-          {item.brand && <p className="text-xs text-zinc-500">{item.brand}</p>}
-          <p className="mt-1 text-sm text-sky-400">{fmt(item.price)}</p>
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Prix payé (€)</label>
-          <input type="number" min="0" step="0.01" value={pricePaid} onChange={(e) => setPricePaid(e.target.value)} required
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60" />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Date d'achat</label>
-          <input type="date" value={boughtDate} onChange={(e) => setBoughtDate(e.target.value)} required
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60" />
-        </div>
-
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Verdict</label>
-          <div className="flex gap-2">
-            {VERDICTS.map((v) => (
-              <button key={v} type="button" onClick={() => setVerdict(v)}
-                className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
-                  verdict === v
-                    ? v === 'Satisfait' ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-400'
-                    : v === 'Mitigé' ? 'border-amber-500/50 bg-amber-500/20 text-amber-400'
-                    : 'border-red-500/50 bg-red-500/20 text-red-400'
-                    : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                }`}>
-                {v}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="flex-1 rounded-lg border border-zinc-700 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
-            Annuler
-          </button>
-          <button type="submit"
-            className="flex-1 rounded-lg bg-sky-500 py-2 text-sm font-medium text-white hover:bg-sky-400 transition-colors">
-            Valider l'achat
-          </button>
-        </div>
-      </form>
-    </div>
-  )
-}
-
-// ─── ModalCategories ──────────────────────────────────────────────────────────
-
-interface ModalCategoriesProps {
-  categories:   ShoppingCategory[]
-  wishlist:     ShoppingItem[]
-  bought:       BoughtItem[]
-  onAdd:        (name: string, color: string) => void
-  onUpdate:     (id: string, updates: Partial<Omit<ShoppingCategory, 'id'>>) => void
-  onDelete:     (id: string) => void
-  onClose:      () => void
-}
-
-function ModalCategories({ categories, wishlist, bought, onAdd, onUpdate, onDelete, onClose }: ModalCategoriesProps) {
-  const [newName,    setNewName]    = useState('')
-  const [newColor,   setNewColor]   = useState('#0EA5E9')
-  const [editId,     setEditId]     = useState<string | null>(null)
-  const [editName,   setEditName]   = useState('')
-  const [editColor,  setEditColor]  = useState('')
-  const [confirmDel, setConfirmDel] = useState<string | null>(null)
-
-  const countItems = (id: string) =>
-    wishlist.filter((i) => i.categoryId === id).length + bought.filter((i) => i.categoryId === id).length
-
-  const handleAdd = () => {
-    if (!newName.trim()) return
-    onAdd(newName.trim(), newColor)
-    setNewName('')
-    setNewColor('#0EA5E9')
-  }
-
-  const startEdit = (cat: ShoppingCategory) => {
-    setEditId(cat.id)
-    setEditName(cat.name)
-    setEditColor(cat.color)
-  }
-
-  const saveEdit = () => {
-    if (!editId || !editName.trim()) return
-    onUpdate(editId, { name: editName.trim(), color: editColor })
-    setEditId(null)
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
-      <div onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl flex flex-col gap-4 max-h-[80vh] overflow-y-auto">
-        <h2 className="text-base font-semibold text-zinc-100">Gérer les catégories</h2>
-
-        {/* Liste */}
-        <div className="flex flex-col gap-2">
-          {categories.length === 0 && (
-            <p className="text-sm text-zinc-600 text-center py-4">Aucune catégorie</p>
-          )}
-          {categories.map((cat) => {
-            const count = countItems(cat.id)
-            return editId === cat.id ? (
-              <div key={cat.id} className="flex gap-2 items-center">
-                <input value={editName} onChange={(e) => setEditName(e.target.value)}
-                  className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60" />
-                <input type="color" value={editColor} onChange={(e) => setEditColor(e.target.value)}
-                  className="h-9 w-9 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-1" />
-                <button onClick={saveEdit}
-                  className="rounded-lg bg-sky-500/15 px-3 py-2 text-xs text-sky-400 hover:bg-sky-500/25 transition-colors">
-                  OK
-                </button>
-              </div>
-            ) : confirmDel === cat.id ? (
-              <div key={cat.id} className="flex items-center gap-2 rounded-xl bg-red-500/10 border border-red-500/20 px-3 py-2">
-                <span className="flex-1 text-xs text-red-400">
-                  Supprimer "{cat.name}" ? ({count} article{count > 1 ? 's' : ''})
-                </span>
-                <button onClick={() => { onDelete(cat.id); setConfirmDel(null) }}
-                  className="rounded-lg bg-red-500/20 px-2 py-1 text-xs text-red-400 hover:bg-red-500/30 transition-colors">
-                  Oui
-                </button>
-                <button onClick={() => setConfirmDel(null)}
-                  className="rounded-lg bg-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-600 transition-colors">
-                  Non
-                </button>
-              </div>
-            ) : (
-              <div key={cat.id} className="flex items-center gap-3 rounded-xl bg-zinc-800/60 px-3 py-2">
-                <div className="h-3.5 w-3.5 shrink-0 rounded-full" style={{ backgroundColor: cat.color }} />
-                <span className="flex-1 text-sm text-zinc-200">{cat.name}</span>
-                <span className="text-xs text-zinc-600">{count} article{count > 1 ? 's' : ''}</span>
-                <button onClick={() => startEdit(cat)} className="text-zinc-500 hover:text-zinc-300 transition-colors">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-                <button onClick={() => setConfirmDel(cat.id)} className="text-zinc-500 hover:text-red-400 transition-colors">
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                  </svg>
-                </button>
-              </div>
-            )
-          })}
-        </div>
-
-        {/* Nouvelle catégorie */}
-        <div className="border-t border-zinc-800 pt-4">
-          <p className="mb-2 text-xs text-zinc-500">Nouvelle catégorie</p>
-          <div className="flex gap-2">
-            <input value={newName} onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAdd())}
-              className="flex-1 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60"
-              placeholder="Nom…" />
-            <input type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)}
-              className="h-9 w-9 cursor-pointer rounded-lg border border-zinc-700 bg-zinc-800 p-1" />
-            <button onClick={handleAdd}
-              className="rounded-lg bg-sky-500/15 px-3 py-2 text-xs text-sky-400 hover:bg-sky-500/25 transition-colors">
-              + Ajouter
-            </button>
-          </div>
-        </div>
-
-        <button onClick={onClose}
-          className="mt-1 w-full rounded-lg border border-zinc-700 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
-          Fermer
+        {/* Submit */}
+        <button
+          type="submit"
+          style={{
+            padding: '12px 0',
+            border: 'none',
+            borderRadius: 8,
+            background: 'var(--terra)',
+            color: 'var(--paper-1)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 15,
+            fontWeight: 500,
+            cursor: 'pointer',
+            marginTop: 'auto',
+          }}
+        >
+          Ajouter
         </button>
+      </form>
+    </div>
+  )
+}
+
+// ─── CategoryDistribution ─────────────────────────────────────────────────────
+
+function CategoryDistribution({ bought, categories }: { bought: BoughtItem[]; categories: ShoppingCategory[] }) {
+  const data = useMemo(() => {
+    if (!bought.length) return []
+    const map: Record<string, { name: string; color: string; total: number }> = {}
+    for (const item of bought) {
+      const key = item.categoryId ?? '__none__'
+      if (!map[key]) {
+        const cat = catOf(categories, item.categoryId)
+        map[key] = { name: cat.name, color: cat.color, total: 0 }
+      }
+      map[key].total += item.pricePaid
+    }
+    const total = Object.values(map).reduce((a, v) => a + v.total, 0)
+    return Object.entries(map)
+      .map(([, v]) => ({ ...v, pct: total > 0 ? v.total / total : 0 }))
+      .sort((a, b) => b.total - a.total)
+  }, [bought, categories])
+
+  if (!data.length) {
+    return (
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+        Aucun achat enregistré.
+      </p>
+    )
+  }
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {/* Stratified bar */}
+      <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
+        {data.map((d) => (
+          <div key={d.name} style={{ width: `${d.pct * 100}%`, background: d.color }} />
+        ))}
+      </div>
+
+      {/* Rows */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {data.map((d) => (
+          <div key={d.name} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <div style={{ width: 8, height: 8, borderRadius: '50%', background: d.color, flexShrink: 0 }} />
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>{d.name}</span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+                  {Math.round(d.pct * 100)}%
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--ink)' }}>
+                  {fmt(d.total)}
+                </span>
+              </div>
+            </div>
+            <div style={{ height: 3, borderRadius: 2, background: 'var(--paper-2)' }}>
+              <div style={{ height: '100%', borderRadius: 2, background: d.color, width: `${d.pct * 100}%`, transition: 'width 600ms var(--ease)' }} />
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )
 }
 
-// ─── ShoppingCard (wishlist) ──────────────────────────────────────────────────
+// ─── MonthlyEvolution ─────────────────────────────────────────────────────────
 
-interface ShoppingCardProps {
-  item:       ShoppingItem
-  categories: ShoppingCategory[]
-  onEdit:     () => void
-  onDelete:   () => void
-  onBuy:      () => void
-  onCatFilter:(id: string) => void
-}
+function MonthlyEvolution({ bought }: { bought: BoughtItem[] }) {
+  const { months, totals, max, mean, currentMonth } = useMemo(() => {
+    const now = new Date()
+    const months: string[] = []
+    const totals: number[] = []
 
-function ShoppingCard({ item, categories, onEdit, onDelete, onBuy, onCatFilter }: ShoppingCardProps) {
-  const cat = categories.find((c) => c.id === item.categoryId)
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      months.push(key)
+      const total = bought
+        .filter((b) => b.boughtDate.startsWith(key))
+        .reduce((a, b) => a + b.pricePaid, 0)
+      totals.push(total)
+    }
+
+    const nonZero = totals.filter((t) => t > 0)
+    const max = Math.max(...totals, 1)
+    const mean = nonZero.length > 0 ? nonZero.reduce((a, b) => a + b, 0) / nonZero.length : 0
+    const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+
+    return { months, totals, max, mean, currentMonth }
+  }, [bought])
+
+  const hasData = totals.some((t) => t > 0)
+
+  if (!hasData) {
+    return (
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+        Aucun achat enregistré.
+      </p>
+    )
+  }
+
+  const CHART_H = 100
+  const BAR_W = 28
+  const GAP = 8
+  const CHART_W = months.length * (BAR_W + GAP) - GAP
 
   return (
-    <div className="group flex flex-col overflow-hidden transition-colors"
-      style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
-      <div style={{ height: 240, width: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', flexShrink: 0 }}>
-        {item.imageUrl
-          ? <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
-          : <ImagePlaceholder />
-        }
-      </div>
-
-      <div className="flex flex-col gap-2 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium" style={{ color: 'var(--fg)' }}>{item.name}</p>
-            {item.brand && <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>{item.brand}</p>}
-          </div>
-          {item.link && (
-            <a href={item.link} target="_blank" rel="noopener noreferrer"
-              className="shrink-0 transition-colors" style={{ color: 'var(--fg-muted)' }} title="Voir le lien">
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          )}
-        </div>
-
-        <p className="text-lg font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>
-          {fmt(item.price)}
-        </p>
-
-        <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={priorityChipStyle[item.priority]}>
-            {item.priority}
-          </span>
-          {cat && (
-            <button onClick={() => onCatFilter(cat.id)}
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-70"
-              style={{ backgroundColor: cat.color + '22', color: cat.color }}>
-              {cat.name}
-            </button>
-          )}
-        </div>
-
-        {item.notes && (
-          <p className="text-[11px] line-clamp-2" style={{ color: 'var(--fg-subtle)' }}>{item.notes}</p>
+    <div style={{ overflowX: 'auto' }}>
+      <svg
+        width={CHART_W + 40}
+        height={CHART_H + 40}
+        style={{ display: 'block' }}
+      >
+        {/* Mean line */}
+        {mean > 0 && (
+          <line
+            x1={20}
+            x2={CHART_W + 20}
+            y1={CHART_H - (mean / max) * CHART_H}
+            y2={CHART_H - (mean / max) * CHART_H}
+            stroke="var(--ink-4)"
+            strokeWidth={1}
+            strokeDasharray="4 4"
+          />
         )}
 
-        <div className="mt-1 flex gap-2">
-          <button onClick={onBuy}
-            className="flex-1 py-1.5 text-xs font-medium transition-colors"
-            style={{ background: 'var(--accent)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
-            Acheter
-          </button>
-          <button onClick={onEdit}
-            className="rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
-            style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-            </svg>
-          </button>
-          <button onClick={onDelete}
-            className="rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
-            style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
+        {/* Bars */}
+        {months.map((m, i) => {
+          const h = totals[i] > 0 ? Math.max(3, (totals[i] / max) * CHART_H) : 0
+          const x = 20 + i * (BAR_W + GAP)
+          const y = CHART_H - h
+          const isCurrent = m === currentMonth
+          const label = FRENCH_MONTHS[parseInt(m.split('-')[1]) - 1]
+
+          return (
+            <g key={m}>
+              {h > 0 && (
+                <rect
+                  x={x}
+                  y={y}
+                  width={BAR_W}
+                  height={h}
+                  rx={3}
+                  fill={isCurrent ? 'var(--terra)' : 'var(--paper-3)'}
+                />
+              )}
+              <text
+                x={x + BAR_W / 2}
+                y={CHART_H + 18}
+                textAnchor="middle"
+                fontSize={10}
+                fontFamily="var(--font-mono)"
+                fill={isCurrent ? 'var(--terra)' : 'var(--ink-4)'}
+              >
+                {label}
+              </text>
+            </g>
+          )
+        })}
+      </svg>
     </div>
   )
 }
 
-// ─── BoughtCard ───────────────────────────────────────────────────────────────
+// ─── HistoryList ──────────────────────────────────────────────────────────────
 
-interface BoughtCardProps {
-  item:       BoughtItem
+function HistoryList({ bought, categories, onDelete }: {
+  bought: BoughtItem[]
   categories: ShoppingCategory[]
-  onEdit:     () => void
-  onDelete:   () => void
-  onCatFilter:(id: string) => void
-}
+  onDelete: (id: string) => void
+}) {
+  if (!bought.length) {
+    return (
+      <p style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+        Aucun achat enregistré.
+      </p>
+    )
+  }
 
-function BoughtCard({ item, categories, onEdit, onDelete, onCatFilter }: BoughtCardProps) {
-  const cat = categories.find((c) => c.id === item.categoryId)
-
-  return (
-    <div className="flex flex-col overflow-hidden transition-colors"
-      style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
-      <div style={{ height: 240, width: '100%', overflow: 'hidden', borderRadius: 'var(--r-lg) var(--r-lg) 0 0', flexShrink: 0 }}>
-        {item.imageUrl
-          ? <img src={item.imageUrl} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top', display: 'block' }} />
-          : <ImagePlaceholder />
-        }
-      </div>
-
-      <div className="flex flex-col gap-2 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium" style={{ color: 'var(--fg)' }}>{item.name}</p>
-            {item.brand && <p className="text-xs" style={{ color: 'var(--fg-muted)' }}>{item.brand}</p>}
-          </div>
-          {item.link && (
-            <a href={item.link} target="_blank" rel="noopener noreferrer"
-              className="shrink-0 transition-colors" style={{ color: 'var(--fg-muted)' }}>
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-              </svg>
-            </a>
-          )}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <p className="text-lg font-semibold" style={{ fontFamily: 'var(--font-mono)', color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>
-            {fmt(item.pricePaid)}
-          </p>
-          {item.pricePaid !== item.price && (
-            <p className="text-xs line-through" style={{ color: 'var(--fg-subtle)' }}>{fmt(item.price)}</p>
-          )}
-        </div>
-
-        <p className="text-[11px]" style={{ color: 'var(--fg-subtle)' }}>Acheté le {fmtDate(item.boughtDate)}</p>
-
-        <div className="flex flex-wrap gap-1.5">
-          <span className="rounded-full px-2 py-0.5 text-[10px] font-medium" style={verdictChipStyle[item.verdict]}>
-            {item.verdict}
-          </span>
-          {cat && (
-            <button onClick={() => onCatFilter(cat.id)}
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium transition-opacity hover:opacity-70"
-              style={{ backgroundColor: cat.color + '22', color: cat.color }}>
-              {cat.name}
-            </button>
-          )}
-        </div>
-
-        {item.notes && <p className="text-[11px] line-clamp-2" style={{ color: 'var(--fg-subtle)' }}>{item.notes}</p>}
-
-        <div className="mt-1 flex gap-2">
-          <button onClick={onEdit}
-            className="flex-1 rounded-lg py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
-            style={{ color: 'var(--fg-muted)', background: 'var(--paper-2)', border: '1px solid var(--border)', cursor: 'pointer' }}>
-            Éditer verdict
-          </button>
-          <button onClick={onDelete}
-            className="rounded-lg px-3 py-1.5 text-xs transition-colors hover:bg-[var(--paper-2)]"
-            style={{ color: 'var(--fg-muted)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ─── ModalEditBought ──────────────────────────────────────────────────────────
-
-interface ModalEditBoughtProps {
-  item:    BoughtItem
-  onSave:  (updates: Partial<Pick<BoughtItem, 'verdict' | 'pricePaid' | 'boughtDate' | 'notes'>>) => void
-  onClose: () => void
-}
-
-function ModalEditBought({ item, onSave, onClose }: ModalEditBoughtProps) {
-  const [pricePaid,  setPricePaid]  = useState(item.pricePaid.toString())
-  const [boughtDate, setBoughtDate] = useState(item.boughtDate)
-  const [verdict,    setVerdict]    = useState<ShoppingVerdict>(item.verdict)
-  const [notes,      setNotes]      = useState(item.notes ?? '')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    onSave({ pricePaid: parseFloat(pricePaid), boughtDate, verdict, notes: notes.trim() || undefined })
-    onClose()
+  const verdictStyle: Record<ShoppingVerdict, React.CSSProperties> = {
+    Satisfait: { color: 'var(--sage-deep)' },
+    Mitigé:    { color: 'var(--terra-deep)' },
+    Déçu:      { color: 'var(--danger)' },
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
-      <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl flex flex-col gap-4">
-        <h2 className="text-base font-semibold text-zinc-100">Éditer l'achat</h2>
+    <div style={{ overflowX: 'auto' }}>
+      {/* Header */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '96px 1fr 130px 110px 110px',
+        gap: 16,
+        padding: '0 4px 10px',
+        borderBottom: '2px solid var(--paper-2)',
+      }}>
+        {['Date', 'Article', 'Catégorie', 'Prix payé', 'Verdict'].map((h) => (
+          <span key={h} style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+            {h}
+          </span>
+        ))}
+      </div>
 
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Prix payé (€)</label>
-          <input type="number" min="0" step="0.01" value={pricePaid} onChange={(e) => setPricePaid(e.target.value)} required
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60" />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Date d'achat</label>
-          <input type="date" value={boughtDate} onChange={(e) => setBoughtDate(e.target.value)} required
-            className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60" />
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Verdict</label>
-          <div className="flex gap-2">
-            {VERDICTS.map((v) => (
-              <button key={v} type="button" onClick={() => setVerdict(v)}
-                className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors ${
-                  verdict === v
-                    ? v === 'Satisfait' ? 'border-emerald-500/50 bg-emerald-500/20 text-emerald-400'
-                    : v === 'Mitigé' ? 'border-amber-500/50 bg-amber-500/20 text-amber-400'
-                    : 'border-red-500/50 bg-red-500/20 text-red-400'
-                    : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
-                }`}>
-                {v}
+      {/* Rows */}
+      {[...bought].sort((a, b) => b.boughtDate.localeCompare(a.boughtDate)).map((item) => {
+        const cat = catOf(categories, item.categoryId)
+        return (
+          <div key={item.id} className="hist-row" style={{ position: 'relative' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+              {fmtDate(item.boughtDate)}
+            </span>
+            <div>
+              <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {item.name}
+              </div>
+              {item.brand && (
+                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                  {item.brand}
+                </div>
+              )}
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+              <div style={{ width: 7, height: 7, borderRadius: '50%', background: cat.color, flexShrink: 0 }} />
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {cat.name}
+              </span>
+            </div>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 14, color: 'var(--terra)', fontVariantNumeric: 'tabular-nums' }}>
+              {fmt(item.pricePaid)}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 4 }}>
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, ...verdictStyle[item.verdict] }}>
+                {item.verdict}
+              </span>
+              <button
+                type="button"
+                onClick={() => onDelete(item.id)}
+                style={{ border: 'none', background: 'transparent', cursor: 'pointer', color: 'var(--ink-4)', display: 'flex', padding: 2, borderRadius: 4 }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--danger)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--ink-4)')}
+              >
+                <X size={13} />
               </button>
-            ))}
+            </div>
           </div>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs text-zinc-500">Note personnelle</label>
-          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2}
-            className="w-full resize-none rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-sky-500/60" />
-        </div>
-        <div className="flex gap-3 pt-2">
-          <button type="button" onClick={onClose}
-            className="flex-1 rounded-lg border border-zinc-700 py-2 text-sm text-zinc-400 hover:text-zinc-200 transition-colors">
-            Annuler
-          </button>
-          <button type="submit"
-            className="flex-1 rounded-lg bg-sky-500 py-2 text-sm font-medium text-white hover:bg-sky-400 transition-colors">
-            Enregistrer
-          </button>
-        </div>
-      </form>
+        )
+      })}
     </div>
   )
 }
 
-// ─── SortSelect ───────────────────────────────────────────────────────────────
+// ─── StatCard ─────────────────────────────────────────────────────────────────
 
-type SortKey = 'priority' | 'price_asc' | 'price_desc' | 'category' | 'date_desc'
+function StatCard({
+  kicker,
+  value,
+  sub,
+  mono,
+  delay,
+}: {
+  kicker: string
+  value: string
+  sub: string
+  mono?: boolean
+  delay: number
+}) {
+  return (
+    <div
+      className="reveal"
+      style={{
+        animationDelay: `${delay}ms`,
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        borderRadius: 'var(--r-lg)',
+        padding: '20px 24px',
+      }}
+    >
+      <div style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 8 }}>
+        {kicker}
+      </div>
+      <div style={{
+        fontFamily: mono ? 'var(--font-mono)' : 'var(--font-serif)',
+        fontSize: 28,
+        fontWeight: 500,
+        color: 'var(--ink)',
+        letterSpacing: mono ? '-0.02em' : '-0.01em',
+        lineHeight: 1.1,
+        fontVariantNumeric: 'tabular-nums',
+      }}>
+        {value}
+      </div>
+      <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', marginTop: 6 }}>
+        {sub}
+      </div>
+    </div>
+  )
+}
 
-function sortItems<T extends ShoppingItem>(items: T[], key: SortKey, categories: ShoppingCategory[]): T[] {
-  const priorityOrder: Record<ShoppingPriority, number> = { Urgent: 0, Besoin: 1, Envie: 2 }
-  return [...items].sort((a, b) => {
-    switch (key) {
-      case 'priority':   return priorityOrder[a.priority] - priorityOrder[b.priority]
-      case 'price_asc':  return a.price - b.price
-      case 'price_desc': return b.price - a.price
-      case 'date_desc':  return b.createdAt.localeCompare(a.createdAt)
-      case 'category': {
-        const ca = categories.find((c) => c.id === a.categoryId)?.name ?? ''
-        const cb = categories.find((c) => c.id === b.categoryId)?.name ?? ''
-        return ca.localeCompare(cb)
-      }
-      default: return 0
-    }
-  })
+// ─── SectionTitle ─────────────────────────────────────────────────────────────
+
+function SectionTitle({ children }: { children: React.ReactNode }) {
+  return (
+    <div style={{
+      fontFamily: 'var(--font-serif)',
+      fontSize: 22,
+      fontWeight: 500,
+      color: 'var(--ink)',
+      borderBottom: '1px solid var(--paper-2)',
+      paddingBottom: 16,
+      marginBottom: 24,
+    }}>
+      {children}
+    </div>
+  )
 }
 
 // ─── ShoppingPage ─────────────────────────────────────────────────────────────
 
 export function ShoppingPage() {
   const {
-    wishlist, bought, categories,
-    addWishlistItem, updateWishlistItem, removeWishlistItem,
-    buyItem, updateBoughtItem, removeBoughtItem,
-    addCategory, updateCategory, deleteCategory,
+    wishlist,
+    bought,
+    categories,
+    addWishlistItem,
+    removeWishlistItem,
+    buyItem,
+    removeBoughtItem,
+    addCategory,
   } = useShoppingStore()
 
-  // ── Modal state ───────────────────────────────────────────────────────────
-  const [showAddModal,  setShowAddModal]  = useState(false)
-  const [editItem,      setEditItem]      = useState<ShoppingItem | undefined>()
-  const [buyTarget,     setBuyTarget]     = useState<ShoppingItem | undefined>()
-  const [editBought,    setEditBought]    = useState<BoughtItem | undefined>()
-  const [showCatModal,  setShowCatModal]  = useState(false)
+  const transactions = useStore((s) => s.transactions)
 
-  // ── Filters & sort ────────────────────────────────────────────────────────
-  const [sortKey,          setSortKey]          = useState<SortKey>('priority')
-  const [filterCatIds,     setFilterCatIds]     = useState<string[]>([])
-  const [filterPriorities, setFilterPriorities] = useState<ShoppingPriority[]>([])
-  const [activeTab,        setActiveTab]        = useState<'wishlist' | 'bought'>('wishlist')
+  // ── Finance data ──────────────────────────────────────────────────────────
+  const finance = useMemo<Finance>(() => {
+    const now = new Date()
+    const currentYYYYMM = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    const solde = computeMonthBalance(transactions, currentYYYYMM)
+    const monthTx = transactions.filter((t) => t.date.startsWith(currentYYYYMM))
+    const revenuMensuel = monthTx.filter((t) => t.type === 'income').reduce((a, t) => a + t.amount, 0)
+    const depensesMensuelles = monthTx.filter((t) => t.type === 'expense').reduce((a, t) => a + t.amount, 0)
+    const marge = revenuMensuel - depensesMensuelles
+    return { solde, marge, revenuMensuel }
+  }, [transactions])
 
   // ── Stats ─────────────────────────────────────────────────────────────────
-  const totalWishlistValue = useMemo(() => wishlist.reduce((s, i) => s + i.price, 0), [wishlist])
-  const thisMonth = useMemo(() => {
-    const m = new Date().toISOString().slice(0, 7)
-    return bought.filter((i) => i.boughtDate.startsWith(m)).length
+  const wishlistTotal = useMemo(() => wishlist.reduce((a, i) => a + i.price, 0), [wishlist])
+
+  const boughtThisMonth = useMemo(() => {
+    const now = new Date()
+    const m = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+    return bought.filter((b) => b.boughtDate.startsWith(m))
   }, [bought])
-  const totalBoughtValue = useMemo(() => bought.reduce((s, i) => s + i.pricePaid, 0), [bought])
 
-  // ── Filtered + sorted lists ───────────────────────────────────────────────
-  const filteredWishlist = useMemo(() => {
-    let list = wishlist
-    if (filterCatIds.length)     list = list.filter((i) => i.categoryId && filterCatIds.includes(i.categoryId))
-    if (filterPriorities.length) list = list.filter((i) => filterPriorities.includes(i.priority))
-    return sortItems(list, sortKey, categories)
-  }, [wishlist, filterCatIds, filterPriorities, sortKey, categories])
+  const boughtThisMonthTotal = useMemo(
+    () => boughtThisMonth.reduce((a, b) => a + b.pricePaid, 0),
+    [boughtThisMonth],
+  )
 
-  const filteredBought = useMemo(() => {
-    let list = bought
-    if (filterCatIds.length) list = list.filter((i) => i.categoryId && filterCatIds.includes(i.categoryId))
-    return sortItems(list, sortKey, categories)
-  }, [bought, filterCatIds, sortKey, categories])
+  // ── Panel state ───────────────────────────────────────────────────────────
+  const [decidingItem, setDecidingItem] = useState<ShoppingItem | null>(null)
+  const [showAddPanel, setShowAddPanel] = useState(false)
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-  const toggleCatFilter = (id: string) =>
-    setFilterCatIds((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id])
+  const handleDecide = useCallback((item: ShoppingItem) => {
+    setShowAddPanel(false)
+    setDecidingItem(item)
+  }, [])
 
-  const togglePriorityFilter = (p: ShoppingPriority) =>
-    setFilterPriorities((prev) => prev.includes(p) ? prev.filter((x) => x !== p) : [...prev, p])
-
-  const handleSaveItem = (data: Omit<ShoppingItem, 'id' | 'createdAt'>) => {
-    if (editItem) updateWishlistItem(editItem.id, data)
-    else          addWishlistItem(data)
-    setEditItem(undefined)
-    setShowAddModal(false)
-  }
+  const handleCloseVerdict = useCallback(() => setDecidingItem(null), [])
+  const handleCloseAdd = useCallback(() => setShowAddPanel(false), [])
 
   return (
-    <div className="flex flex-col gap-6 p-6 max-w-7xl mx-auto">
-
-      {/* ── Header ──────────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>Achats</h1>
-          <p className="text-sm mt-0.5" style={{ color: 'var(--fg-muted)', fontStyle: 'italic' }}>Wishlist & historique</p>
+    <div
+      style={{
+        maxWidth: 1280,
+        margin: '0 auto',
+        padding: '40px 48px 80px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 80,
+      }}
+    >
+      {/* ── Hero ──────────────────────────────────────────────────────────────── */}
+      <section>
+        <div className="reveal" style={{ animationDelay: '0ms' }}>
+          <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.14em', marginBottom: 16 }}>
+            Budget · Wishlist · Historique
+          </div>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 'clamp(40px, 6vw, 68px)', fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1, margin: 0 }}>
+            Achats<span style={{ color: 'var(--terra)' }}>.</span>
+          </h1>
         </div>
-        <div className="flex gap-2">
-          <button onClick={() => setShowCatModal(true)}
-            className="flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs transition-colors"
-            style={{ border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'transparent' }}>
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-            </svg>
-            Catégories
-          </button>
-          <button onClick={() => { setEditItem(undefined); setShowAddModal(true) }}
-            className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium transition-colors"
-            style={{ background: 'var(--terra)', color: 'var(--paper-1)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
-            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-            </svg>
+
+        {/* Stat banner */}
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(4, 1fr)',
+            gap: 16,
+            marginTop: 40,
+          }}
+        >
+          <StatCard
+            kicker="Solde net"
+            value={fmt(finance.solde)}
+            sub="Ce mois"
+            mono
+            delay={80}
+          />
+          <StatCard
+            kicker="Marge mensuelle"
+            value={fmt(finance.marge)}
+            sub="Revenus − dépenses"
+            mono
+            delay={130}
+          />
+          <StatCard
+            kicker="Wishlist"
+            value={fmt(wishlistTotal)}
+            sub={`${wishlist.length} article${wishlist.length > 1 ? 's' : ''}`}
+            mono
+            delay={180}
+          />
+          <StatCard
+            kicker="Achats ce mois"
+            value={fmt(boughtThisMonthTotal)}
+            sub={`${boughtThisMonth.length} achat${boughtThisMonth.length > 1 ? 's' : ''}`}
+            mono
+            delay={230}
+          />
+        </div>
+      </section>
+
+      {/* ── Wishlist ──────────────────────────────────────────────────────────── */}
+      <section>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <SectionTitle>Wishlist</SectionTitle>
+          <button
+            type="button"
+            onClick={() => { setDecidingItem(null); setShowAddPanel(true) }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '9px 18px',
+              background: 'var(--terra)',
+              color: 'var(--paper-1)',
+              border: 'none',
+              borderRadius: 'var(--r-full)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 14,
+              fontWeight: 500,
+              cursor: 'pointer',
+            }}
+          >
+            <Plus size={15} />
             Ajouter
           </button>
         </div>
-      </div>
 
-      {/* ── Stats ───────────────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Wishlist',        value: String(wishlist.length), sub: <span>Valeur totale <span style={{ color: 'var(--terra)', fontWeight: 500 }}>{fmt(totalWishlistValue)}</span></span> },
-          { label: 'Achetés ce mois', value: String(thisMonth),       sub: `${bought.length} au total` },
-          { label: 'Total dépensé',   value: fmt(totalBoughtValue),   sub: 'Tous les achats', mono: true },
-        ].map(({ label, value, sub, mono }) => (
-          <div key={label} className="p-4" style={{ borderRadius: 'var(--r-lg)', border: '1px solid var(--border)', background: 'var(--bg-elev)' }}>
-            <p style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--fg-subtle)', marginBottom: 6 }}>{label}</p>
-            <p style={{ fontFamily: mono ? 'var(--font-mono)' : 'var(--font-serif)', fontSize: 26, fontWeight: 500, color: 'var(--fg)', letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums' }}>{value}</p>
-            <p className="text-xs mt-1" style={{ color: 'var(--fg-muted)' }}>{sub}</p>
+        {wishlist.length === 0 ? (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '60px 0', gap: 16 }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontStyle: 'italic', color: 'var(--ink-3)', margin: 0 }}>
+              Aucune envie pour l'instant.
+            </p>
+            <button
+              type="button"
+              onClick={() => setShowAddPanel(true)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 16px',
+                background: 'var(--terra-soft)',
+                color: 'var(--terra-deep)',
+                border: 'none',
+                borderRadius: 'var(--r-full)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 13,
+                cursor: 'pointer',
+              }}
+            >
+              <Plus size={13} />
+              Ajouter
+            </button>
           </div>
-        ))}
-      </div>
-
-      {/* ── Tabs ────────────────────────────────────────────────────────────── */}
-      <div className="flex gap-1 p-1 w-fit rounded-xl" style={{ background: 'var(--bg)', border: '1px solid var(--border)' }}>
-        {(['wishlist', 'bought'] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)}
-            className="rounded-lg px-4 py-1.5 text-sm font-medium transition-colors"
-            style={activeTab === tab
-              ? { background: 'var(--paper-3)', color: 'var(--fg)', border: '1px solid var(--border-strong)' }
-              : { background: 'transparent', color: 'var(--fg-muted)', border: '1px solid transparent' }
-            }>
-            {tab === 'wishlist' ? `Wishlist (${wishlist.length})` : `Achetés (${bought.length})`}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Controls ────────────────────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-center gap-3">
-        <select value={sortKey} onChange={(e) => setSortKey(e.target.value as SortKey)}
-          className="rounded-lg px-3 py-1.5 text-xs outline-none transition-colors"
-          style={{ border: '1px solid var(--border)', background: 'var(--bg-elev)', color: 'var(--fg-muted)' }}>
-          <option value="priority">Par priorité</option>
-          <option value="price_asc">Prix croissant</option>
-          <option value="price_desc">Prix décroissant</option>
-          <option value="category">Par catégorie</option>
-          <option value="date_desc">Plus récent</option>
-        </select>
-
-        {activeTab === 'wishlist' && (
-          <div className="flex gap-1.5">
-            {PRIORITIES.map((p) => (
-              <button key={p} onClick={() => togglePriorityFilter(p)}
-                className="rounded-full px-3 py-1 text-[11px] font-medium transition-colors"
-                style={filterPriorities.includes(p)
-                  ? priorityChipStyle[p]
-                  : { background: 'var(--bg-elev)', border: '1px solid var(--border)', color: 'var(--fg-muted)' }
-                }>
-                {p}
-              </button>
+        ) : (
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 16,
+            }}
+          >
+            {wishlist.map((item, i) => (
+              <WishCard
+                key={item.id}
+                item={item}
+                categories={categories}
+                index={i}
+                onDecide={handleDecide}
+                onDelete={() => removeWishlistItem(item.id)}
+              />
             ))}
           </div>
         )}
+      </section>
 
-        {categories.length > 0 && (
-          <div className="flex flex-wrap gap-1.5">
-            {categories.map((c) => (
-              <button key={c.id} onClick={() => toggleCatFilter(c.id)}
-                className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-medium transition-colors"
-                style={filterCatIds.includes(c.id)
-                  ? { color: c.color, borderColor: c.color + '60', backgroundColor: c.color + '15', border: `1px solid ${c.color}60` }
-                  : { border: '1px solid var(--border)', color: 'var(--fg-muted)', background: 'var(--bg-elev)' }
-                }>
-                <span className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: filterCatIds.includes(c.id) ? c.color : 'var(--fg-subtle)' }} />
-                {c.name}
-              </button>
-            ))}
+      {/* ── Analytics ─────────────────────────────────────────────────────────── */}
+      <section>
+        <SectionTitle>Analyse</SectionTitle>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 48 }}>
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20 }}>
+              Répartition par catégorie
+            </div>
+            <CategoryDistribution bought={bought} categories={categories} />
           </div>
-        )}
-
-        {(filterCatIds.length > 0 || filterPriorities.length > 0) && (
-          <button onClick={() => { setFilterCatIds([]); setFilterPriorities([]) }}
-            className="text-xs transition-colors" style={{ color: 'var(--fg-subtle)', background: 'transparent', border: 'none', cursor: 'pointer' }}>
-            Effacer filtres
-          </button>
-        )}
-      </div>
-
-      {/* ── Grille Wishlist ──────────────────────────────────────────────────── */}
-      {activeTab === 'wishlist' && (
-        <>
-          {filteredWishlist.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20" style={{ color: 'var(--fg-subtle)' }}>
-              <span className="text-4xl mb-3">🛍️</span>
-              <p className="text-sm" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
-                {wishlist.length === 0 ? 'Ta wishlist est vide' : 'Aucun article pour ces filtres'}
-              </p>
-              {wishlist.length === 0 && (
-                <button onClick={() => setShowAddModal(true)}
-                  className="mt-4 px-4 py-2 text-xs transition-colors"
-                  style={{ background: 'var(--terra-soft)', color: 'var(--terra-deep)', borderRadius: 'var(--r-full)', border: 'none', cursor: 'pointer' }}>
-                  + Ajouter un article
-                </button>
-              )}
+          <div>
+            <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', textTransform: 'uppercase', letterSpacing: '0.12em', marginBottom: 20 }}>
+              Évolution mensuelle (12 mois)
             </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredWishlist.map((item) => (
-                <ShoppingCard
-                  key={item.id} item={item} categories={categories}
-                  onEdit={() => { setEditItem(item); setShowAddModal(true) }}
-                  onDelete={() => removeWishlistItem(item.id)}
-                  onBuy={() => setBuyTarget(item)}
-                  onCatFilter={toggleCatFilter}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+            <MonthlyEvolution bought={bought} />
+          </div>
+        </div>
+      </section>
 
-      {/* ── Grille Achetés ───────────────────────────────────────────────────── */}
-      {activeTab === 'bought' && (
-        <>
-          {filteredBought.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20" style={{ color: 'var(--fg-subtle)' }}>
-              <span className="text-4xl mb-3">✓</span>
-              <p className="text-sm" style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic' }}>
-                {bought.length === 0 ? 'Aucun achat enregistré' : 'Aucun article pour ces filtres'}
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {filteredBought.map((item) => (
-                <BoughtCard
-                  key={item.id} item={item} categories={categories}
-                  onEdit={() => setEditBought(item)}
-                  onDelete={() => removeBoughtItem(item.id)}
-                  onCatFilter={toggleCatFilter}
-                />
-              ))}
-            </div>
-          )}
-        </>
-      )}
+      {/* ── Historique ────────────────────────────────────────────────────────── */}
+      <section>
+        <SectionTitle>Historique</SectionTitle>
+        <HistoryList bought={bought} categories={categories} onDelete={removeBoughtItem} />
+      </section>
 
-      {/* ── Modals ──────────────────────────────────────────────────────────── */}
-      {(showAddModal || editItem) && (
-        <ModalAddItem
-          initial={editItem}
+      {/* ── Panels ────────────────────────────────────────────────────────────── */}
+      {decidingItem && (
+        <VerdictPanel
+          item={decidingItem}
+          finance={finance}
           categories={categories}
-          onSave={handleSaveItem}
-          onClose={() => { setShowAddModal(false); setEditItem(undefined) }}
-          onNewCat={addCategory}
+          buyItem={buyItem}
+          onClose={handleCloseVerdict}
         />
       )}
 
-      {buyTarget && (
-        <ModalBuyItem
-          item={buyTarget}
-          onBuy={(pricePaid, boughtDate, verdict) => buyItem(buyTarget.id, pricePaid, boughtDate, verdict)}
-          onClose={() => setBuyTarget(undefined)}
-        />
-      )}
-
-      {editBought && (
-        <ModalEditBought
-          item={editBought}
-          onSave={(updates) => updateBoughtItem(editBought.id, updates)}
-          onClose={() => setEditBought(undefined)}
-        />
-      )}
-
-      {showCatModal && (
-        <ModalCategories
+      {showAddPanel && (
+        <AddItemPanel
           categories={categories}
-          wishlist={wishlist}
-          bought={bought}
-          onAdd={addCategory}
-          onUpdate={updateCategory}
-          onDelete={deleteCategory}
-          onClose={() => setShowCatModal(false)}
+          onAdd={addWishlistItem}
+          onAddCategory={addCategory}
+          onClose={handleCloseAdd}
         />
       )}
     </div>
