@@ -481,7 +481,6 @@ function RecipeDetailPanel({
   onAddToCourses: (recetteNom: string, items: CourseItem[]) => void
 }) {
   const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
-  const updateRecette = useCuisineStore((s) => s.updateRecette)
 
   // selected ingredient ids for adding to courses
   const recetteIngredients = allIngredients.filter((i) => recette.ingredientIds.includes(i.id))
@@ -1595,7 +1594,7 @@ export function CuisinePage() {
   )
 
   const addToCourses = useCallback(
-    (recetteNom: string, newItems: CourseItem[]) => {
+    (_recetteNom: string, newItems: CourseItem[]) => {
       const existingNames = new Set(courses.map((i) => i.name.trim().toLowerCase()))
       const fresh = newItems.filter((i) => !existingNames.has(i.name.trim().toLowerCase()))
       if (fresh.length === 0) {
