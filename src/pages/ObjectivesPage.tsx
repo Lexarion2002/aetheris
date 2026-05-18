@@ -3,7 +3,7 @@ import { useStore } from '../store'
 import { getDomainColors, getDomainIcon } from '../utils/domainColors'
 import { ObjectiveFormModal } from '../components/ObjectiveFormModal'
 import { TaskFormModal } from '../components/TaskFormModal'
-import type { Objective, Milestone, ProgressEntry } from '../types'
+import type { Objective, ProgressEntry } from '../types'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 

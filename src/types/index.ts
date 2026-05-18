@@ -24,8 +24,8 @@ export interface Task {
   status: TaskStatus
   priority: Priority
   timeEstimate: number | null  // minutes
-  dueDate: string | null       // ISO date — échéance dure
-  plannedDate: string | null   // ISO date — jour où on prévoit de la faire
+  dueDate: string | null        // ISO date — échéance dure
+  plannedDate?: string | null   // ISO date — jour où on prévoit de la faire
   notes?: string
   objectiveId?: string         // lien vers un objectif
   milestoneId?: string         // lien vers un jalon

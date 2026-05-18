@@ -5,6 +5,10 @@ import { useWritingStore } from '../store/writingStore'
 import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
 import type { Task } from '../types'
+import type { Tache, SousTache } from '../store/droitStore'
+import type { Story } from '../store/writingStore'
+import type { WorkoutEntry } from '../store/sportStore'
+import type { Mission } from '../store/careerStore'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -32,15 +36,15 @@ interface CandidateItem {
 
 // ─── Adapters ─────────────────────────────────────────────────────────────────
 
-function adaptDroit(taches: ReturnType<typeof useDroitStore>['taches'], plannedTaskIds: Set<string>): CandidateItem[] {
+function adaptDroit(taches: Tache[], plannedTaskIds: Set<string>): CandidateItem[] {
   const items: CandidateItem[] = []
   for (const t of taches) {
     const progress = t.subtasks.length > 0
-      ? Math.round((t.subtasks.filter((s) => s.done).length / t.subtasks.length) * 100)
+      ? Math.round((t.subtasks.filter((s: SousTache) => s.done).length / t.subtasks.length) * 100)
       : (t.manualProgress ?? 0)
     if (progress >= 100) continue
     if (t.subtasks.length > 0) {
-      for (const st of t.subtasks.filter((s) => !s.done)) {
+      for (const st of t.subtasks.filter((s: SousTache) => !s.done)) {
         if (!plannedTaskIds.has(st.id)) {
           items.push({ sourceType: 'droit', sourceId: st.id, label: st.label, sublabel: t.matiere, domainGroup: 'Droit' })
         }
@@ -52,24 +56,24 @@ function adaptDroit(taches: ReturnType<typeof useDroitStore>['taches'], plannedT
   return items
 }
 
-function adaptEcriture(stories: ReturnType<typeof useWritingStore>['stories'], plannedTaskIds: Set<string>): CandidateItem[] {
+function adaptEcriture(stories: Story[], plannedTaskIds: Set<string>): CandidateItem[] {
   return stories
-    .filter((s) => s.status === 'active' && !plannedTaskIds.has(s.id))
-    .map((s) => ({ sourceType: 'ecriture' as const, sourceId: s.id, label: `Écriture — ${s.title}`, domainGroup: 'Écriture' }))
+    .filter((s: Story) => s.status === 'active' && !plannedTaskIds.has(s.id))
+    .map((s: Story) => ({ sourceType: 'ecriture' as const, sourceId: s.id, label: `Écriture — ${s.title}`, domainGroup: 'Écriture' }))
 }
 
-function adaptSport(historique: ReturnType<typeof useSportStore>['historique'], plannedTaskIds: Set<string>): CandidateItem[] {
+function adaptSport(historique: WorkoutEntry[], plannedTaskIds: Set<string>): CandidateItem[] {
   const today = todayIso()
-  const hasToday = historique.some((h) => h.date === today)
+  const hasToday = historique.some((h: WorkoutEntry) => h.date === today)
   if (hasToday || plannedTaskIds.has('sport-today')) return []
   return [{ sourceType: 'sport' as const, sourceId: 'sport-today', label: 'Séance sport', domainGroup: 'Sport' }]
 }
 
-function adaptCareer(missions: ReturnType<typeof useCareerStore>['missions'], plannedTaskIds: Set<string>): CandidateItem[] {
+function adaptCareer(missions: Mission[], plannedTaskIds: Set<string>): CandidateItem[] {
   return missions
-    .filter((m) => m.stade !== 'rendu' && !plannedTaskIds.has(m.id))
+    .filter((m: Mission) => m.stade !== 'rendu' && !plannedTaskIds.has(m.id))
     .slice(0, 3)
-    .map((m) => ({ sourceType: 'career' as const, sourceId: m.id, label: m.titre, sublabel: m.client ?? undefined, domainGroup: 'Carrière' }))
+    .map((m: Mission) => ({ sourceType: 'career' as const, sourceId: m.id, label: m.sujet, sublabel: m.commanditaire || undefined, domainGroup: 'Carrière' }))
 }
 
 // ─── TaskRow ──────────────────────────────────────────────────────────────────
@@ -212,10 +216,6 @@ interface ExternalEntry {
   done:       boolean
 }
 
-interface PlannerState {
-  externalItems: ExternalEntry[]
-}
-
 // ─── TodayPage ────────────────────────────────────────────────────────────────
 
 export function TodayPage() {
@@ -224,10 +224,10 @@ export function TodayPage() {
   const setTaskStatus = useStore((s) => s.setTaskStatus)
   const updateTask   = useStore((s) => s.updateTask)
 
-  const droit   = useDroitStore()
-  const writing = useWritingStore()
-  const sport   = useSportStore()
-  const career  = useCareerStore()
+  const droitTaches    = useDroitStore((s) => s.taches)
+  const writingStories = useWritingStore((s) => s.stories)
+  const sportHistorique = useSportStore((s) => s.historique)
+  const careerMissions = useCareerStore((s) => s.missions)
 
   const today = todayIso()
 
@@ -248,11 +248,11 @@ export function TodayPage() {
 
   // Candidats multi-sources
   const candidates = useMemo((): CandidateItem[] => [
-    ...adaptDroit(droit.taches, plannedTaskIds),
-    ...adaptEcriture(writing.stories, plannedTaskIds),
-    ...adaptSport(sport.historique, plannedTaskIds),
-    ...adaptCareer(career.missions, plannedTaskIds),
-  ], [droit.taches, writing.stories, sport.historique, career.missions, plannedTaskIds])
+    ...adaptDroit(droitTaches, plannedTaskIds),
+    ...adaptEcriture(writingStories, plannedTaskIds),
+    ...adaptSport(sportHistorique, plannedTaskIds),
+    ...adaptCareer(careerMissions, plannedTaskIds),
+  ], [droitTaches, writingStories, sportHistorique, careerMissions, plannedTaskIds])
 
   // Tâches du store principal non encore planifiées pour aujourd'hui
   const taskCandidates = useMemo(
