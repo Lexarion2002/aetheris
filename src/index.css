@@ -350,3 +350,18 @@ body.theme-light .recharts-wrapper {
   transition: background var(--dur) var(--ease);
 }
 .hist-row:hover { background: var(--paper-1); }
+
+/* ─── Cuisine page ───────────────────────────────────────── */
+@keyframes cuisine-fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes cuisine-slide-in {
+  from { transform: translateX(24px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes cuisine-section-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.cuisine-section-anim { animation: cuisine-section-in 280ms var(--ease); }

@@ -1,368 +1,1523 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { Plus, Heart, X, Check, BookOpen, ShoppingBasket, ImageUp, Replace, Trash2, Link } from 'lucide-react'
 import { useCuisineStore } from '../store/cuisineStore'
-import type { Recette, Ingredient, RecetteCategorie, IngredientCategorie } from '../types/cuisine'
+import type { Recette, Ingredient, RecetteCategorie } from '../types/cuisine'
+import {
+  RECIPE_TYPES,
+  RAYONS,
+  CATEGORIE_TO_DISPLAY,
+  DISPLAY_TO_CATEGORIE,
+  INGREDIENT_TO_RAYON,
+  PLACEHOLDER_TINTS,
+} from '../lib/cuisineConstants'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
+// ─── Local shopping list ───────────────────────────────────────────────────────
 
-const RECETTE_CATEGORIES: { value: RecetteCategorie; label: string; icon: string }[] = [
-  { value: 'entree',  label: 'Entrée',   icon: '🥗' },
-  { value: 'plat',    label: 'Plat',     icon: '🍽️' },
-  { value: 'dessert', label: 'Dessert',  icon: '🍰' },
-  { value: 'snack',   label: 'Snack',    icon: '🥨' },
-  { value: 'boisson', label: 'Boisson',  icon: '🥤' },
-  { value: 'sauce',   label: 'Sauce',    icon: '🫙' },
-  { value: 'autre',   label: 'Autre',    icon: '🍴' },
-]
-
-const INGREDIENT_CATEGORIES: { value: IngredientCategorie; label: string; icon: string }[] = [
-  { value: 'legume',          label: 'Légume',         icon: '🥦' },
-  { value: 'fruit',           label: 'Fruit',          icon: '🍎' },
-  { value: 'viande',          label: 'Viande',         icon: '🥩' },
-  { value: 'poisson',         label: 'Poisson',        icon: '🐟' },
-  { value: 'produit_laitier', label: 'Produit laitier',icon: '🧀' },
-  { value: 'cereale',         label: 'Céréale',        icon: '🌾' },
-  { value: 'legumineuse',     label: 'Légumineuse',    icon: '🫘' },
-  { value: 'oeuf',            label: 'Œuf',            icon: '🥚' },
-  { value: 'herbe',           label: 'Herbe',          icon: '🌿' },
-  { value: 'epice',           label: 'Épice',          icon: '🌶️' },
-  { value: 'huile',           label: 'Huile',          icon: '🫒' },
-  { value: 'condiment',       label: 'Condiment',      icon: '🧂' },
-  { value: 'conserve',        label: 'Conserve',       icon: '🥫' },
-  { value: 'boisson',         label: 'Boisson',        icon: '🧃' },
-  { value: 'autre',           label: 'Autre',          icon: '📦' },
-]
-
-function catRecette(value: RecetteCategorie) {
-  return RECETTE_CATEGORIES.find((c) => c.value === value) ?? { label: value, icon: '🍴' }
+interface CourseItem {
+  id: string
+  name: string
+  qty: string
+  rayon: string
+  checked: boolean
+  fromRecipe: string | null
 }
 
-function catIngredient(value: IngredientCategorie) {
-  return INGREDIENT_CATEGORIES.find((c) => c.value === value) ?? { label: value, icon: '📦' }
+const COURSES_LS_KEY = 'aetheris-courses-v1'
+
+function loadCourses(): CourseItem[] {
+  try {
+    const raw = localStorage.getItem(COURSES_LS_KEY)
+    return raw ? (JSON.parse(raw) as CourseItem[]) : []
+  } catch {
+    return []
+  }
 }
 
-function fmtTemps(minutes: number) {
-  if (minutes < 60) return `${minutes} min`
-  const h = Math.floor(minutes / 60)
-  const m = minutes % 60
-  return m > 0 ? `${h}h${String(m).padStart(2, '0')}` : `${h}h`
+// ─── Image helpers ─────────────────────────────────────────────────────────────
+
+const IMG_PREFIX = 'aetheris-recipe-img-'
+
+function getRecipeImage(recette: Recette): string | null {
+  if (recette.image?.startsWith('https://')) return recette.image
+  try { return localStorage.getItem(IMG_PREFIX + recette.id) || null } catch { return null }
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+function setRecipeImage(
+  id: string,
+  src: string,
+  updateRecette: (id: string, u: Partial<Omit<Recette, 'id'>>) => void,
+) {
+  if (src.startsWith('https://') || src.startsWith('http://')) {
+    updateRecette(id, { image: src })
+    try { localStorage.removeItem(IMG_PREFIX + id) } catch {}
+  } else {
+    try { localStorage.setItem(IMG_PREFIX + id, src) } catch {}
+  }
+}
 
-function TabBar({ active, onChange }: { active: 'recettes' | 'courses'; onChange: (t: 'recettes' | 'courses') => void }) {
+function removeRecipeImage(
+  id: string,
+  updateRecette: (id: string, u: Partial<Omit<Recette, 'id'>>) => void,
+) {
+  try { localStorage.removeItem(IMG_PREFIX + id) } catch {}
+  updateRecette(id, { image: undefined })
+}
+
+// ─── Primitives ────────────────────────────────────────────────────────────────
+
+function CheckBox({ checked, onClick }: { checked: boolean; onClick: () => void }) {
   return (
-    <div className="flex gap-1 rounded-xl bg-zinc-900 p-1 w-fit">
-      {(['recettes', 'courses'] as const).map((tab) => (
+    <button
+      onClick={onClick}
+      style={{
+        width: 18,
+        height: 18,
+        borderRadius: 4,
+        border: checked ? '1.5px solid var(--terra)' : '1.5px solid var(--ink-4)',
+        background: checked ? 'var(--terra)' : 'transparent',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+        cursor: 'pointer',
+        transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+      }}
+    >
+      {checked && <Check size={11} color="var(--paper-1)" strokeWidth={3} />}
+    </button>
+  )
+}
+
+// ─── ImageImport ───────────────────────────────────────────────────────────────
+
+function ImageImport({
+  currentImage,
+  onPick,
+  onRemove,
+  onClose,
+}: {
+  currentImage: string | null
+  onPick: (src: string) => void
+  onRemove: () => void
+  onClose: () => void
+}) {
+  const [tab, setTab] = useState<'url' | 'file'>('url')
+  const [urlVal, setUrlVal] = useState('')
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  const handleFile = (file: File) => {
+    if (!file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const result = e.target?.result
+      if (typeof result === 'string') onPick(result)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  return (
+    <div
+      onClick={(e) => e.stopPropagation()}
+      style={{
+        position: 'absolute',
+        top: 8,
+        left: 8,
+        right: 8,
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        borderRadius: 'var(--r-lg)',
+        padding: 12,
+        zIndex: 20,
+        boxShadow: 'var(--shadow-2)',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 10,
+      }}
+    >
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{ display: 'flex', gap: 4 }}>
+          {(['url', 'file'] as const).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                letterSpacing: '0.06em',
+                textTransform: 'uppercase',
+                padding: '3px 8px',
+                borderRadius: 4,
+                background: tab === t ? 'var(--paper-3)' : 'transparent',
+                color: tab === t ? 'var(--ink)' : 'var(--ink-3)',
+                border: 'none',
+                cursor: 'pointer',
+              }}
+            >
+              {t === 'url' ? 'URL' : 'Fichier'}
+            </button>
+          ))}
+        </div>
         <button
-          key={tab}
-          onClick={() => onChange(tab)}
-          className={[
-            'rounded-lg px-4 py-1.5 text-sm font-medium transition-all duration-150 outline-none',
-            'focus-visible:ring-1 focus-visible:ring-teal-500/50',
-            active === tab
-              ? 'bg-zinc-800 text-zinc-100'
-              : 'text-zinc-500 hover:text-zinc-300',
-          ].join(' ')}
+          onClick={onClose}
+          style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'flex' }}
         >
-          {tab === 'recettes' ? '🍽️ Recettes' : '🛒 Liste de courses'}
+          <X size={14} />
         </button>
-      ))}
+      </div>
+
+      {tab === 'url' && (
+        <div style={{ display: 'flex', gap: 6 }}>
+          <input
+            autoFocus
+            value={urlVal}
+            onChange={(e) => setUrlVal(e.target.value)}
+            placeholder="https://..."
+            style={{
+              flex: 1,
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              padding: '6px 10px',
+              borderRadius: 6,
+              border: '1px solid var(--paper-2)',
+              background: 'var(--paper)',
+              color: 'var(--ink)',
+              outline: 'none',
+            }}
+          />
+          <button
+            onClick={() => { if (urlVal.trim()) { onPick(urlVal.trim()); onClose() } }}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              fontWeight: 500,
+              padding: '6px 12px',
+              borderRadius: 6,
+              background: 'var(--terra)',
+              color: 'var(--paper-1)',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Valider
+          </button>
+        </div>
+      )}
+
+      {tab === 'file' && (
+        <>
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*"
+            style={{ display: 'none' }}
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              if (f) { handleFile(f); onClose() }
+            }}
+          />
+          <button
+            onClick={() => fileRef.current?.click()}
+            onDragOver={(e) => e.preventDefault()}
+            onDrop={(e) => {
+              e.preventDefault()
+              const f = e.dataTransfer.files?.[0]
+              if (f) { handleFile(f); onClose() }
+            }}
+            style={{
+              border: '1.5px dashed var(--ink-4)',
+              borderRadius: 8,
+              padding: '14px 0',
+              background: 'transparent',
+              color: 'var(--ink-3)',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              cursor: 'pointer',
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 6,
+            }}
+          >
+            <ImageUp size={18} />
+            Cliquer ou glisser une image
+          </button>
+        </>
+      )}
+
+      {currentImage && (
+        <button
+          onClick={() => { onRemove(); onClose() }}
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 11,
+            color: 'var(--ink-3)',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            textAlign: 'left',
+            padding: '2px 0',
+          }}
+        >
+          Retirer l'image
+        </button>
+      )}
     </div>
   )
 }
 
-// ─── Modal Recette ────────────────────────────────────────────────────────────
+// ─── RecipeCard ────────────────────────────────────────────────────────────────
 
-function ModalRecette({
-  initial,
-  allIngredients,
-  onSave,
-  onClose,
+function RecipeCard({
+  recette,
+  index,
+  onOpen,
+  onToggleFavorite,
+  onSetImage,
+  onRemoveImage,
 }: {
-  initial?: Recette
-  allIngredients: Ingredient[]
-  onSave: (data: Omit<Recette, 'id'>) => void
-  onClose: () => void
+  recette: Recette
+  index: number
+  onOpen: () => void
+  onToggleFavorite: () => void
+  onSetImage: (src: string) => void
+  onRemoveImage: () => void
 }) {
-  const [nom,              setNom]              = useState(initial?.nom              ?? '')
-  const [categorie,        setCategorie]        = useState<RecetteCategorie>(initial?.categorie ?? 'plat')
-  const [tempsPreparation, setTempsPreparation] = useState(initial?.tempsPreparation ?? 30)
-  const [lien,             setLien]             = useState(initial?.lien             ?? '')
-  const [favori,           setFavori]           = useState(initial?.favori           ?? false)
-  const [ingredientIds,    setIngredientIds]    = useState<string[]>(initial?.ingredientIds ?? [])
+  const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
+  const [showImgImport, setShowImgImport] = useState(false)
+  const [hovered, setHovered] = useState(false)
 
-  const [image,        setImage]        = useState<string | undefined>(initial?.image)
-  const imageInputRef = useRef<HTMLInputElement>(null)
-
-  const handleImageFile = (file: File) => {
-    if (!file.type.startsWith('image/')) return
-    const reader = new FileReader()
-    reader.onload = (e) => setImage(e.target?.result as string)
-    reader.readAsDataURL(file)
-  }
-
-  const addIngredient  = useCuisineStore((s) => s.addIngredient)
-  const [ingQuery,     setIngQuery]     = useState('')
-  const [showDropdown, setShowDropdown] = useState(false)
-  const ingInputRef = useRef<HTMLInputElement>(null)
-
-  // Ingrédients non encore sélectionnés qui matchent la query
-  const suggestions = useMemo(() => {
-    if (!ingQuery.trim()) return []
-    const q = ingQuery.trim().toLowerCase()
-    return allIngredients.filter(
-      (i) => !ingredientIds.includes(i.id) && i.nom.toLowerCase().includes(q),
-    )
-  }, [ingQuery, allIngredients, ingredientIds])
-
-  // Vrai si la query correspond exactement à un ingrédient existant (sélectionné ou non)
-  const hasExactMatch = useMemo(() => {
-    const q = ingQuery.trim().toLowerCase()
-    return q.length > 0 && allIngredients.some((i) => i.nom.toLowerCase() === q)
-  }, [ingQuery, allIngredients])
-
-  const addToSelection = (id: string) => {
-    setIngredientIds((prev) => (prev.includes(id) ? prev : [...prev, id]))
-    setIngQuery('')
-    setShowDropdown(false)
-    ingInputRef.current?.focus()
-  }
-
-  const removeFromSelection = (id: string) =>
-    setIngredientIds((prev) => prev.filter((i) => i !== id))
-
-  const createAndAdd = () => {
-    const trimmed = ingQuery.trim()
-    if (!trimmed) return
-    const existing = allIngredients.find((i) => i.nom.toLowerCase() === trimmed.toLowerCase())
-    if (existing) {
-      addToSelection(existing.id)
-    } else {
-      const newIng = addIngredient({ nom: trimmed, categorie: 'autre', disponible: false, recetteIds: [] })
-      setIngredientIds((prev) => [...prev, newIng.id])
-      setIngQuery('')
-      setShowDropdown(false)
-      ingInputRef.current?.focus()
+  // Listen for cross-component image sync
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string | null>).detail
+      setImgSrc(detail)
     }
+    window.addEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
+    return () => window.removeEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
+  }, [recette.id])
+
+  // Refresh imgSrc when recette.image changes (e.g. https:// URL stored in store)
+  useEffect(() => {
+    setImgSrc(getRecipeImage(recette))
+  }, [recette.image, recette.id])
+
+  const tint = PLACEHOLDER_TINTS[index % PLACEHOLDER_TINTS.length]
+
+  const handlePick = (src: string) => {
+    onSetImage(src)
+    setImgSrc(src)
+    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: src }))
   }
 
-  const handleIngKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter') {
-      e.preventDefault()
-      if (suggestions.length > 0) addToSelection(suggestions[0].id)
-      else if (ingQuery.trim()) createAndAdd()
-    } else if (e.key === 'Escape') {
-      setIngQuery('')
-      setShowDropdown(false)
+  const handleRemove = () => {
+    onRemoveImage()
+    setImgSrc(null)
+    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: null }))
+  }
+
+  return (
+    <div
+      onClick={onOpen}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        borderRadius: 'var(--r-xl)',
+        overflow: 'hidden',
+        cursor: 'pointer',
+        opacity: 0,
+        transform: 'translateY(8px)',
+        animation: `cuisine-section-in 300ms var(--ease) both`,
+        animationDelay: `${30 + index * 40}ms`,
+        transition: 'border-color var(--dur) var(--ease), box-shadow var(--dur) var(--ease)',
+        boxShadow: hovered ? 'var(--shadow-2)' : 'var(--shadow-1)',
+        borderColor: hovered ? 'var(--ink-4)' : 'var(--paper-2)',
+      }}
+    >
+      {/* Image zone */}
+      <div
+        style={{
+          position: 'relative',
+          aspectRatio: '4/3',
+          background: imgSrc ? 'transparent' : tint.bg,
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+      >
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={recette.nom}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 32, color: tint.ink, opacity: 0.35 }}>
+            {CATEGORIE_TO_DISPLAY[recette.categorie]?.[0] ?? '?'}
+          </span>
+        )}
+
+        {/* Heart button */}
+        <button
+          onClick={(e) => { e.stopPropagation(); onToggleFavorite() }}
+          style={{
+            position: 'absolute',
+            top: 10,
+            right: 10,
+            background: 'var(--paper-1)',
+            border: '1px solid var(--paper-2)',
+            borderRadius: 'var(--r-full)',
+            width: 32,
+            height: 32,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            opacity: hovered || recette.favori ? 1 : 0,
+            transition: 'opacity var(--dur) var(--ease)',
+          }}
+        >
+          <Heart
+            size={15}
+            strokeWidth={2}
+            fill={recette.favori ? 'var(--terra)' : 'none'}
+            color={recette.favori ? 'var(--terra)' : 'var(--ink-3)'}
+          />
+        </button>
+
+        {/* Image import trigger */}
+        <button
+          onClick={(e) => { e.stopPropagation(); setShowImgImport((v) => !v) }}
+          style={{
+            position: 'absolute',
+            top: 10,
+            left: 10,
+            background: 'var(--paper-1)',
+            border: '1px solid var(--paper-2)',
+            borderRadius: 'var(--r-full)',
+            padding: '4px 10px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 5,
+            cursor: 'pointer',
+            opacity: hovered || showImgImport ? 1 : 0,
+            transition: 'opacity var(--dur) var(--ease)',
+            fontFamily: 'var(--font-sans)',
+            fontSize: 11,
+            color: 'var(--ink-2)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {imgSrc ? <Replace size={12} /> : <ImageUp size={12} />}
+          {imgSrc ? 'Changer' : 'Ajouter une image'}
+        </button>
+
+        {showImgImport && (
+          <ImageImport
+            currentImage={imgSrc}
+            onPick={handlePick}
+            onRemove={handleRemove}
+            onClose={() => setShowImgImport(false)}
+          />
+        )}
+      </div>
+
+      {/* Content */}
+      <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {/* Badge + time */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.08em',
+            textTransform: 'uppercase',
+            padding: '2px 7px',
+            borderRadius: 4,
+            border: '1px solid var(--ink-4)',
+            color: 'var(--ink-3)',
+          }}>
+            {CATEGORIE_TO_DISPLAY[recette.categorie] ?? 'Autre'}
+          </span>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginLeft: 'auto' }}>
+            {recette.tempsPreparation} min
+          </span>
+        </div>
+
+        {/* Title */}
+        <h3 style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 17,
+          fontWeight: 400,
+          color: 'var(--ink)',
+          margin: 0,
+          lineHeight: 1.3,
+          marginBottom: 8,
+        }}>
+          {recette.nom}
+        </h3>
+      </div>
+    </div>
+  )
+}
+
+// ─── RecipeDetailPanel ─────────────────────────────────────────────────────────
+
+function RecipeDetailPanel({
+  recette,
+  allIngredients,
+  courses,
+  onClose,
+  onToggleFavorite,
+  onAddToCourses,
+}: {
+  recette: Recette
+  allIngredients: Ingredient[]
+  courses: CourseItem[]
+  onClose: () => void
+  onToggleFavorite: () => void
+  onAddToCourses: (recetteNom: string, items: CourseItem[]) => void
+}) {
+  const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
+  const updateRecette = useCuisineStore((s) => s.updateRecette)
+
+  // selected ingredient ids for adding to courses
+  const recetteIngredients = allIngredients.filter((i) => recette.ingredientIds.includes(i.id))
+  const [selected, setSelected] = useState<Set<string>>(new Set(recetteIngredients.map((i) => i.id)))
+
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<string | null>).detail
+      setImgSrc(detail)
     }
+    window.addEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
+    return () => window.removeEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
+  }, [recette.id])
+
+  useEffect(() => {
+    const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', handleKey)
+    return () => document.removeEventListener('keydown', handleKey)
+  }, [onClose])
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const courseNameSet = new Set(courses.map((c) => c.name.trim().toLowerCase()))
+
+  const handleAddToCourses = () => {
+    const items: CourseItem[] = recetteIngredients
+      .filter((i) => selected.has(i.id))
+      .map((i) => ({
+        id: crypto.randomUUID(),
+        name: i.nom,
+        qty: i.quantite || '—',
+        rayon: INGREDIENT_TO_RAYON[i.categorie] || 'Autre',
+        checked: false,
+        fromRecipe: recette.nom,
+      }))
+    onAddToCourses(recette.nom, items)
+  }
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div
+        onClick={onClose}
+        style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'color-mix(in srgb, var(--ink) 18%, transparent)',
+          zIndex: 40,
+          animation: 'cuisine-fade-in 240ms var(--ease)',
+        }}
+      />
+
+      {/* Panel */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          width: 'min(720px, 80%)',
+          background: 'var(--paper)',
+          borderLeft: '1px solid var(--paper-2)',
+          zIndex: 41,
+          animation: 'cuisine-slide-in 320ms var(--ease)',
+          display: 'flex',
+          flexDirection: 'column',
+          overflowY: 'auto',
+        }}
+      >
+        {/* Header bar */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          padding: '16px 24px',
+          borderBottom: '1px solid var(--paper-2)',
+          position: 'sticky',
+          top: 0,
+          background: 'var(--paper)',
+          zIndex: 1,
+        }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+            cuisine
+          </span>
+          <span style={{ color: 'var(--ink-4)', fontSize: 12 }}>·</span>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
+            {recette.nom}
+          </span>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={onToggleFavorite}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 6,
+                borderRadius: 'var(--r-full)',
+              }}
+            >
+              <Heart
+                size={17}
+                fill={recette.favori ? 'var(--terra)' : 'none'}
+                color={recette.favori ? 'var(--terra)' : 'var(--ink-3)'}
+                strokeWidth={2}
+              />
+            </button>
+            <button
+              onClick={onClose}
+              style={{
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 6,
+                borderRadius: 'var(--r-full)',
+                color: 'var(--ink-3)',
+              }}
+            >
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Image or terra bar */}
+        {imgSrc ? (
+          <img
+            src={imgSrc}
+            alt={recette.nom}
+            style={{ width: '100%', height: 220, objectFit: 'cover', display: 'block', flexShrink: 0 }}
+          />
+        ) : (
+          <div style={{ height: 8, background: 'var(--terra)', flexShrink: 0 }} />
+        )}
+
+        {/* Content */}
+        <div style={{ padding: '28px 32px 40px', flex: 1, display: 'flex', flexDirection: 'column', gap: 24 }}>
+          {/* Badge + title + meta */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              padding: '3px 8px',
+              borderRadius: 4,
+              background: 'var(--terra-soft)',
+              color: '#6B2F14',
+              width: 'fit-content',
+            }}>
+              {CATEGORIE_TO_DISPLAY[recette.categorie] ?? 'Autre'}
+            </span>
+
+            <h1 style={{
+              fontFamily: 'var(--font-serif)',
+              fontSize: 28,
+              fontWeight: 400,
+              color: 'var(--ink)',
+              margin: 0,
+              lineHeight: 1.25,
+            }}>
+              {recette.nom}
+            </h1>
+
+            <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+                {recette.tempsPreparation}min
+              </span>
+              {recette.lien && (
+                <a
+                  href={recette.lien}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 4,
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 12,
+                    color: 'var(--terra)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  <Link size={12} />
+                  Voir la recette
+                </a>
+              )}
+            </div>
+          </div>
+
+          {/* Ingrédients */}
+          {recetteIngredients.length > 0 && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              <span style={{
+                fontFamily: 'var(--font-mono)',
+                fontSize: 10.5,
+                letterSpacing: '0.12em',
+                textTransform: 'uppercase',
+                color: 'var(--ink-3)',
+              }}>
+                Ingrédients
+              </span>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {recetteIngredients.map((ing) => {
+                  const alreadyInCourses = courseNameSet.has(ing.nom.trim().toLowerCase())
+                  const isSelected = selected.has(ing.id)
+                  return (
+                    <div
+                      key={ing.id}
+                      onClick={() => toggleSelected(ing.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 12,
+                        padding: '10px 14px',
+                        borderRadius: 'var(--r-lg)',
+                        background: isSelected ? 'var(--paper-1)' : 'transparent',
+                        border: '1px solid',
+                        borderColor: isSelected ? 'var(--paper-2)' : 'transparent',
+                        cursor: 'pointer',
+                        transition: 'background var(--dur) var(--ease)',
+                      }}
+                    >
+                      <CheckBox checked={isSelected} onClick={() => toggleSelected(ing.id)} />
+                      <span style={{
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: 14,
+                        color: 'var(--ink)',
+                        flex: 1,
+                      }}>
+                        {ing.nom}
+                      </span>
+                      {ing.quantite && (
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+                          {ing.quantite}
+                        </span>
+                      )}
+                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.04em' }}>
+                        {INGREDIENT_TO_RAYON[ing.categorie] || 'Autre'}
+                      </span>
+                      {alreadyInCourses && (
+                        <span style={{
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 10,
+                          color: 'var(--sage)',
+                          letterSpacing: '0.06em',
+                          textTransform: 'uppercase',
+                        }}>
+                          ✓ liste
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+
+              {/* Footer action */}
+              <button
+                onClick={handleAddToCourses}
+                style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  padding: '10px 20px',
+                  borderRadius: 'var(--r-lg)',
+                  background: 'var(--terra)',
+                  color: 'var(--paper-1)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 8,
+                  width: 'fit-content',
+                }}
+              >
+                <ShoppingBasket size={15} />
+                Ajouter à la liste
+              </button>
+            </div>
+          )}
+
+          {recetteIngredients.length === 0 && (
+            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+              Aucun ingrédient enregistré pour cette recette.
+            </p>
+          )}
+        </div>
+      </div>
+    </>
+  )
+}
+
+// ─── SectionTabs ───────────────────────────────────────────────────────────────
+
+function SectionTabs({
+  section,
+  recettesCount,
+  coursesChecked,
+  coursesTotal,
+  onChange,
+}: {
+  section: 'recettes' | 'courses'
+  recettesCount: number
+  coursesChecked: number
+  coursesTotal: number
+  onChange: (s: 'recettes' | 'courses') => void
+}) {
+  return (
+    <div style={{
+      borderBottom: '1px solid var(--paper-2)',
+      display: 'flex',
+      gap: 0,
+    }}>
+      {([
+        { id: 'recettes', label: 'Recettes', Icon: BookOpen, count: String(recettesCount) },
+        { id: 'courses', label: 'Liste de courses', Icon: ShoppingBasket, count: `${coursesChecked}/${coursesTotal}` },
+      ] as const).map(({ id, label, Icon, count }) => {
+        const active = section === id
+        return (
+          <button
+            key={id}
+            onClick={() => onChange(id)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              padding: '12px 20px',
+              background: 'none',
+              border: 'none',
+              borderBottom: active ? '2px solid var(--terra)' : '2px solid transparent',
+              cursor: 'pointer',
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              fontWeight: active ? 500 : 400,
+              color: active ? 'var(--ink)' : 'var(--ink-3)',
+              transition: 'color var(--dur) var(--ease)',
+              marginBottom: -1,
+            }}
+          >
+            <Icon size={15} strokeWidth={1.8} />
+            {label}
+            <span style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              background: active ? 'var(--terra-soft)' : 'var(--paper-2)',
+              color: active ? '#8E3D1C' : 'var(--ink-3)',
+              padding: '1px 7px',
+              borderRadius: 'var(--r-full)',
+              transition: 'background var(--dur) var(--ease)',
+            }}>
+              {count}
+            </span>
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+// ─── RecettesView ──────────────────────────────────────────────────────────────
+
+function RecettesView({
+  recettes,
+  onOpen,
+  onToggleFavorite,
+  onSetImage,
+  onRemoveImage,
+  onNewRecette,
+}: {
+  recettes: Recette[]
+  onOpen: (id: string) => void
+  onToggleFavorite: (id: string) => void
+  onSetImage: (id: string, src: string) => void
+  onRemoveImage: (id: string) => void
+  onNewRecette: () => void
+}) {
+  const [activeType, setActiveType] = useState<string>('Toutes')
+  const [favoriOnly, setFavoriOnly] = useState(false)
+
+  const filtered = recettes.filter((r) => {
+    if (activeType !== 'Toutes') {
+      const cat = DISPLAY_TO_CATEGORIE[activeType]
+      if (cat && r.categorie !== cat) return false
+    }
+    if (favoriOnly && !r.favori) return false
+    return true
+  })
+
+  return (
+    <div className="cuisine-section-anim" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {/* Editorial header */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+        }}>
+          cuisine · {recettes.length} recette{recettes.length !== 1 ? 's' : ''}
+        </span>
+        <h1 style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 32,
+          fontWeight: 400,
+          color: 'var(--ink)',
+          margin: 0,
+          lineHeight: 1.2,
+        }}>
+          Ton carnet de cuisine.
+        </h1>
+        <p style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 15,
+          color: 'var(--ink-3)',
+          fontStyle: 'italic',
+          margin: 0,
+        }}>
+          Recettes, ingrédients et liste de courses.
+        </p>
+      </div>
+
+      {/* New recipe button */}
+      <button
+        onClick={onNewRecette}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 8,
+          padding: '10px 20px',
+          background: 'var(--terra)',
+          color: 'var(--paper-1)',
+          border: 'none',
+          borderRadius: 'var(--r-lg)',
+          fontFamily: 'var(--font-sans)',
+          fontSize: 13,
+          fontWeight: 500,
+          cursor: 'pointer',
+          width: 'fit-content',
+        }}
+      >
+        <Plus size={15} />
+        Nouvelle recette
+      </button>
+
+      {/* Filter chips */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 6 }}>
+        {RECIPE_TYPES.map((type, i) => {
+          const active = activeType === type
+          return (
+            <span key={type} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              {i > 0 && (
+                <span style={{ color: 'var(--ink-4)', fontSize: 12, userSelect: 'none' }}>·</span>
+              )}
+              <button
+                onClick={() => setActiveType(type)}
+                style={{
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 13,
+                  padding: '5px 12px',
+                  borderRadius: 'var(--r-full)',
+                  background: active ? 'var(--paper-3)' : 'transparent',
+                  color: active ? 'var(--ink)' : 'var(--ink-3)',
+                  border: active ? '1px solid var(--ink-4)' : '1px solid transparent',
+                  cursor: 'pointer',
+                  transition: 'background var(--dur) var(--ease), color var(--dur) var(--ease)',
+                }}
+              >
+                {type}
+              </button>
+            </span>
+          )
+        })}
+
+        <button
+          onClick={() => setFavoriOnly((v) => !v)}
+          style={{
+            marginLeft: 8,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontFamily: 'var(--font-sans)',
+            fontSize: 13,
+            padding: '5px 12px',
+            borderRadius: 'var(--r-full)',
+            background: favoriOnly ? 'var(--terra-soft)' : 'transparent',
+            color: favoriOnly ? 'var(--terra-deep)' : 'var(--ink-3)',
+            border: favoriOnly ? '1px solid var(--terra-soft)' : '1px solid transparent',
+            cursor: 'pointer',
+            transition: 'background var(--dur) var(--ease)',
+          }}
+        >
+          <Heart size={13} fill={favoriOnly ? 'var(--terra)' : 'none'} color={favoriOnly ? 'var(--terra)' : 'var(--ink-3)'} strokeWidth={2} />
+          Favoris
+        </button>
+      </div>
+
+      {/* Grid */}
+      {filtered.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 0', textAlign: 'center' }}>
+          <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink-3)', fontStyle: 'italic', margin: 0 }}>
+            Aucune recette pour l'instant.
+          </p>
+          <button
+            onClick={onNewRecette}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              color: 'var(--terra)',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+            }}
+          >
+            Créer la première →
+          </button>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 24,
+        }}>
+          {filtered.map((r, i) => (
+            <RecipeCard
+              key={r.id}
+              recette={r}
+              index={i}
+              onOpen={() => onOpen(r.id)}
+              onToggleFavorite={() => onToggleFavorite(r.id)}
+              onSetImage={(src) => onSetImage(r.id, src)}
+              onRemoveImage={() => onRemoveImage(r.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── ShoppingItemRow ───────────────────────────────────────────────────────────
+
+function ShoppingItemRow({
+  item,
+  onToggle,
+  onRemove,
+}: {
+  item: CourseItem
+  onToggle: () => void
+  onRemove: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '10px 14px',
+        borderRadius: 'var(--r-lg)',
+        background: item.checked ? 'transparent' : 'var(--paper-1)',
+        border: '1px solid',
+        borderColor: item.checked ? 'transparent' : 'var(--paper-2)',
+        transition: 'background var(--dur) var(--ease)',
+        opacity: item.checked ? 0.5 : 1,
+      }}
+    >
+      <CheckBox checked={item.checked} onClick={onToggle} />
+      <span style={{
+        fontFamily: 'var(--font-sans)',
+        fontSize: 14,
+        color: 'var(--ink)',
+        flex: 1,
+        textDecoration: item.checked ? 'line-through' : 'none',
+        textDecorationColor: 'var(--ink-3)',
+      }}>
+        {item.name}
+      </span>
+      {item.qty && item.qty !== '—' && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+          {item.qty}
+        </span>
+      )}
+      {item.fromRecipe && (
+        <span style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 3,
+          fontFamily: 'var(--font-mono)',
+          fontSize: 10,
+          color: 'var(--ink-4)',
+          letterSpacing: '0.04em',
+        }}>
+          <Link size={9} />
+          {item.fromRecipe}
+        </span>
+      )}
+      <button
+        onClick={onRemove}
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          color: 'var(--ink-4)',
+          padding: 2,
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity var(--dur) var(--ease)',
+        }}
+      >
+        <X size={13} />
+      </button>
+    </div>
+  )
+}
+
+// ─── RayonGroup ────────────────────────────────────────────────────────────────
+
+function RayonGroup({
+  rayon,
+  items,
+  onToggle,
+  onRemove,
+}: {
+  rayon: string
+  items: CourseItem[]
+  onToggle: (id: string) => void
+  onRemove: (id: string) => void
+}) {
+  const sorted = [...items].sort((a, b) => {
+    if (a.checked === b.checked) return 0
+    return a.checked ? 1 : -1
+  })
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <h2 style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 16,
+          fontWeight: 400,
+          color: 'var(--ink-2)',
+          margin: 0,
+        }}>
+          {rayon}
+        </h2>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+          {items.length === 0 ? '—' : `${items.length}`}
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-4)', fontStyle: 'italic', margin: 0 }}>
+          —
+        </p>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+          {sorted.map((item) => (
+            <ShoppingItemRow
+              key={item.id}
+              item={item}
+              onToggle={() => onToggle(item.id)}
+              onRemove={() => onRemove(item.id)}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── QuickAddForm ──────────────────────────────────────────────────────────────
+
+function QuickAddForm({ onAdd }: { onAdd: (data: { name: string; qty: string; rayon: string }) => void }) {
+  const [name, setName] = useState('')
+  const [qty, setQty] = useState('')
+  const [rayon, setRayon] = useState<string>(RAYONS[0])
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!name.trim()) return
+    onAdd({ name: name.trim(), qty, rayon })
+    setName('')
+    setQty('')
+  }
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    padding: '8px 12px',
+    borderRadius: 'var(--r-lg)',
+    border: '1px solid var(--paper-2)',
+    background: 'var(--paper-1)',
+    color: 'var(--ink)',
+    outline: 'none',
+  }
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      style={{
+        display: 'flex',
+        gap: 8,
+        flexWrap: 'wrap',
+        padding: '16px 0',
+        borderTop: '1px solid var(--paper-2)',
+        marginTop: 8,
+      }}
+    >
+      <input
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="Nom de l'article…"
+        style={{ ...inputStyle, flex: '2 1 160px' }}
+      />
+      <input
+        value={qty}
+        onChange={(e) => setQty(e.target.value)}
+        placeholder="Quantité"
+        style={{ ...inputStyle, flex: '1 1 80px' }}
+      />
+      <select
+        value={rayon}
+        onChange={(e) => setRayon(e.target.value)}
+        style={{ ...inputStyle, flex: '1 1 120px' }}
+      >
+        {RAYONS.map((r) => <option key={r} value={r}>{r}</option>)}
+      </select>
+      <button
+        type="submit"
+        disabled={!name.trim()}
+        style={{
+          fontFamily: 'var(--font-sans)',
+          fontSize: 13,
+          fontWeight: 500,
+          padding: '8px 16px',
+          borderRadius: 'var(--r-lg)',
+          background: 'var(--terra)',
+          color: 'var(--paper-1)',
+          border: 'none',
+          cursor: 'pointer',
+          opacity: name.trim() ? 1 : 0.4,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        <Plus size={14} />
+        Ajouter
+      </button>
+    </form>
+  )
+}
+
+// ─── ListeDeCoursesView ────────────────────────────────────────────────────────
+
+function ListeDeCoursesView({
+  items,
+  onToggle,
+  onClearChecked,
+  onAdd,
+  onRemove,
+}: {
+  items: CourseItem[]
+  onToggle: (id: string) => void
+  onClearChecked: () => void
+  onAdd: (data: { name: string; qty: string; rayon: string }) => void
+  onRemove: (id: string) => void
+}) {
+  const checkedCount = items.filter((i) => i.checked).length
+  const total = items.length
+
+  const byRayon = (rayon: string) => items.filter((i) => i.rayon === rayon)
+
+  return (
+    <div className="cuisine-section-anim" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
+      {/* Editorial header */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)',
+          fontSize: 11,
+          letterSpacing: '0.12em',
+          textTransform: 'uppercase',
+          color: 'var(--ink-3)',
+        }}>
+          liste de courses · {checkedCount}/{total} cochés
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+          <h1 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 32,
+            fontWeight: 400,
+            color: 'var(--ink)',
+            margin: 0,
+            lineHeight: 1.2,
+          }}>
+            À rapporter.
+          </h1>
+          {checkedCount > 0 && (
+            <button
+              onClick={onClearChecked}
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                fontFamily: 'var(--font-sans)',
+                fontSize: 12,
+                padding: '6px 12px',
+                borderRadius: 'var(--r-lg)',
+                background: 'transparent',
+                color: 'var(--ink-3)',
+                border: '1px solid var(--ink-4)',
+                cursor: 'pointer',
+                marginLeft: 'auto',
+              }}
+            >
+              <Trash2 size={13} />
+              Vider les cochés
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Rayon groups */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+        {RAYONS.map((rayon) => (
+          <RayonGroup
+            key={rayon}
+            rayon={rayon}
+            items={byRayon(rayon)}
+            onToggle={onToggle}
+            onRemove={onRemove}
+          />
+        ))}
+      </div>
+
+      {/* Quick add */}
+      <QuickAddForm onAdd={onAdd} />
+    </div>
+  )
+}
+
+// ─── NewRecipeModal ────────────────────────────────────────────────────────────
+
+function NewRecipeModal({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void
+  onCreate: (id: string) => void
+}) {
+  const addRecette = useCuisineStore((s) => s.addRecette)
+  const [nom, setNom] = useState('')
+  const [categorie, setCategorie] = useState<RecetteCategorie>('plat')
+  const [tempsPreparation, setTempsPreparation] = useState(30)
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 14,
+    padding: '10px 14px',
+    borderRadius: 'var(--r-lg)',
+    border: '1px solid var(--paper-2)',
+    background: 'var(--paper)',
+    color: 'var(--ink)',
+    outline: 'none',
+    width: '100%',
+    boxSizing: 'border-box',
   }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!nom.trim()) return
-    onSave({ nom: nom.trim(), categorie, tempsPreparation, favori, lien: lien.trim() || undefined, image, ingredientIds })
-    onClose()
+    const newRecette = addRecette({
+      nom: nom.trim(),
+      categorie,
+      tempsPreparation,
+      favori: false,
+      ingredientIds: [],
+    })
+    onCreate(newRecette.id)
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        zIndex: 50,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: 24,
+        background: 'color-mix(in srgb, var(--ink) 40%, transparent)',
+        animation: 'cuisine-fade-in 180ms var(--ease)',
+      }}
+    >
       <form
-        onSubmit={handleSubmit}
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl flex flex-col gap-4"
+        onSubmit={handleSubmit}
+        style={{
+          background: 'var(--paper-1)',
+          border: '1px solid var(--paper-2)',
+          borderRadius: 'var(--r-xl)',
+          padding: '28px 32px',
+          width: '100%',
+          maxWidth: 480,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 20,
+          boxShadow: 'var(--shadow-3)',
+          animation: 'cuisine-section-in 220ms var(--ease)',
+        }}
       >
-        <h2 className="text-base font-semibold text-zinc-100">
-          {initial ? 'Modifier la recette' : 'Nouvelle recette'}
-        </h2>
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)',
+            fontSize: 22,
+            fontWeight: 400,
+            color: 'var(--ink)',
+            margin: 0,
+          }}>
+            Nouvelle recette
+          </h2>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--ink-3)',
+              display: 'flex',
+            }}
+          >
+            <X size={18} />
+          </button>
+        </div>
 
         {/* Nom */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-zinc-500">Nom</label>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+            Nom *
+          </label>
           <input
             autoFocus
             value={nom}
             onChange={(e) => setNom(e.target.value)}
             placeholder="ex. Risotto aux champignons"
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-colors"
+            style={inputStyle}
           />
         </div>
 
-        {/* Catégorie + Temps */}
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-zinc-500">Catégorie</label>
+        {/* Categorie + Temps */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+              Type
+            </label>
             <select
               value={categorie}
               onChange={(e) => setCategorie(e.target.value as RecetteCategorie)}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-colors"
+              style={inputStyle}
             >
-              {RECETTE_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
+              {RECIPE_TYPES.filter((t) => t !== 'Toutes').map((t) => (
+                <option key={t} value={DISPLAY_TO_CATEGORIE[t] ?? t.toLowerCase()}>
+                  {t}
+                </option>
               ))}
             </select>
           </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-zinc-500">Temps de préparation (min)</label>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+              Temps (min)
+            </label>
             <input
               type="number"
               min={1}
               value={tempsPreparation}
               onChange={(e) => setTempsPreparation(Math.max(1, parseInt(e.target.value) || 1))}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-colors"
+              style={inputStyle}
             />
-          </div>
-        </div>
-
-        {/* Lien */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-zinc-500">Lien (optionnel)</label>
-          <input
-            value={lien}
-            onChange={(e) => setLien(e.target.value)}
-            placeholder="https://..."
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-colors"
-          />
-        </div>
-
-        {/* Favori */}
-        <label className="flex items-center gap-2.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={favori}
-            onChange={(e) => setFavori(e.target.checked)}
-            className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 accent-teal-500"
-          />
-          <span className="text-sm text-zinc-400">Marquer comme favori ⭐</span>
-        </label>
-
-        {/* Image */}
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-zinc-500">Image (optionnel)</label>
-          <input
-            ref={imageInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImageFile(f) }}
-          />
-          {image ? (
-            <div className="relative rounded-xl overflow-hidden">
-              <img src={image} alt="aperçu" className="w-full h-32 object-cover" />
-              <button
-                type="button"
-                onClick={() => setImage(undefined)}
-                className="absolute top-2 right-2 rounded-lg bg-zinc-950/70 px-2.5 py-1 text-xs text-zinc-300 hover:bg-zinc-950 transition-colors"
-              >
-                Supprimer
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => imageInputRef.current?.click()}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files?.[0]; if (f) handleImageFile(f) }}
-              className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-zinc-700 bg-zinc-800/40 py-6 text-zinc-500 hover:border-zinc-600 hover:text-zinc-400 hover:bg-zinc-800/60 transition-colors cursor-pointer"
-            >
-              <span className="text-2xl">📷</span>
-              <span className="text-xs">Cliquer ou glisser une image</span>
-            </button>
-          )}
-        </div>
-
-        {/* Ingrédients */}
-        <div className="flex flex-col gap-2">
-          <label className="text-xs text-zinc-500">
-            Ingrédients{ingredientIds.length > 0 ? ` (${ingredientIds.length})` : ''}
-          </label>
-
-          {/* Chips sélectionnés */}
-          {ingredientIds.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {ingredientIds.map((id) => {
-                const ing = allIngredients.find((i) => i.id === id)
-                if (!ing) return null
-                return (
-                  <span
-                    key={id}
-                    className="inline-flex items-center gap-1 rounded-md bg-teal-500/15 border border-teal-500/30 px-2 py-0.5 text-xs text-teal-400"
-                  >
-                    {catIngredient(ing.categorie).icon} {ing.nom}
-                    <button
-                      type="button"
-                      onClick={() => removeFromSelection(id)}
-                      className="ml-0.5 text-teal-600 hover:text-teal-300 transition-colors leading-none"
-                    >
-                      ×
-                    </button>
-                  </span>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Input autocomplete */}
-          <div className="relative">
-            <input
-              ref={ingInputRef}
-              value={ingQuery}
-              onChange={(e) => { setIngQuery(e.target.value); setShowDropdown(true) }}
-              onKeyDown={handleIngKeyDown}
-              onFocus={() => { if (ingQuery.trim()) setShowDropdown(true) }}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
-              placeholder="Rechercher ou créer un ingrédient…"
-              className="w-full rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-colors"
-            />
-            {showDropdown && ingQuery.trim() && (suggestions.length > 0 || !hasExactMatch) && (
-              <div className="absolute top-full left-0 right-0 z-10 mt-1 rounded-lg border border-zinc-700 bg-zinc-900 shadow-xl overflow-hidden">
-                {/* Ingrédients existants matchant la query */}
-                {suggestions.slice(0, 6).map((i) => (
-                  <button
-                    key={i.id}
-                    type="button"
-                    onMouseDown={() => addToSelection(i.id)}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
-                  >
-                    <span className="text-base">{catIngredient(i.categorie).icon}</span>
-                    <span className="flex-1 text-left">{i.nom}</span>
-                    <span className="text-[11px] text-zinc-600">{catIngredient(i.categorie).label}</span>
-                  </button>
-                ))}
-                {/* Option créer — toujours présente sauf si exact match */}
-                {!hasExactMatch && (
-                  <button
-                    type="button"
-                    onMouseDown={createAndAdd}
-                    className={[
-                      'flex w-full items-center gap-2 px-3 py-2 text-sm text-teal-400 hover:bg-zinc-800 transition-colors',
-                      suggestions.length > 0 ? 'border-t border-zinc-700/50' : '',
-                    ].join(' ')}
-                  >
-                    <span className="text-base">+</span>
-                    <span>Créer « {ingQuery.trim()} »</span>
-                  </button>
-                )}
-              </div>
-            )}
           </div>
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-2 pt-1">
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              padding: '9px 18px',
+              borderRadius: 'var(--r-lg)',
+              background: 'transparent',
+              color: 'var(--ink-3)',
+              border: '1px solid var(--ink-4)',
+              cursor: 'pointer',
+            }}
           >
             Annuler
           </button>
           <button
             type="submit"
             disabled={!nom.trim()}
-            className="rounded-lg bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 13,
+              fontWeight: 500,
+              padding: '9px 18px',
+              borderRadius: 'var(--r-lg)',
+              background: 'var(--terra)',
+              color: 'var(--paper-1)',
+              border: 'none',
+              cursor: nom.trim() ? 'pointer' : 'not-allowed',
+              opacity: nom.trim() ? 1 : 0.4,
+            }}
           >
-            {initial ? 'Mettre à jour' : 'Créer'}
+            Créer la recette
           </button>
         </div>
       </form>
@@ -370,605 +1525,179 @@ function ModalRecette({
   )
 }
 
-// ─── Modal Ingredient ─────────────────────────────────────────────────────────
+// ─── Toast ─────────────────────────────────────────────────────────────────────
 
-function ModalIngredient({
-  initial,
-  onSave,
-  onClose,
-}: {
-  initial?: Ingredient
-  onSave: (data: Omit<Ingredient, 'id'>) => void
-  onClose: () => void
-}) {
-  const [nom,       setNom]       = useState(initial?.nom       ?? '')
-  const [categorie, setCategorie] = useState<IngredientCategorie>(initial?.categorie ?? 'autre')
-  const [quantite,  setQuantite]  = useState(initial?.quantite  ?? '')
-  const [disponible, setDisponible] = useState(initial?.disponible ?? true)
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!nom.trim()) return
-    onSave({
-      nom:        nom.trim(),
-      categorie,
-      quantite:   quantite.trim() || undefined,
-      disponible,
-      recetteIds: initial?.recetteIds ?? [],
-    })
-    onClose()
-  }
+function Toast({ message, onDismiss }: { message: string; onDismiss: () => void }) {
+  useEffect(() => {
+    const t = setTimeout(onDismiss, 2600)
+    return () => clearTimeout(t)
+  }, [onDismiss])
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-zinc-950/80 backdrop-blur-sm" />
-      <form
-        onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-sm rounded-2xl border border-zinc-800 bg-zinc-900 p-6 shadow-2xl flex flex-col gap-4"
-      >
-        <h2 className="text-base font-semibold text-zinc-100">
-          {initial ? 'Modifier l\'ingrédient' : 'Nouvel ingrédient'}
-        </h2>
-
-        <div className="flex flex-col gap-1.5">
-          <label className="text-xs text-zinc-500">Nom</label>
-          <input
-            autoFocus
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-            placeholder="ex. Tomates cerises"
-            className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-teal-500/50 focus:ring-1 focus:ring-teal-500/20 transition-colors"
-          />
-        </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-zinc-500">Catégorie</label>
-            <select
-              value={categorie}
-              onChange={(e) => setCategorie(e.target.value as IngredientCategorie)}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 outline-none focus:border-teal-500/50 transition-colors"
-            >
-              {INGREDIENT_CATEGORIES.map((c) => (
-                <option key={c.value} value={c.value}>{c.icon} {c.label}</option>
-              ))}
-            </select>
-          </div>
-          <div className="flex flex-col gap-1.5">
-            <label className="text-xs text-zinc-500">Quantité (optionnel)</label>
-            <input
-              value={quantite}
-              onChange={(e) => setQuantite(e.target.value)}
-              placeholder="ex. 200g"
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2 text-sm text-zinc-100 placeholder:text-zinc-600 outline-none focus:border-teal-500/50 transition-colors"
-            />
-          </div>
-        </div>
-
-        <label className="flex items-center gap-2.5 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            checked={disponible}
-            onChange={(e) => setDisponible(e.target.checked)}
-            className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 accent-teal-500"
-          />
-          <span className="text-sm text-zinc-400">Disponible à la maison</span>
-        </label>
-
-        <div className="flex justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-4 py-2 text-sm text-zinc-500 hover:text-zinc-300 transition-colors"
-          >
-            Annuler
-          </button>
-          <button
-            type="submit"
-            disabled={!nom.trim()}
-            className="rounded-lg bg-teal-500 px-4 py-2 text-sm font-medium text-zinc-950 hover:bg-teal-400 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-          >
-            {initial ? 'Mettre à jour' : 'Créer'}
-          </button>
-        </div>
-      </form>
+    <div style={{
+      position: 'fixed',
+      bottom: 28,
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 60,
+      background: 'var(--ink)',
+      color: 'var(--paper-1)',
+      borderRadius: 'var(--r-lg)',
+      padding: '10px 18px',
+      fontFamily: 'var(--font-sans)',
+      fontSize: 13,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 8,
+      boxShadow: 'var(--shadow-3)',
+      animation: 'cuisine-fade-in 200ms var(--ease)',
+      whiteSpace: 'nowrap',
+    }}>
+      <Check size={14} color="var(--sage)" strokeWidth={2.5} />
+      {message}
     </div>
   )
 }
 
-// ─── Vue Recettes ─────────────────────────────────────────────────────────────
+// ─── CuisinePage ───────────────────────────────────────────────────────────────
 
-function VueRecettes() {
-  const recettes          = useCuisineStore((s) => s.recettes)
-  const ingredients       = useCuisineStore((s) => s.ingredients)
-  const addRecette        = useCuisineStore((s) => s.addRecette)
-  const updateRecette     = useCuisineStore((s) => s.updateRecette)
-  const deleteRecette     = useCuisineStore((s) => s.deleteRecette)
-  const addIngredient     = useCuisineStore((s) => s.addIngredient)
-  const updateIngredient  = useCuisineStore((s) => s.updateIngredient)
-  const deleteIngredient  = useCuisineStore((s) => s.deleteIngredient)
-  const toggleDisponible  = useCuisineStore((s) => s.toggleDisponible)
-  const listeCourses      = useCuisineStore((s) => s.listeCourses)
-  const addToListeCourses = useCuisineStore((s) => s.addToListeCourses)
-  const removeFromLC      = useCuisineStore((s) => s.removeFromListeCourses)
+export function CuisinePage() {
+  const recettes = useCuisineStore((s) => s.recettes)
+  const ingredients = useCuisineStore((s) => s.ingredients)
+  const updateRecette = useCuisineStore((s) => s.updateRecette)
 
-  const [filterCat,   setFilterCat]   = useState<RecetteCategorie | 'all'>('all')
-  const [favoriOnly,  setFavoriOnly]  = useState(false)
-  const [showModal,   setShowModal]   = useState(false)
-  const [editRecette, setEditRecette] = useState<Recette | undefined>()
-  const [showIngModal, setShowIngModal] = useState(false)
-  const [editIngr,    setEditIngr]    = useState<Ingredient | undefined>()
-  const [activePanel, setActivePanel] = useState<'recettes' | 'ingredients'>('recettes')
+  const [section, setSection] = useState<'recettes' | 'courses'>('recettes')
+  const [openRecetteId, setOpenRecetteId] = useState<string | null>(null)
+  const [toast, setToast] = useState<string | null>(null)
+  const [showNewModal, setShowNewModal] = useState(false)
+  const [courses, setCourses] = useState<CourseItem[]>(() => loadCourses())
 
-  const filtered = useMemo(() => {
-    return recettes.filter((r) => {
-      if (filterCat !== 'all' && r.categorie !== filterCat) return false
-      if (favoriOnly && !r.favori) return false
-      return true
-    })
-  }, [recettes, filterCat, favoriOnly])
+  // Persist courses to localStorage
+  useEffect(() => {
+    try { localStorage.setItem(COURSES_LS_KEY, JSON.stringify(courses)) } catch {}
+  }, [courses])
 
-  const openNew    = () => { setEditRecette(undefined); setShowModal(true) }
-  const openEdit   = (r: Recette) => { setEditRecette(r); setShowModal(true) }
-  const closeModal = () => { setEditRecette(undefined); setShowModal(false) }
+  const openRecette = recettes.find((r) => r.id === openRecetteId) ?? null
 
-  const handleSaveRecette = (data: Omit<Recette, 'id'>) => {
-    if (editRecette) updateRecette(editRecette.id, data)
-    else             addRecette(data)
-    setEditRecette(undefined)
-    setShowModal(false)
-  }
-
-  const openNewIng    = () => { setEditIngr(undefined); setShowIngModal(true) }
-  const openEditIng   = (i: Ingredient) => { setEditIngr(i); setShowIngModal(true) }
-  const closeIngModal = () => { setEditIngr(undefined); setShowIngModal(false) }
-
-  const handleSaveIngredient = (data: Omit<Ingredient, 'id'>) => {
-    if (editIngr) updateIngredient(editIngr.id, data)
-    else          addIngredient(data)
-    setEditIngr(undefined)
-    setShowIngModal(false)
-  }
-
-  return (
-    <div className="flex flex-col gap-6">
-
-      {/* ── Sous-onglets ──────────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between">
-        <div className="flex gap-1 rounded-lg bg-zinc-900 p-0.5">
-          {(['recettes', 'ingredients'] as const).map((p) => (
-            <button
-              key={p}
-              onClick={() => setActivePanel(p)}
-              className={[
-                'rounded-md px-3 py-1 text-xs font-medium transition-all outline-none',
-                activePanel === p ? 'bg-zinc-800 text-zinc-200' : 'text-zinc-600 hover:text-zinc-400',
-              ].join(' ')}
-            >
-              {p === 'recettes' ? 'Recettes' : 'Ingrédients'}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={activePanel === 'recettes' ? openNew : openNewIng}
-          className="flex items-center gap-1.5 rounded-lg bg-teal-500/15 border border-teal-500/25 px-3 py-1.5 text-xs font-medium text-teal-400 hover:bg-teal-500/25 transition-colors"
-        >
-          <span>+</span>
-          {activePanel === 'recettes' ? 'Recette' : 'Ingrédient'}
-        </button>
-      </div>
-
-      {/* ── Panel Recettes ───────────────────────────────────────────────────── */}
-      {activePanel === 'recettes' && (
-        <div className="flex flex-col gap-4">
-          {/* Filtres */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setFilterCat('all')}
-              className={[
-                'rounded-lg px-3 py-1 text-xs font-medium border transition-colors',
-                filterCat === 'all'
-                  ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
-                  : 'bg-transparent border-zinc-800 text-zinc-600 hover:border-zinc-700 hover:text-zinc-400',
-              ].join(' ')}
-            >
-              Toutes
-            </button>
-            {RECETTE_CATEGORIES.map((c) => (
-              <button
-                key={c.value}
-                onClick={() => setFilterCat(c.value)}
-                className={[
-                  'rounded-lg px-3 py-1 text-xs font-medium border transition-colors',
-                  filterCat === c.value
-                    ? 'bg-zinc-800 border-zinc-700 text-zinc-200'
-                    : 'bg-transparent border-zinc-800 text-zinc-600 hover:border-zinc-700 hover:text-zinc-400',
-                ].join(' ')}
-              >
-                {c.icon} {c.label}
-              </button>
-            ))}
-            <button
-              onClick={() => setFavoriOnly((v) => !v)}
-              className={[
-                'rounded-lg px-3 py-1 text-xs font-medium border transition-colors ml-auto',
-                favoriOnly
-                  ? 'bg-amber-500/15 border-amber-500/30 text-amber-400'
-                  : 'bg-transparent border-zinc-800 text-zinc-600 hover:border-zinc-700 hover:text-zinc-400',
-              ].join(' ')}
-            >
-              ⭐ Favoris
-            </button>
-          </div>
-
-          {/* Liste */}
-          {filtered.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="text-3xl">🍽️</span>
-              <p className="text-sm text-zinc-500">Aucune recette{filterCat !== 'all' ? ' dans cette catégorie' : ''}.</p>
-              <button onClick={openNew} className="text-xs text-teal-400 hover:text-teal-300 transition-colors">
-                Ajouter la première →
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {filtered.map((r) => {
-                const cat   = catRecette(r.categorie)
-                const inLC  = listeCourses.includes(r.id)
-                const ingCount = r.ingredientIds.length
-                return (
-                  <div
-                    key={r.id}
-                    className="group relative rounded-xl border border-zinc-800 bg-zinc-900/60 hover:border-zinc-700 transition-colors flex flex-col overflow-hidden"
-                  >
-                    {/* Image cover */}
-                    {r.image && (
-                      <img
-                        src={r.image}
-                        alt={r.nom}
-                        className="w-full h-[120px] object-cover"
-                      />
-                    )}
-                    {/* Content */}
-                    <div className="flex flex-col gap-3 p-4">
-                    {/* Header */}
-                    <div className="flex items-start gap-3">
-                      <span className="text-xl shrink-0 mt-0.5">{cat.icon}</span>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h3 className="text-sm font-medium text-zinc-100 truncate">{r.nom}</h3>
-                          {r.favori && <span className="text-xs text-amber-400">⭐</span>}
-                        </div>
-                        <p className="text-xs text-zinc-600 mt-0.5">{cat.label}</p>
-                      </div>
-                      <div className="flex items-center gap-1 shrink-0">
-                        {/* Favori toggle */}
-                        <button
-                          onClick={() => updateRecette(r.id, { favori: !r.favori })}
-                          className="rounded p-1 text-zinc-600 hover:text-amber-400 transition-colors opacity-0 group-hover:opacity-100"
-                          title={r.favori ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-                        >
-                          {r.favori ? '★' : '☆'}
-                        </button>
-                        {/* Edit */}
-                        <button
-                          onClick={() => openEdit(r)}
-                          className="rounded p-1 text-zinc-600 hover:text-zinc-300 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          ✎
-                        </button>
-                        {/* Delete */}
-                        <button
-                          onClick={() => { if (confirm(`Supprimer « ${r.nom} » ?`)) deleteRecette(r.id) }}
-                          className="rounded p-1 text-zinc-600 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Badges */}
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 border border-zinc-700/50">
-                        ⏱ {fmtTemps(r.tempsPreparation)}
-                      </span>
-                      {ingCount > 0 && (
-                        <span className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] text-zinc-400 border border-zinc-700/50">
-                          🧂 {ingCount} ingrédient{ingCount > 1 ? 's' : ''}
-                        </span>
-                      )}
-                      {r.lien && (
-                        <a
-                          href={r.lien}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md bg-zinc-800 px-2 py-0.5 text-[11px] text-teal-500 border border-zinc-700/50 hover:text-teal-400 transition-colors"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          ↗ Recette
-                        </a>
-                      )}
-                    </div>
-
-                    {/* Ajouter à la liste de courses */}
-                    <button
-                      onClick={() => inLC ? removeFromLC(r.id) : addToListeCourses(r.id)}
-                      className={[
-                        'w-full rounded-lg border px-3 py-1.5 text-xs font-medium transition-colors',
-                        inLC
-                          ? 'border-teal-500/30 bg-teal-500/10 text-teal-400 hover:bg-teal-500/20'
-                          : 'border-zinc-700 bg-zinc-800/50 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300',
-                      ].join(' ')}
-                    >
-                      {inLC ? '✓ Dans la liste de courses' : '+ Ajouter à la liste de courses'}
-                    </button>
-                    </div>{/* /Content */}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Panel Ingrédients ────────────────────────────────────────────────── */}
-      {activePanel === 'ingredients' && (
-        <div className="flex flex-col gap-3">
-          {ingredients.length === 0 ? (
-            <div className="flex flex-col items-center gap-3 py-16 text-center">
-              <span className="text-3xl">🧂</span>
-              <p className="text-sm text-zinc-500">Aucun ingrédient enregistré.</p>
-              <button onClick={openNewIng} className="text-xs text-teal-400 hover:text-teal-300 transition-colors">
-                Ajouter le premier →
-              </button>
-            </div>
-          ) : (
-            <div className="grid gap-2 sm:grid-cols-2">
-              {ingredients.map((i) => {
-                const cat = catIngredient(i.categorie)
-                return (
-                  <div
-                    key={i.id}
-                    className="group flex items-center gap-3 rounded-xl border border-zinc-800 bg-zinc-900/60 px-4 py-3 hover:border-zinc-700 transition-colors"
-                  >
-                    <span className="text-lg shrink-0">{cat.icon}</span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-zinc-200 truncate">{i.nom}</p>
-                      <p className="text-[11px] text-zinc-600">
-                        {cat.label}{i.quantite ? ` · ${i.quantite}` : ''}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => toggleDisponible(i.id)}
-                      className={[
-                        'shrink-0 rounded-md px-2 py-0.5 text-[10px] font-medium border cursor-pointer transition-colors',
-                        i.disponible
-                          ? 'bg-teal-500/10 border-teal-500/25 text-teal-500 hover:bg-teal-500/20'
-                          : 'bg-zinc-800 border-zinc-700 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400',
-                      ].join(' ')}
-                    >
-                      {i.disponible ? 'Dispo' : 'Manquant'}
-                    </button>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <button
-                        onClick={() => openEditIng(i)}
-                        className="rounded p-1 text-zinc-600 hover:text-zinc-300 transition-colors"
-                      >
-                        ✎
-                      </button>
-                      <button
-                        onClick={() => { if (confirm(`Supprimer « ${i.nom} » ?`)) deleteIngredient(i.id) }}
-                        className="rounded p-1 text-zinc-600 hover:text-red-400 transition-colors"
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Modals */}
-      {showModal && (
-        <ModalRecette
-          initial={editRecette}
-          allIngredients={ingredients}
-          onSave={handleSaveRecette}
-          onClose={closeModal}
-        />
-      )}
-      {showIngModal && (
-        <ModalIngredient
-          initial={editIngr}
-          onSave={handleSaveIngredient}
-          onClose={closeIngModal}
-        />
-      )}
-    </div>
-  )
-}
-
-// ─── Vue Liste de courses ─────────────────────────────────────────────────────
-
-function VueListeCourses() {
-  const recettes             = useCuisineStore((s) => s.recettes)
-  const ingredients          = useCuisineStore((s) => s.ingredients)
-  const listeCourses         = useCuisineStore((s) => s.listeCourses)
-  const removeFromLC         = useCuisineStore((s) => s.removeFromListeCourses)
-  const clearListeCourses    = useCuisineStore((s) => s.clearListeCourses)
-  const toggleDisponible     = useCuisineStore((s) => s.toggleDisponible)
-  const generateListeCourses = useCuisineStore((s) => s.generateListeCourses)
-
-  const planifiees = useMemo(
-    () => recettes.filter((r) => listeCourses.includes(r.id)),
-    [recettes, listeCourses],
+  const toggleFavorite = useCallback(
+    (id: string) => updateRecette(id, { favori: !recettes.find((r) => r.id === id)?.favori }),
+    [recettes, updateRecette],
   )
 
-  // Agréger tous les ingrédients manquants des recettes planifiées
-  const manquants = useMemo(() => {
-    const ids = new Set<string>()
-    listeCourses.forEach((rId) => {
-      generateListeCourses(rId).forEach((i) => ids.add(i.id))
-    })
-    return ingredients.filter((i) => ids.has(i.id))
-  }, [listeCourses, ingredients, generateListeCourses])
+  const handleSetImage = useCallback(
+    (id: string, src: string) => setRecipeImage(id, src, updateRecette),
+    [updateRecette],
+  )
 
-  // Grouper par catégorie
-  const grouped = useMemo(() => {
-    const map = new Map<IngredientCategorie, Ingredient[]>()
-    manquants.forEach((i) => {
-      const list = map.get(i.categorie) ?? []
-      list.push(i)
-      map.set(i.categorie, list)
-    })
-    return map
-  }, [manquants])
+  const handleRemoveImage = useCallback(
+    (id: string) => removeRecipeImage(id, updateRecette),
+    [updateRecette],
+  )
 
-  const total    = manquants.length
-  const achetes  = ingredients.filter((i) => manquants.some((m) => m.id === i.id) && i.disponible).length
+  const addToCourses = useCallback(
+    (recetteNom: string, newItems: CourseItem[]) => {
+      const existingNames = new Set(courses.map((i) => i.name.trim().toLowerCase()))
+      const fresh = newItems.filter((i) => !existingNames.has(i.name.trim().toLowerCase()))
+      if (fresh.length === 0) {
+        setToast('Tout est déjà dans la liste.')
+        return
+      }
+      setCourses((prev) => [...prev, ...fresh])
+      setToast(`${fresh.length} ingrédient${fresh.length > 1 ? 's' : ''} ajouté${fresh.length > 1 ? 's' : ''} à la liste.`)
+    },
+    [courses],
+  )
+
+  const toggleCourse = useCallback(
+    (id: string) => setCourses((prev) => prev.map((i) => i.id === id ? { ...i, checked: !i.checked } : i)),
+    [],
+  )
+
+  const clearChecked = useCallback(
+    () => setCourses((prev) => prev.filter((i) => !i.checked)),
+    [],
+  )
+
+  const addCourse = useCallback(
+    (data: { name: string; qty: string; rayon: string }) => {
+      const item: CourseItem = {
+        id: crypto.randomUUID(),
+        name: data.name,
+        qty: data.qty || '—',
+        rayon: data.rayon || 'Autre',
+        checked: false,
+        fromRecipe: null,
+      }
+      setCourses((prev) => [...prev, item])
+    },
+    [],
+  )
+
+  const removeCourse = useCallback(
+    (id: string) => setCourses((prev) => prev.filter((i) => i.id !== id)),
+    [],
+  )
+
+  const checkedCount = courses.filter((i) => i.checked).length
 
   return (
-    <div className="flex flex-col gap-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
+      {/* Section tabs */}
+      <SectionTabs
+        section={section}
+        recettesCount={recettes.length}
+        coursesChecked={checkedCount}
+        coursesTotal={courses.length}
+        onChange={setSection}
+      />
 
-      {/* Recettes planifiées */}
-      <div className="flex flex-col gap-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-medium text-zinc-400">
-            Recettes planifiées ({planifiees.length})
-          </h2>
-          {listeCourses.length > 0 && (
-            <button
-              onClick={() => { if (confirm('Vider la liste de courses ?')) clearListeCourses() }}
-              className="text-xs text-zinc-600 hover:text-red-400 transition-colors"
-            >
-              Vider la liste
-            </button>
-          )}
-        </div>
-
-        {planifiees.length === 0 ? (
-          <p className="text-sm text-zinc-600 py-4 text-center">
-            Aucune recette planifiée — va dans l'onglet Recettes et clique sur « + Ajouter à la liste ».
-          </p>
+      {/* Content */}
+      <div style={{ padding: '40px 0' }}>
+        {section === 'recettes' ? (
+          <RecettesView
+            recettes={recettes}
+            onOpen={setOpenRecetteId}
+            onToggleFavorite={toggleFavorite}
+            onSetImage={handleSetImage}
+            onRemoveImage={handleRemoveImage}
+            onNewRecette={() => setShowNewModal(true)}
+          />
         ) : (
-          <div className="flex flex-wrap gap-2">
-            {planifiees.map((r) => {
-              const cat = catRecette(r.categorie)
-              return (
-                <div
-                  key={r.id}
-                  className="flex items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-900/60 px-3 py-2"
-                >
-                  <span className="text-sm">{cat.icon}</span>
-                  <span className="text-sm text-zinc-300">{r.nom}</span>
-                  <button
-                    onClick={() => removeFromLC(r.id)}
-                    className="text-zinc-600 hover:text-red-400 transition-colors text-xs"
-                  >
-                    ✕
-                  </button>
-                </div>
-              )
-            })}
-          </div>
+          <ListeDeCoursesView
+            items={courses}
+            onToggle={toggleCourse}
+            onClearChecked={clearChecked}
+            onAdd={addCourse}
+            onRemove={removeCourse}
+          />
         )}
       </div>
 
-      {/* Séparateur */}
-      {listeCourses.length > 0 && <div className="border-t border-zinc-800/60" />}
-
-      {/* Ingrédients à acheter */}
-      {listeCourses.length > 0 && (
-        <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-medium text-zinc-400">
-              À acheter
-            </h2>
-            {total > 0 && (
-              <span className="text-xs text-zinc-600 tabular-nums">
-                {achetes}/{total} cochés
-              </span>
-            )}
-          </div>
-
-          {total === 0 ? (
-            <div className="flex flex-col items-center gap-2 py-10 text-center">
-              <span className="text-3xl">✅</span>
-              <p className="text-sm text-zinc-500">Tous les ingrédients sont disponibles !</p>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              {Array.from(grouped.entries()).map(([categorie, items]) => {
-                const catMeta = catIngredient(categorie)
-                return (
-                  <div key={categorie} className="flex flex-col gap-2">
-                    <p className="text-xs font-semibold uppercase tracking-wider text-zinc-600 flex items-center gap-1.5">
-                      <span>{catMeta.icon}</span>
-                      {catMeta.label}
-                    </p>
-                    {items.map((i) => (
-                      <label
-                        key={i.id}
-                        className={[
-                          'flex items-center gap-3 rounded-xl border px-4 py-3 cursor-pointer transition-colors select-none',
-                          i.disponible
-                            ? 'border-zinc-800/50 bg-zinc-900/30 opacity-50'
-                            : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700',
-                        ].join(' ')}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={i.disponible}
-                          onChange={() => toggleDisponible(i.id)}
-                          className="h-4 w-4 rounded border-zinc-600 bg-zinc-800 accent-teal-500 shrink-0"
-                        />
-                        <span className={[
-                          'flex-1 text-sm transition-colors',
-                          i.disponible ? 'line-through text-zinc-600' : 'text-zinc-200',
-                        ].join(' ')}>
-                          {i.nom}
-                        </span>
-                        {i.quantite && (
-                          <span className="text-xs text-zinc-600 shrink-0">{i.quantite}</span>
-                        )}
-                      </label>
-                    ))}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
+      {/* Recipe detail panel */}
+      {openRecette && (
+        <RecipeDetailPanel
+          recette={openRecette}
+          allIngredients={ingredients}
+          courses={courses}
+          onClose={() => setOpenRecetteId(null)}
+          onToggleFavorite={() => toggleFavorite(openRecette.id)}
+          onAddToCourses={addToCourses}
+        />
       )}
-    </div>
-  )
-}
 
-// ─── Page principale ──────────────────────────────────────────────────────────
+      {/* New recipe modal */}
+      {showNewModal && (
+        <NewRecipeModal
+          onClose={() => setShowNewModal(false)}
+          onCreate={(id) => {
+            setShowNewModal(false)
+            setOpenRecetteId(id)
+          }}
+        />
+      )}
 
-export function CuisinePage() {
-  const [tab, setTab] = useState<'recettes' | 'courses'>('recettes')
-
-  return (
-    <div className="flex flex-col gap-6">
-      {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold text-zinc-100 flex items-center gap-2">
-          <span>🍳</span> Cuisine
-        </h1>
-        <p className="text-sm text-zinc-500">Recettes, ingrédients et liste de courses.</p>
-      </div>
-
-      {/* Tabs */}
-      <TabBar active={tab} onChange={setTab} />
-
-      {/* Content */}
-      {tab === 'recettes' ? <VueRecettes /> : <VueListeCourses />}
+      {/* Toast */}
+      {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   )
 }
