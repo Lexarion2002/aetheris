@@ -1,6 +1,6 @@
 import { useState, useMemo, useRef } from 'react'
 import type { CSSProperties } from 'react'
-import { Layers, Clock3, Plus, ChevronDown, Edit3, CheckCircle2, RotateCcw, Trash2 } from 'lucide-react'
+import { Layers, Clock3, Plus, ChevronDown, Edit3, CheckCircle2, RotateCcw, Trash2, Sparkles } from 'lucide-react'
 import { useStore } from '../store'
 import { getDomainIcon } from '../utils/domainColors'
 import { ObjectiveFormModal } from '../components/ObjectiveFormModal'
@@ -9,7 +9,143 @@ import {
   fmtLong, daysUntil, relativeDate, urgencyBucket,
   URGENCY_ORDER, URGENCY_LABEL, type UrgencyBucket,
 } from '../utils/objectiveUtils'
+import { hasApiKey, suggestMilestoneRecovery, type MilestoneRecovery } from '../lib/aiService'
 import type { Objective, Milestone } from '../types'
+
+// ─── KitRecoveryBanner — suggestion de reprise pour un objectif en retard ────
+
+function KitRecoveryBanner({ obj }: { obj: Objective }) {
+  const domains       = useStore(s => s.domains)
+  const allMilestones = useStore(s => s.milestones)
+  const addTaskAction = useStore(s => s.addTask)
+  const today         = new Date().toISOString().split('T')[0]
+  const domain        = domains.find(d => d.id === obj.domainId)
+
+  const [loading, setLoading]    = useState(false)
+  const [suggestion, setSuggestion] = useState<MilestoneRecovery | null>(null)
+  const [error, setError]        = useState<string | null>(null)
+  const [accepted, setAccepted]  = useState(false)
+
+  const fetchSuggestion = async () => {
+    setLoading(true); setError(null)
+    try {
+      const ms = allMilestones.filter(m => m.objectiveId === obj.id)
+      const result = await suggestMilestoneRecovery(obj, ms, domain)
+      setSuggestion(result)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur Kit')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const accept = () => {
+    if (!suggestion) return
+    addTaskAction({
+      domainId:     obj.domainId,
+      title:        suggestion.nextAction,
+      status:       'todo',
+      priority:     'high',
+      timeEstimate: suggestion.timeEstimate,
+      dueDate:      null,
+      plannedDate:  today,
+      objectiveId:  obj.id,
+    })
+    setAccepted(true)
+  }
+
+  if (accepted) {
+    return (
+      <div style={{
+        padding: '8px 14px', borderTop: '1px solid var(--paper-2)',
+        fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic',
+        color: 'var(--sage-deep)', background: 'var(--sage-soft)',
+      }}>
+        ✓ Tâche planifiée pour aujourd'hui — bon courage.
+      </div>
+    )
+  }
+
+  if (!suggestion && !loading && !error) {
+    return (
+      <div style={{ padding: '8px 14px', borderTop: '1px solid var(--paper-2)', background: 'var(--terra-soft)' }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); void fetchSuggestion() }}
+          style={{
+            fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+            color: 'var(--terra-deep)', background: 'transparent',
+            border: 0, cursor: 'pointer', padding: 0,
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          <Sparkles size={12} />
+          Demander à Kit comment reprendre
+        </button>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{
+      padding: '10px 14px', borderTop: '1px solid var(--paper-2)',
+      background: 'var(--terra-soft)',
+      display: 'flex', flexDirection: 'column', gap: 8,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+        <Sparkles size={12} style={{ color: 'var(--terra-deep)' }} />
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--terra-deep)' }}>
+          kit suggère
+        </span>
+      </div>
+      {loading && (
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic', color: 'var(--ink-2)' }}>
+          réflexion…
+        </span>
+      )}
+      {error && (
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
+          {error}
+        </span>
+      )}
+      {suggestion && (
+        <>
+          <div style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--ink)', lineHeight: 1.35 }}>
+            {suggestion.nextAction}
+          </div>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', color: 'var(--ink-2)', lineHeight: 1.4 }}>
+            {suggestion.reason}
+          </div>
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); accept() }}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+                background: 'var(--terra)', color: 'var(--paper-1)',
+                border: 0, borderRadius: 6, padding: '4px 12px', cursor: 'pointer',
+              }}
+            >
+              Reprendre aujourd'hui
+            </button>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+              {suggestion.timeEstimate}m
+            </span>
+            <button
+              onClick={(e) => { e.stopPropagation(); void fetchSuggestion() }}
+              disabled={loading}
+              style={{
+                marginLeft: 'auto',
+                fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--ink-3)',
+                background: 'transparent', border: 0, cursor: 'pointer', padding: 0,
+              }}
+            >
+              ↻
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
 
 // ─── Primitives visuels ────────────────────────────────────────────────────────
 
@@ -459,6 +595,9 @@ function ObjectiveCard({
             </div>
           </div>
         </button>
+
+        {/* ── Bandeau Kit pour objectifs en retard ── */}
+        {isOverdue && hasApiKey() && <KitRecoveryBanner obj={obj} />}
 
         {/* ── Corps déplié — jalons ── */}
         <div style={{

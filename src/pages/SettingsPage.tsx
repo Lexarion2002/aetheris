@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { getDomainIcon } from '../utils/domainColors'
+import { getApiKey, setApiKey } from '../lib/aiService'
 import type { DomainColor } from '../types'
 import type { AppTheme, AppLanguage, AetherisData } from '../store'
 
@@ -84,6 +85,14 @@ export function SettingsPage() {
 
   // Notifications
   const [notifDeadlines,  setNotifDeadlines]       = useState(false)
+
+  // Anthropic API key
+  const [apiKey,          setApiKeyLocal]          = useState('')
+  const [apiKeySaved,     setApiKeySaved]          = useState(false)
+  useEffect(() => {
+    const existing = getApiKey()
+    if (existing) setApiKeyLocal(existing)
+  }, [])
 
   // Import/export
   const [importStatus,    setImportStatus]         = useState<'idle' | 'success' | 'error'>('idle')
@@ -505,6 +514,43 @@ export function SettingsPage() {
               style={{ border: '1px solid var(--danger)', color: 'var(--danger)', background: 'transparent' }}>
               Réinitialiser
             </button>
+          )}
+        </div>
+      </Section>
+
+      {/* ── Kit (IA) ──────────────────────────────────────────────────────── */}
+      <Section title="Kit · l'intelligence d'Aetheris" description="Connecte une clé Anthropic pour que Kit propose tes tâches du jour, ton plan de semaine et te relance sur les objectifs en retard">
+        <div className="space-y-3">
+          <div>
+            <p style={rowLabel}>Clé API Anthropic</p>
+            <p style={rowSublabel}>
+              Récupère ta clé sur{' '}
+              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--terra)', textDecoration: 'underline' }}>
+                console.anthropic.com
+              </a>
+              {' '}— elle reste dans ton navigateur, jamais transmise ailleurs qu'à l'API.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <input
+              type="password"
+              value={apiKey}
+              onChange={(e) => { setApiKeyLocal(e.target.value); setApiKeySaved(false) }}
+              placeholder="sk-ant-…"
+              className={`flex-1 ${inputCls} px-3 py-2 text-sm font-mono`}
+              autoComplete="off"
+            />
+            <button
+              onClick={() => { setApiKey(apiKey); setApiKeySaved(true); setTimeout(() => setApiKeySaved(false), 2000) }}
+              className={actionBtn}
+            >
+              {apiKeySaved ? '✓ Enregistré' : 'Enregistrer'}
+            </button>
+          </div>
+          {!apiKey && (
+            <p className="text-xs italic" style={{ color: 'var(--fg-subtle)' }}>
+              Sans clé, les suggestions Kit sont désactivées — tout le reste d'Aetheris fonctionne normalement.
+            </p>
           )}
         </div>
       </Section>

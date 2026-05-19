@@ -2,11 +2,12 @@
 // Design éditorial : palette papier/encre, grille 7 colonnes, backlog, retards
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Target, ClockAlert, Plus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Target, ClockAlert, Plus, Sparkles, X } from 'lucide-react'
 import { useStore } from '../store'
 import { useTimerStore } from '../store/timerStore'
 import { TaskFormModal } from '../components/TaskFormModal'
 import { ObjectivesPage } from './ObjectivesPage'
+import { hasApiKey, generateWeekPlan, type WeekPlanItem } from '../lib/aiService'
 import type { Domain, Task, TimeSession } from '../types'
 import {
   getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
@@ -553,18 +554,212 @@ function Backlog({
   )
 }
 
+// ─── KitWeekPlanModal — modale du plan de semaine généré ─────────────────────
+
+function KitWeekPlanModal({
+  items, weekStart, domains, onAccept, onClose,
+}: {
+  items: WeekPlanItem[]
+  weekStart: string
+  domains: Domain[]
+  onAccept: (selected: WeekPlanItem[]) => void
+  onClose: () => void
+}) {
+  const [skipped, setSkipped] = useState<Set<number>>(new Set())
+
+  const toggle = (idx: number) => {
+    setSkipped(prev => {
+      const next = new Set(prev)
+      if (next.has(idx)) next.delete(idx)
+      else next.add(idx)
+      return next
+    })
+  }
+
+  const grouped = useMemo(() => {
+    const map = new Map<number, Array<WeekPlanItem & { idx: number }>>()
+    items.forEach((item, idx) => {
+      if (!map.has(item.dayOffset)) map.set(item.dayOffset, [])
+      map.get(item.dayOffset)!.push({ ...item, idx })
+    })
+    return [...map.entries()].sort(([a], [b]) => a - b)
+  }, [items])
+
+  const DAYS_LONG = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+  const dayDate = (offset: number) => {
+    const d = new Date(weekStart + 'T00:00:00')
+    d.setDate(d.getDate() + offset)
+    return d.getDate()
+  }
+
+  const accepted = items.filter((_, idx) => !skipped.has(idx))
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(58,46,34,0.45)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        zIndex: 50, padding: '60px 20px 20px', overflowY: 'auto',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: 'var(--paper-1)', border: '1px solid var(--ink-4)',
+          borderRadius: 14, maxWidth: 720, width: '100%',
+          boxShadow: 'var(--shadow-2)', overflow: 'hidden',
+        }}
+      >
+        {/* Header */}
+        <div style={{ padding: '20px 24px', borderBottom: '1px solid var(--paper-2)', display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+              <Sparkles size={14} style={{ color: 'var(--terra)' }} />
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
+                plan de semaine
+              </span>
+            </div>
+            <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: 'var(--ink)', margin: 0, lineHeight: 1.2 }}>
+              Kit te propose {items.length} tâches.
+            </h2>
+            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 13, color: 'var(--ink-2)', margin: '4px 0 0' }}>
+              Décoche celles que tu veux écarter, puis valide.
+            </p>
+          </div>
+          <button onClick={onClose} style={{
+            background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', padding: 4,
+          }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Liste par jour */}
+        <div style={{ padding: '12px 24px 8px', maxHeight: 'calc(100vh - 260px)', overflowY: 'auto' }}>
+          {grouped.map(([offset, dayItems]) => (
+            <div key={offset} style={{ marginBottom: 16 }}>
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>
+                  {DAYS_LONG[offset]}
+                </span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+                  {dayDate(offset)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {dayItems.map(item => {
+                  const dom = domains.find(d => d.id === item.domainId)
+                  const isSkipped = skipped.has(item.idx)
+                  return (
+                    <label
+                      key={item.idx}
+                      style={{
+                        display: 'flex', alignItems: 'flex-start', gap: 10,
+                        padding: '8px 10px', borderRadius: 8,
+                        background: isSkipped ? 'transparent' : 'var(--paper)',
+                        border: '1px solid ' + (isSkipped ? 'transparent' : 'var(--paper-2)'),
+                        opacity: isSkipped ? 0.5 : 1, cursor: 'pointer',
+                        transition: 'opacity var(--dur) var(--ease)',
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={!isSkipped}
+                        onChange={() => toggle(item.idx)}
+                        style={{ marginTop: 2, accentColor: 'var(--terra)' }}
+                      />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                            {dom?.name ?? '?'}
+                          </span>
+                          <span style={{ color: 'var(--ink-4)' }}>·</span>
+                          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
+                            {item.timeEstimate}m
+                          </span>
+                        </div>
+                        <div style={{
+                          fontFamily: 'var(--font-sans)', fontSize: 13.5, color: 'var(--ink)',
+                          textDecoration: isSkipped ? 'line-through' : 'none',
+                          lineHeight: 1.3,
+                        }}>
+                          {item.title}
+                        </div>
+                        <div style={{ fontFamily: 'var(--font-sans)', fontStyle: 'italic', fontSize: 11.5, color: 'var(--ink-3)', marginTop: 2, lineHeight: 1.35 }}>
+                          {item.reason}
+                        </div>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 24px', borderTop: '1px solid var(--paper-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+            {accepted.length} sur {items.length} retenues
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={onClose}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 13, padding: '7px 14px',
+                background: 'transparent', color: 'var(--ink-2)',
+                border: '1px solid var(--ink-4)', borderRadius: 8, cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={() => onAccept(accepted)}
+              disabled={accepted.length === 0}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                padding: '7px 16px', background: 'var(--terra)', color: 'var(--paper-1)',
+                border: '1px solid transparent', borderRadius: 8,
+                cursor: accepted.length === 0 ? 'not-allowed' : 'pointer',
+                opacity: accepted.length === 0 ? 0.5 : 1,
+              }}
+            >
+              Planifier {accepted.length} tâche{accepted.length > 1 ? 's' : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// expose helper inside the file
+function dayDateIsoFromOffset(weekStart: string, offset: number): string {
+  const d = new Date(weekStart + 'T00:00:00')
+  d.setDate(d.getDate() + offset)
+  return d.toISOString().split('T')[0]
+}
+
 // ─── Page principale ──────────────────────────────────────────────────────────
 
 export function WeekView() {
   const tasks        = useStore(s => s.tasks)
   const timeSessions = useStore(s => s.timeSessions)
   const domains      = useStore(s => s.domains)
+  const objectives   = useStore(s => s.objectives)
+  const milestones   = useStore(s => s.milestones)
   const setTaskStatus = useStore(s => s.setTaskStatus)
+  const addTaskAction = useStore(s => s.addTask)
 
   const [weekOffset, setWeekOffset]       = useState(0)
   const [showAllOverdue, setShowAllOverdue] = useState(false)
   const [taskModalOpen, setTaskModalOpen]   = useState(false)
   const [taskModalPlannedDate, setTaskModalPlannedDate] = useState<string | undefined>(undefined)
+
+  // ── Kit : plan de semaine ──────────────────────────────────────────────────
+  const [kitPlanItems,   setKitPlanItems]   = useState<WeekPlanItem[] | null>(null)
+  const [kitPlanLoading, setKitPlanLoading] = useState(false)
+  const [kitPlanError,   setKitPlanError]   = useState<string | null>(null)
 
   // ── Calcul des jours de la semaine ──────────────────────────────────────────
   const days      = useMemo(() => getWeekDays(weekOffset), [weekOffset])
@@ -664,6 +859,39 @@ export function WeekView() {
     setTaskModalOpen(true)
   }
 
+  const generatePlan = async () => {
+    if (kitPlanLoading) return
+    setKitPlanLoading(true); setKitPlanError(null)
+    try {
+      const active = objectives.filter(o => !o.archived && o.progress < 100)
+      const items = await generateWeekPlan({
+        domains, objectives: active, milestones, recentTasks: tasks.slice(-30),
+      }, bounds.start)
+      setKitPlanItems(items)
+    } catch (err) {
+      setKitPlanError(err instanceof Error ? err.message : 'Erreur Kit')
+    } finally {
+      setKitPlanLoading(false)
+    }
+  }
+
+  const acceptPlan = (selected: WeekPlanItem[]) => {
+    selected.forEach(item => {
+      addTaskAction({
+        domainId:     item.domainId,
+        title:        item.title,
+        status:       'todo',
+        priority:     'medium',
+        timeEstimate: item.timeEstimate,
+        dueDate:      null,
+        plannedDate:  dayDateIsoFromOffset(bounds.start, item.dayOffset),
+        objectiveId:  item.objectiveId,
+        milestoneId:  item.milestoneId,
+      })
+    })
+    setKitPlanItems(null)
+  }
+
   const firstDomainId = domains[0]?.id ?? ''
   const pctDone = planned ? Math.round((completed / planned) * 100) : 0
 
@@ -718,6 +946,8 @@ export function WeekView() {
             onNext={() => setWeekOffset(o => o + 1)}
             onToday={() => setWeekOffset(0)}
             onNewTask={() => openNewTask()}
+            onGeneratePlan={hasApiKey() ? generatePlan : undefined}
+            kitLoading={kitPlanLoading}
             hasNoDomains={domains.length === 0}
           />
         </div>
@@ -809,6 +1039,33 @@ export function WeekView() {
           onClose={() => setTaskModalOpen(false)}
         />
       )}
+
+      {/* ── Erreur Kit (plan) ─────────────────────────────────────────────── */}
+      {kitPlanError && (
+        <div
+          onClick={() => setKitPlanError(null)}
+          style={{
+            position: 'fixed', bottom: 20, right: 20, zIndex: 60,
+            background: 'var(--terra-soft)', border: '1px solid #DEB89C',
+            padding: '10px 14px', borderRadius: 8, maxWidth: 320,
+            fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)',
+            cursor: 'pointer', boxShadow: 'var(--shadow-1)',
+          }}
+        >
+          <strong>Kit :</strong> {kitPlanError}
+        </div>
+      )}
+
+      {/* ── Modale plan de semaine ────────────────────────────────────────── */}
+      {kitPlanItems && (
+        <KitWeekPlanModal
+          items={kitPlanItems}
+          weekStart={bounds.start}
+          domains={domains}
+          onAccept={acceptPlan}
+          onClose={() => setKitPlanItems(null)}
+        />
+      )}
     </div>
   )
 }
@@ -816,13 +1073,15 @@ export function WeekView() {
 // ─── WeekNav ──────────────────────────────────────────────────────────────────
 
 function WeekNav({
-  weekOffset, onPrev, onNext, onToday, onNewTask, hasNoDomains,
+  weekOffset, onPrev, onNext, onToday, onNewTask, onGeneratePlan, kitLoading, hasNoDomains,
 }: {
   weekOffset: number
   onPrev: () => void
   onNext: () => void
   onToday: () => void
   onNewTask: () => void
+  onGeneratePlan?: () => void
+  kitLoading?: boolean
   hasNoDomains: boolean
 }) {
   const [hoverIdx, setHoverIdx] = useState(-1)
@@ -855,6 +1114,29 @@ function WeekNav({
       </button>
 
       <div style={{ width: 1, height: 22, background: 'var(--paper-2)', margin: '0 6px' }} />
+
+      {onGeneratePlan && (
+        <button
+          onClick={onGeneratePlan}
+          disabled={hasNoDomains || kitLoading}
+          style={{
+            fontFamily: 'var(--font-sans)', fontSize: 13,
+            padding: '7px 12px',
+            background: hoverIdx === 4 ? 'var(--paper-3)' : 'transparent',
+            color: 'var(--terra-deep)',
+            border: '1px solid var(--terra-soft)',
+            borderRadius: 8, cursor: (hasNoDomains || kitLoading) ? 'not-allowed' : 'pointer',
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            transition: 'background var(--dur) var(--ease)',
+            opacity: (hasNoDomains || kitLoading) ? 0.5 : 1,
+            whiteSpace: 'nowrap',
+          }}
+          onMouseEnter={() => setHoverIdx(4)}
+          onMouseLeave={() => setHoverIdx(-1)}
+        >
+          <Sparkles size={14} /> {kitLoading ? 'Kit réfléchit…' : 'Plan Kit'}
+        </button>
+      )}
 
       <button
         onClick={onNewTask}

@@ -1,9 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { useDroitStore } from '../store/droitStore'
 import { useWritingStore } from '../store/writingStore'
 import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
+import { hasApiKey, suggestTodayTasks, type TodaySuggestion } from '../lib/aiService'
 import type { Task } from '../types'
 import type { Tache, SousTache } from '../store/droitStore'
 import type { Story } from '../store/writingStore'
@@ -221,8 +222,11 @@ interface ExternalEntry {
 export function TodayPage() {
   const tasks        = useStore((s) => s.tasks)
   const objectives   = useStore((s) => s.objectives)
+  const milestones   = useStore((s) => s.milestones)
+  const domains      = useStore((s) => s.domains)
   const setTaskStatus = useStore((s) => s.setTaskStatus)
   const updateTask   = useStore((s) => s.updateTask)
+  const addTaskAction = useStore((s) => s.addTask)
 
   const droitTaches    = useDroitStore((s) => s.taches)
   const writingStories = useWritingStore((s) => s.stories)
@@ -297,6 +301,73 @@ export function TodayPage() {
   const doneCount = plannedTasks.filter((t) => t.status === 'done').length + externalItems.filter((e) => e.done).length
   const totalCount = allItems.length
 
+  // ── Kit : suggestions du jour ─────────────────────────────────────────────
+  const [kitItems,    setKitItems]    = useState<TodaySuggestion[]>([])
+  const [kitLoading,  setKitLoading]  = useState(false)
+  const [kitError,    setKitError]    = useState<string | null>(null)
+  const [kitDismissed, setKitDismissed] = useState<Set<number>>(new Set())
+
+  const kitEnabled = hasApiKey()
+  const activeObjectives = useMemo(
+    () => objectives.filter((o) => !o.archived && o.progress < 100),
+    [objectives],
+  )
+
+  const cacheKey = `aetheris-kit-today-${today}`
+
+  const fetchKit = async () => {
+    if (!kitEnabled || activeObjectives.length === 0) return
+    setKitLoading(true)
+    setKitError(null)
+    try {
+      const recent = tasks.slice(-30)
+      const items = await suggestTodayTasks({
+        domains, objectives: activeObjectives, milestones, recentTasks: recent,
+      }, 5)
+      setKitItems(items)
+      setKitDismissed(new Set())
+      window.localStorage.setItem(cacheKey, JSON.stringify(items))
+    } catch (err) {
+      setKitError(err instanceof Error ? err.message : 'Erreur Kit')
+    } finally {
+      setKitLoading(false)
+    }
+  }
+
+  // Auto-fetch au premier chargement de la journée
+  useEffect(() => {
+    if (!kitEnabled || activeObjectives.length === 0) return
+    const cached = window.localStorage.getItem(cacheKey)
+    if (cached) {
+      try { setKitItems(JSON.parse(cached) as TodaySuggestion[]) }
+      catch { /* ignore */ }
+    } else {
+      void fetchKit()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [today])
+
+  const acceptKitSuggestion = (s: TodaySuggestion, idx: number) => {
+    addTaskAction({
+      domainId:     s.domainId,
+      title:        s.title,
+      status:       'todo',
+      priority:     'medium',
+      timeEstimate: s.timeEstimate,
+      dueDate:      null,
+      plannedDate:  today,
+      objectiveId:  s.objectiveId,
+      milestoneId:  s.milestoneId,
+    })
+    setKitDismissed((prev) => new Set(prev).add(idx))
+  }
+
+  const dismissKitSuggestion = (idx: number) => {
+    setKitDismissed((prev) => new Set(prev).add(idx))
+  }
+
+  const visibleKit = kitItems.map((s, i) => ({ ...s, idx: i })).filter(s => !kitDismissed.has(s.idx))
+
   return (
     <div style={{ padding: '8px 0 80px' }}>
 
@@ -323,6 +394,117 @@ export function TodayPage() {
           )}
         </div>
       </header>
+
+      {/* ── Suggestions de Kit ──────────────────────────────────────────────── */}
+      {kitEnabled && (visibleKit.length > 0 || kitLoading || kitError) && (
+        <section style={{ marginBottom: 32 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
+                ✦ kit suggère
+              </span>
+              {kitLoading && (
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                  réflexion…
+                </span>
+              )}
+            </div>
+            <button
+              onClick={() => void fetchKit()}
+              disabled={kitLoading}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-3)',
+                background: 'transparent', border: 0, cursor: kitLoading ? 'not-allowed' : 'pointer',
+                padding: '4px 8px', borderRadius: 4,
+              }}
+            >
+              {kitLoading ? '…' : '↻ regénérer'}
+            </button>
+          </div>
+
+          {kitError && (
+            <div style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)',
+              padding: '10px 14px', borderRadius: 8,
+              background: 'var(--terra-soft)', border: '1px solid #DEB89C',
+            }}>
+              {kitError}
+            </div>
+          )}
+
+          {!kitError && visibleKit.length > 0 && (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
+              {visibleKit.map((s) => {
+                const dom = domains.find((d) => d.id === s.domainId)
+                return (
+                  <div
+                    key={s.idx}
+                    style={{
+                      background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+                      borderRadius: 10, padding: '12px 14px',
+                      display: 'flex', flexDirection: 'column', gap: 6,
+                      position: 'relative',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10,
+                        letterSpacing: '0.1em', textTransform: 'uppercase',
+                        color: 'var(--ink-3)',
+                      }}>
+                        {dom?.name ?? '?'}
+                      </span>
+                      <span style={{ color: 'var(--ink-4)' }}>·</span>
+                      <span style={{
+                        fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                        color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums',
+                      }}>
+                        {s.timeEstimate}m
+                      </span>
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--ink)',
+                      lineHeight: 1.3, letterSpacing: '-0.005em',
+                    }}>
+                      {s.title}
+                    </div>
+                    <div style={{
+                      fontFamily: 'var(--font-sans)', fontSize: 12,
+                      fontStyle: 'italic', color: 'var(--ink-3)',
+                      lineHeight: 1.4,
+                    }}>
+                      {s.reason}
+                    </div>
+                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                      <button
+                        onClick={() => acceptKitSuggestion(s, s.idx)}
+                        style={{
+                          flex: 1,
+                          fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+                          background: 'var(--terra)', color: 'var(--paper-1)',
+                          border: 0, borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+                        }}
+                      >
+                        + Planifier
+                      </button>
+                      <button
+                        onClick={() => dismissKitSuggestion(s.idx)}
+                        style={{
+                          fontFamily: 'var(--font-sans)', fontSize: 12,
+                          background: 'transparent', color: 'var(--ink-3)',
+                          border: '1px solid var(--paper-2)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
+                        }}
+                      >
+                        Passer
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── Liste des items ─────────────────────────────────────────────────── */}
       <section style={{ marginBottom: 40 }}>
