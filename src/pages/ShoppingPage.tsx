@@ -381,6 +381,11 @@ function CardImage({ itemId }: { itemId: string }) {
           src={src}
           alt=""
           style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          onError={() => {
+            // Blob corrompu en IndexedDB → on nettoie et on retire l'image
+            dbDeleteImage(dbKey).catch(() => {})
+            setAndTrackSrc('')
+          }}
         />
         <div
           className="card-image-ctl"
