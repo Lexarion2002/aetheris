@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Landmark } from 'lucide-react'
+import { ArrowUpRight, Landmark, ShoppingBag, BookOpen, Film, Briefcase, PenLine, Scale, Music, Dumbbell, ChefHat } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -13,6 +13,7 @@ import { useSportStore } from '../store/sportStore'
 import { useBookStore } from '../store/bookStore'
 import { useFilmSerieStore } from '../store/filmSerieStore'
 import { useShoppingStore } from '../store/shoppingStore'
+import { useCuisineStore } from '../store/cuisineStore'
 import { AddDomainModal } from '../components/AddDomainModal'
 import { getDomainIcon } from '../utils/domainColors'
 import { computeMonthBalance } from '../utils/financeUtils'
@@ -481,6 +482,64 @@ function DomainCard({ domain, primary, unit, secondary, onClick }: {
   )
 }
 
+// ─── StandalonePageCard — pour les pages domaine sans entrée store ─────────────
+
+function StandalonePageCard({
+  name, icon: Icon, primary, unit, secondary, onClick,
+}: {
+  name:      string
+  icon:      React.ComponentType<{ size?: number }>
+  primary:   string
+  unit:      string
+  secondary: string
+  onClick:   () => void
+}) {
+  const [hover, setHover] = useState(false)
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        textAlign: 'left', fontFamily: 'inherit',
+        background: 'var(--paper-1)',
+        border: `1px solid ${hover ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+        borderRadius: 12, padding: '18px 20px 20px',
+        display: 'flex', flexDirection: 'column', gap: 14,
+        cursor: 'pointer', minHeight: 148,
+        transition: 'border-color var(--dur) var(--ease)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={{
+          width: 34, height: 34, borderRadius: 8,
+          background: hover ? 'var(--terra-soft)' : 'var(--paper-2)',
+          color: hover ? 'var(--terra-deep)' : 'var(--ink-2)',
+          display: 'grid', placeItems: 'center',
+          transition: 'background var(--dur) var(--ease), color var(--dur) var(--ease)',
+        }}>
+          <Icon size={18} />
+        </div>
+        <ArrowUpRight size={14} style={{ color: hover ? 'var(--terra)' : 'var(--ink-4)' }} />
+      </div>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 20, color: 'var(--ink)', letterSpacing: '-0.005em' }}>
+          {name}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 22, fontWeight: 500, color: 'var(--ink)' }}>{primary}</span>
+          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>{unit}</span>
+        </div>
+      </div>
+      {secondary && (
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-2)', fontStyle: 'italic', paddingTop: 10, borderTop: '1px solid var(--paper-2)' }}>
+          {secondary}
+        </div>
+      )}
+    </button>
+  )
+}
+
 function FinanceDomainCard({ balance, topGoal, onNavigate }: { balance: number; topGoal: SavingsGoal | null; onNavigate: () => void }) {
   const [hover, setHover] = useState(false)
   const goalPct = topGoal && topGoal.targetAmount > 0 ? Math.round((topGoal.currentAmount / topGoal.targetAmount) * 100) : 0
@@ -575,6 +634,9 @@ export function Dashboard() {
   const books        = useBookStore()
   const films        = useFilmSerieStore()
   const shopping     = useShoppingStore()
+  const cuisine      = useCuisineStore()
+  const droit        = useDroitStore()
+  void law  // utilisé via useLawStore() pour la rehydratation, pas directement ici
 
   const clearIfNewDay = useTodayStore((s) => s.clearIfNewDay)
   const todayTasks    = useTodayStore((s) => s.tasks)
@@ -719,6 +781,89 @@ export function Dashboard() {
   // Finance excluded from domain grid (always rendered as fixed card)
   const domainGridItems = domains.filter(d => !['finance', 'finances'].includes(d.name.trim().toLowerCase()))
 
+  // Pages standalone — affichées comme cards dans la grille, sauf si déjà
+  // représentées par un domaine du store (déduplication par nom).
+  const existingDomainNames = new Set(domains.map((d) => d.name.trim().toLowerCase()))
+  const startWeek = new Date()
+  startWeek.setHours(0, 0, 0, 0)
+  startWeek.setDate(startWeek.getDate() - ((startWeek.getDay() + 6) % 7))
+  const startWeekIso = startWeek.toISOString().split('T')[0]
+
+  const droitActiveCount = droit.taches.filter((t) => {
+    const totalSt = t.subtasks?.length ?? 0
+    const doneSt = t.subtasks?.filter((s) => s.done).length ?? 0
+    return totalSt === 0 || doneSt < totalSt
+  }).length
+  const sportSessionsWeekCount = sport.historique.filter((h) => h.date >= startWeekIso).length
+  const careerActiveCount = career.missions.filter((m) => m.stade !== 'rendu').length
+  const writingActiveStoriesCount = writing.stories.filter((s) => s.status === 'active').length
+  const booksReadCount = books.bibliotheque.length
+  const booksTarget = books.objectifAnnuel || 0
+  const filmsViewedCount = films.items.filter((it) => it.status === 'vu').length
+  const musicCritiquesCount = music.bibliotheque.length
+  const cuisineRecettesCount = cuisine.recettes.length
+  const shoppingWishCount = shopping.wishlist.length
+
+  type Stand = {
+    name: string; icon: React.ComponentType<{ size?: number }>; path: string
+    primary: string; unit: string; secondary: string
+    showCondition?: boolean
+  }
+
+  const standaloneCards: Stand[] = [
+    {
+      name: 'Droit', icon: Scale, path: '/droit',
+      primary: String(droitActiveCount), unit: droitActiveCount > 1 ? 'tâches' : 'tâche',
+      secondary: droit.taches.length === 0 ? 'rien encore noté' : `${droit.taches.length} au total`,
+      showCondition: !existingDomainNames.has('droit'),
+    },
+    {
+      name: 'Sport', icon: Dumbbell, path: '/sport',
+      primary: String(sportSessionsWeekCount), unit: sportSessionsWeekCount > 1 ? 'séances cette sem.' : 'séance cette sem.',
+      secondary: sport.historique.length > 0 ? `${sport.historique.length} séances au total` : 'aucune séance enregistrée',
+      showCondition: !existingDomainNames.has('sport'),
+    },
+    {
+      name: 'Écriture', icon: PenLine, path: '/ecriture',
+      primary: String(writingActiveStoriesCount), unit: writingActiveStoriesCount > 1 ? 'récits actifs' : 'récit actif',
+      secondary: writing.stories.length > 0 ? `${writing.stories.length} récits au total` : 'aucun récit',
+      showCondition: !existingDomainNames.has('écriture') && !existingDomainNames.has('ecriture'),
+    },
+    {
+      name: 'Musique', icon: Music, path: '/musique',
+      primary: String(musicCritiquesCount), unit: musicCritiquesCount > 1 ? 'critiques' : 'critique',
+      secondary: music.fileAttente.length > 0 ? `${music.fileAttente.length} en attente` : '',
+      showCondition: !existingDomainNames.has('musique'),
+    },
+    {
+      name: 'Livres', icon: BookOpen, path: '/livres',
+      primary: booksTarget > 0 ? `${booksReadCount}/${booksTarget}` : String(booksReadCount),
+      unit: 'livres lus',
+      secondary: books.livreEnCours ? `en cours : ${books.livreEnCours.titre}` : (books.fileAttente.length > 0 ? `${books.fileAttente.length} en attente` : ''),
+    },
+    {
+      name: 'Films & Séries', icon: Film, path: '/films',
+      primary: String(filmsViewedCount), unit: filmsViewedCount > 1 ? 'titres vus' : 'titre vu',
+      secondary: films.items.length > filmsViewedCount ? `${films.items.length - filmsViewedCount} à voir` : '',
+    },
+    {
+      name: 'Cabinet', icon: Briefcase, path: '/cabinet',
+      primary: String(careerActiveCount), unit: careerActiveCount > 1 ? 'missions actives' : 'mission active',
+      secondary: career.missionsArchives.length > 0 ? `${career.missionsArchives.length} archivées` : '',
+    },
+    {
+      name: 'Cuisine', icon: ChefHat, path: '/cuisine',
+      primary: String(cuisineRecettesCount), unit: cuisineRecettesCount > 1 ? 'recettes' : 'recette',
+      secondary: cuisine.ingredients.length > 0 ? `${cuisine.ingredients.length} ingrédients suivis` : '',
+    },
+    {
+      name: 'Achats', icon: ShoppingBag, path: '/achats',
+      primary: String(shoppingWishCount), unit: shoppingWishCount > 1 ? 'envies' : 'envie',
+      secondary: shopping.bought.length > 0 ? `${shopping.bought.length} achetés` : '',
+    },
+  ]
+  const visibleStandalone = standaloneCards.filter((c) => c.showCondition !== false)
+
   // Icons for ongoing cards
   const writingIcon = getDomainIcon('Écriture')
   const bookIcon    = getDomainIcon('Livres')
@@ -856,7 +1001,7 @@ export function Dashboard() {
           </button>
         </div>
 
-        {domains.length === 0 ? (
+        {domains.length === 0 && visibleStandalone.length === 0 ? (
           <div style={{ display: 'grid' }}>
             <EmptyState onAdd={() => setShowModal(true)} />
           </div>
@@ -880,6 +1025,17 @@ export function Dashboard() {
               topGoal={topGoal}
               onNavigate={() => navigate('/finances')}
             />
+            {visibleStandalone.map((c) => (
+              <StandalonePageCard
+                key={c.name}
+                name={c.name}
+                icon={c.icon}
+                primary={c.primary}
+                unit={c.unit}
+                secondary={c.secondary}
+                onClick={() => navigate(c.path)}
+              />
+            ))}
           </div>
         )}
       </section>
