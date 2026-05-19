@@ -545,14 +545,32 @@ export function ObjectivesPage() {
 
   const groups = useMemo(() => {
     if (groupBy === 'domain') {
-      return domains
-        .map(d => ({
+      // Partir des objectifs visibles → grouper par domainId, puis enrichir avec les détails du domaine
+      const byDomainId = new Map<string, Objective[]>()
+      visible.forEach(o => {
+        if (!byDomainId.has(o.domainId)) byDomainId.set(o.domainId, [])
+        byDomainId.get(o.domainId)!.push(o)
+      })
+
+      // Respecter l'ordre des domaines du store pour les domaines connus
+      const result: { key: string; label: string; icon: React.ReactNode; items: Objective[] }[] = []
+      for (const d of domains) {
+        const items = byDomainId.get(d.id)
+        if (!items) continue
+        const I = getDomainIcon(d.name)
+        result.push({
           key: d.id,
           label: d.name,
-          icon: (() => { const I = getDomainIcon(d.name); return I ? <I size={15} style={{ color: 'var(--ink-3)' }} /> : d.icon })(),
-          items: visible.filter(o => o.domainId === d.id),
-        }))
-        .filter(g => g.items.length > 0)
+          icon: I ? <I size={15} style={{ color: 'var(--ink-3)' }} /> : <span>{d.icon}</span>,
+          items,
+        })
+        byDomainId.delete(d.id)
+      }
+      // Fallback : objectifs dont le domaine n'est plus dans le store
+      for (const [domainId, items] of byDomainId) {
+        result.push({ key: domainId, label: 'Domaine inconnu', icon: null, items })
+      }
+      return result
     }
     const map = new Map<UrgencyBucket, Objective[]>()
     URGENCY_ORDER.forEach(u => map.set(u, []))
