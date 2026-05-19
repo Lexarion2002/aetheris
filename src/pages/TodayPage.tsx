@@ -504,57 +504,106 @@ export function TodayPage() {
         </div>
       </header>
 
-      {/* ── Bandeau Kit (auto-plan) ─────────────────────────────────────────── */}
-      {kitEnabled && (autoplan || autoplanLoading || autoplanError) && (
-        <div style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          gap: 16, marginBottom: 24, padding: '10px 16px',
-          background: autoplanError ? 'var(--terra-soft)' : 'var(--paper-1)',
-          border: '1px solid ' + (autoplanError ? '#DEB89C' : 'var(--paper-2)'),
-          borderRadius: 10, flexWrap: 'wrap',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
-              ✦ kit
-            </span>
-            {autoplanLoading ? (
-              <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
-                organise ta journée…
+      {/* ── Bandeau Kit (auto-plan) — toujours visible quand Kit est activé ── */}
+      {kitEnabled && (() => {
+        const state =
+          autoplanLoading                       ? 'loading'
+          : autoplanError                       ? 'error'
+          : autoplan                            ? 'ran'
+          : activeObjectives.length === 0       ? 'no-objectives'
+          : plannedTasks.length >= 3            ? 'already-busy'
+          : 'idle'
+
+        const isError = state === 'error'
+        const isInfo = state === 'no-objectives' || state === 'already-busy'
+
+        return (
+          <div style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            gap: 16, marginBottom: 24, padding: '10px 16px',
+            background: isError ? 'var(--terra-soft)' : 'var(--paper-1)',
+            border: '1px solid ' + (isError ? '#DEB89C' : 'var(--paper-2)'),
+            borderRadius: 10, flexWrap: 'wrap',
+          }}>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0, flex: 1 }}>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
+                ✦ kit
               </span>
-            ) : autoplanError ? (
-              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>
-                {autoplanError}
-              </span>
-            ) : autoplan ? (
-              <>
-                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--ink-2)' }}>
-                  a planifié à <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
-                    {new Date(autoplan.ranAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+              {state === 'loading' && (
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
+                  organise ta journée…
+                </span>
+              )}
+              {state === 'error' && (
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>
+                  {autoplanError}
+                </span>
+              )}
+              {state === 'ran' && autoplan && (
+                <>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--ink-2)' }}>
+                    a planifié à <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+                      {new Date(autoplan.ranAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
                   </span>
+                  <span style={{ color: 'var(--ink-4)' }}>·</span>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+                    {kitTasksRemaining}/{autoplan.taskIds.length} restantes
+                  </span>
+                </>
+              )}
+              {state === 'no-objectives' && (
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
+                  attend un objectif actif pour proposer un plan.{' '}
+                  <a href="/week" style={{ color: 'var(--terra)', textDecoration: 'underline', fontStyle: 'normal' }}>
+                    Créer un objectif →
+                  </a>
                 </span>
-                <span style={{ color: 'var(--ink-4)' }}>·</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
-                  {kitTasksRemaining}/{autoplan.taskIds.length} restantes
+              )}
+              {state === 'already-busy' && (
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
+                  ta journée est déjà bien remplie — Kit ne planifie pas par-dessus.
                 </span>
-              </>
-            ) : null}
+              )}
+              {state === 'idle' && (
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
+                  prêt à planifier ta journée.
+                </span>
+              )}
+            </div>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {(state === 'ran' || state === 'error') && (
+                <button
+                  onClick={() => void runAutoplan(true)}
+                  disabled={autoplanLoading}
+                  style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
+                    background: 'transparent', border: '1px solid var(--paper-2)',
+                    borderRadius: 6, padding: '4px 10px',
+                    cursor: autoplanLoading ? 'not-allowed' : 'pointer',
+                  }}
+                >
+                  ↻ Regénérer
+                </button>
+              )}
+              {(state === 'already-busy' || state === 'idle') && (
+                <button
+                  onClick={() => void runAutoplan(false)}
+                  disabled={autoplanLoading || (state === 'already-busy' && activeObjectives.length === 0)}
+                  style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+                    color: 'var(--paper-1)', background: 'var(--terra)',
+                    border: 0, borderRadius: 6, padding: '4px 12px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  {isInfo ? 'Forcer' : 'Planifier'}
+                </button>
+              )}
+            </div>
           </div>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button
-              onClick={() => void runAutoplan(true)}
-              disabled={autoplanLoading}
-              style={{
-                fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
-                background: 'transparent', border: '1px solid var(--paper-2)',
-                borderRadius: 6, padding: '4px 10px',
-                cursor: autoplanLoading ? 'not-allowed' : 'pointer',
-              }}
-            >
-              ↻ Regénérer
-            </button>
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* ── Liste des items ─────────────────────────────────────────────────── */}
       <section style={{ marginBottom: 40 }}>
