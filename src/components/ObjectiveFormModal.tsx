@@ -1,28 +1,53 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { Circle } from 'lucide-react'
 import { useStore } from '../store'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainIcon } from '../utils/domainColors'
 import type { Domain, Objective } from '../types'
 
 const STATIC_DOMAINS: Domain[] = [
-  { id: 'musique',  name: 'Musique',       color: 'purple', icon: '🎵', description: '' },
-  { id: 'cuisine',  name: 'Cuisine',       color: 'orange', icon: '🍳', description: '' },
-  { id: 'achats',   name: 'Achats',        color: 'teal',   icon: '🛍️', description: '' },
-  { id: 'films',    name: 'Films & Séries',color: 'red',    icon: '🎬', description: '' },
-  { id: 'livres',   name: 'Livres',        color: 'blue',   icon: '📚', description: '' },
-  { id: 'cabinet',  name: 'Cabinet',       color: 'gray',   icon: '🗂️', description: '' },
-  { id: 'ecriture', name: 'Écriture',      color: 'indigo', icon: '✍️', description: '' },
-  { id: 'droit',    name: 'Droit',         color: 'indigo', icon: '⚖️', description: '' },
-  { id: 'sport',    name: 'Sport',         color: 'green',  icon: '🏋️', description: '' },
+  { id: 'musique',  name: 'Musique',        color: 'purple', icon: '', description: '' },
+  { id: 'cuisine',  name: 'Cuisine',        color: 'orange', icon: '', description: '' },
+  { id: 'achats',   name: 'Achats',         color: 'teal',   icon: '', description: '' },
+  { id: 'films',    name: 'Films & Séries', color: 'red',    icon: '', description: '' },
+  { id: 'livres',   name: 'Livres',         color: 'blue',   icon: '', description: '' },
+  { id: 'cabinet',  name: 'Cabinet',        color: 'gray',   icon: '', description: '' },
+  { id: 'ecriture', name: 'Écriture',       color: 'indigo', icon: '', description: '' },
+  { id: 'droit',    name: 'Droit',          color: 'indigo', icon: '', description: '' },
+  { id: 'sport',    name: 'Sport',          color: 'green',  icon: '', description: '' },
 ]
 
 interface Props {
-  domainId?: string
+  domainId?:  string
   objective?: Objective
   onClose: () => void
 }
 
-const progressColor = (p: number) =>
-  p >= 80 ? 'bg-green-500' : p >= 50 ? 'bg-teal-500' : p >= 25 ? 'bg-blue-500' : 'bg-zinc-500'
+// ─── Styles communs ───────────────────────────────────────────────────────────
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--ink-3)',
+  display: 'block',
+  marginBottom: 8,
+}
+
+const fieldStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 10px',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--ink-4)',
+  background: 'var(--paper)',
+  color: 'var(--ink)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+
+// ─── Component ────────────────────────────────────────────────────────────────
 
 export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose }: Props) {
   const storeDomains    = useStore((s) => s.domains)
@@ -72,7 +97,6 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !domainId) return
-
     const payload = {
       domainId,
       title:       title.trim(),
@@ -80,7 +104,6 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
       targetDate:  targetDate || null,
       progress,
     }
-
     if (isEdit) {
       updateObjective(objective.id, payload)
       for (const t of tasks.filter((t) => t.domainId === domainId)) {
@@ -98,42 +121,72 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
     onClose()
   }
 
-  const pColor         = progressColor(progress)
-  const selectedDomain = domains.find((d) => d.id === domainId)
+  const canSubmit = title.trim() && domainId
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+        background: 'color-mix(in srgb, var(--ink) 30%, transparent)',
+        backdropFilter: 'blur(4px)',
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-700/60 bg-zinc-900 shadow-2xl">
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-          <h2 className="text-sm font-semibold text-zinc-200">
-            {isEdit ? "Modifier l'objectif" : 'Nouvel objectif'}
-          </h2>
-          <button onClick={onClose} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors">
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+      <div style={{
+        background: 'var(--paper-1)',
+        borderRadius: 'var(--r-xl)',
+        boxShadow: 'var(--shadow-3)',
+        padding: '28px 32px',
+        maxWidth: 560,
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+      }}>
+        {/* Titre */}
+        <h2 style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 22,
+          color: 'var(--ink)',
+          margin: '0 0 24px',
+          fontWeight: 400,
+        }}>
+          {isEdit ? "Modifier l'objectif" : 'Nouvel objectif'}
+        </h2>
 
-        <form onSubmit={handleSubmit} className="space-y-4 p-5">
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+
+          {/* Domaine — chips horizontaux */}
           {!propDomainId && (
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Domaine</label>
-              <div className="grid grid-cols-4 gap-1.5 sm:grid-cols-7">
+              <label style={labelStyle}>Domaine</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {domains.map((d) => {
-                  const c = getDomainColors(d.color)
+                  const active = domainId === d.id
+                  const Icon   = getDomainIcon(d.name) ?? Circle
                   return (
-                    <button key={d.id} type="button"
+                    <button
+                      key={d.id}
+                      type="button"
                       onClick={() => { setDomainId(d.id); setLinkedTaskIds(new Set()) }}
-                      className={[
-                        'flex flex-col items-center gap-1 rounded-lg border py-2 px-1 text-center transition-all',
-                        domainId === d.id ? [c.bg, c.border, c.text].join(' ') : 'border-zinc-800 text-zinc-500 hover:border-zinc-700 hover:text-zinc-300',
-                      ].join(' ')}>
-                      <span className="text-lg leading-none">{d.icon}</span>
-                      <span className="text-[9px] leading-tight">{d.name}</span>
+                      style={{
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: 6,
+                        padding: '5px 12px',
+                        borderRadius: 'var(--r-full)',
+                        border: `1px solid ${active ? 'var(--ink)' : 'var(--paper-2)'}`,
+                        background: active ? 'var(--ink)' : 'transparent',
+                        color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                        fontFamily: 'var(--font-sans)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                        transition: 'all 0.15s',
+                      }}
+                    >
+                      <Icon size={14} />
+                      {d.name}
                     </button>
                   )
                 })}
@@ -141,64 +194,157 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
             </div>
           )}
 
-          <input ref={titleRef} value={title} onChange={(e) => setTitle(e.target.value)}
+          {/* Titre — ligne éditoriale */}
+          <input
+            ref={titleRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
             placeholder="Titre de l'objectif…"
-            className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500/30 transition-colors"
-            required />
+            required
+            style={{
+              width: '100%',
+              fontFamily: 'var(--font-serif)',
+              fontSize: 18,
+              color: 'var(--ink)',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid var(--paper-2)',
+              borderRadius: 0,
+              outline: 'none',
+              padding: '4px 0 8px',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={(e) => { e.target.style.borderBottomColor = 'var(--ink-4)' }}
+            onBlur={(e) => { e.target.style.borderBottomColor = 'var(--paper-2)' }}
+          />
 
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description, critères de succès, sous-objectifs…" rows={2}
-            className="w-full resize-none rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-300 placeholder-zinc-600 outline-none focus:border-zinc-500 transition-colors" />
+          {/* Description */}
+          <textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description, critères de succès…"
+            rows={2}
+            style={{
+              ...fieldStyle,
+              border: '1px solid var(--paper-2)',
+              resize: 'vertical',
+              padding: '10px 12px',
+            }}
+          />
 
+          {/* Date cible */}
           <div>
-            <label className="mb-2 block text-xs font-medium text-zinc-500">Date cible</label>
-            <input type="date" value={targetDate} onChange={(e) => setTargetDate(e.target.value)}
-              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]" />
+            <label style={labelStyle}>Date cible</label>
+            <input
+              type="date"
+              value={targetDate}
+              onChange={(e) => setTargetDate(e.target.value)}
+              style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', colorScheme: 'light' }}
+            />
           </div>
 
+          {/* Progression — 5 chips */}
           <div>
-            <div className="mb-2 flex items-center justify-between">
-              <label className="text-xs font-medium text-zinc-500">Progression actuelle</label>
-              <span className="text-xs font-semibold tabular-nums text-zinc-300">{progress}%</span>
-            </div>
-            <input type="range" min="0" max="100" step="5" value={progress}
-              onChange={(e) => setProgress(Number(e.target.value))} className="w-full accent-teal-500" />
-            <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-              <div className={['h-full rounded-full transition-all duration-200', pColor].join(' ')} style={{ width: `${progress}%` }} />
-            </div>
-            <div className="mt-1.5 flex gap-1.5">
-              {[0, 25, 50, 75, 100].map((v) => (
-                <button key={v} type="button" onClick={() => setProgress(v)}
-                  className={['flex-1 rounded py-1 text-xs transition-colors', progress === v ? 'bg-teal-500/20 text-teal-300 border border-teal-500/30' : 'text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300'].join(' ')}>
-                  {v}%
-                </button>
-              ))}
+            <label style={labelStyle}>Progression actuelle</label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {[0, 25, 50, 75, 100].map((v) => {
+                const active = progress === v
+                return (
+                  <button
+                    key={v}
+                    type="button"
+                    onClick={() => setProgress(v)}
+                    style={{
+                      flex: 1,
+                      padding: '6px 8px',
+                      borderRadius: 'var(--r-full)',
+                      border: `1px solid ${active ? 'var(--terra)' : 'var(--paper-2)'}`,
+                      background: active ? 'var(--terra)' : 'transparent',
+                      color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {v}%
+                  </button>
+                )
+              })}
             </div>
           </div>
 
+          {/* Lier des tâches */}
           {domainId && linkableTasks.length > 0 && (
             <div>
-              <button type="button" onClick={() => setShowTaskLink(!showTaskLink)}
-                className="flex w-full items-center justify-between rounded-lg border border-zinc-800 px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800/50 hover:text-zinc-200 transition-colors">
-                <span className="flex items-center gap-2">
-                  <span>☑</span> Lier des tâches
+              <button
+                type="button"
+                onClick={() => setShowTaskLink(!showTaskLink)}
+                style={{
+                  display: 'flex', width: '100%', alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '8px 12px',
+                  borderRadius: 'var(--r-md)',
+                  border: '1px solid var(--paper-2)',
+                  background: 'transparent',
+                  color: 'var(--ink-2)',
+                  fontFamily: 'var(--font-sans)',
+                  fontSize: 12,
+                  cursor: 'pointer',
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  Lier des tâches
                   {linkedTaskIds.size > 0 && (
-                    <span className="rounded-full bg-teal-500/20 border border-teal-500/30 px-1.5 py-0.5 text-teal-400 tabular-nums">{linkedTaskIds.size}</span>
+                    <span style={{
+                      padding: '1px 8px',
+                      borderRadius: 'var(--r-full)',
+                      background: 'var(--terra-soft)',
+                      color: 'var(--terra)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: 11,
+                    }}>
+                      {linkedTaskIds.size}
+                    </span>
                   )}
                 </span>
-                <span className="text-zinc-600">{showTaskLink ? '▲' : '▼'}</span>
+                <span style={{ color: 'var(--ink-3)', fontSize: 10 }}>{showTaskLink ? '▲' : '▼'}</span>
               </button>
+
               {showTaskLink && (
-                <div className="mt-1.5 rounded-lg border border-zinc-800 bg-zinc-900/60 divide-y divide-zinc-800/60 max-h-40 overflow-y-auto">
+                <div style={{
+                  marginTop: 6,
+                  borderRadius: 'var(--r-md)',
+                  border: '1px solid var(--paper-2)',
+                  overflow: 'hidden',
+                  maxHeight: 160,
+                  overflowY: 'auto',
+                }}>
                   {linkableTasks.map((t) => {
                     const checked = linkedTaskIds.has(t.id)
                     return (
-                      <label key={t.id} className="flex cursor-pointer items-center gap-3 px-3 py-2 hover:bg-zinc-800/40 transition-colors">
-                        <div className={['flex h-4 w-4 flex-shrink-0 items-center justify-center rounded border transition-colors', checked ? 'border-teal-500 bg-teal-500/20' : 'border-zinc-600'].join(' ')}>
-                          {checked && <svg className="h-2.5 w-2.5 text-teal-400" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" /></svg>}
+                      <label key={t.id} style={{
+                        display: 'flex', cursor: 'pointer', alignItems: 'center', gap: 10,
+                        padding: '8px 12px',
+                        borderBottom: '1px solid var(--paper-2)',
+                        background: 'transparent',
+                      }}>
+                        <div style={{
+                          width: 16, height: 16, flexShrink: 0,
+                          border: `1.5px solid ${checked ? 'var(--terra)' : 'var(--ink-4)'}`,
+                          borderRadius: 4,
+                          background: checked ? 'var(--terra-soft)' : 'transparent',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        }}>
+                          {checked && (
+                            <svg width="10" height="10" viewBox="0 0 12 12" fill="none" stroke="var(--terra)" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M2 6l3 3 5-5" />
+                            </svg>
+                          )}
                         </div>
                         <input type="checkbox" className="hidden" checked={checked} onChange={() => toggleTask(t.id)} />
-                        <span className="text-xs text-zinc-300">{t.title}</span>
+                        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>{t.title}</span>
                       </label>
                     )
                   })}
@@ -207,20 +353,43 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
             </div>
           )}
 
-          {selectedDomain && (
-            <div className="flex items-center gap-2 rounded-lg bg-zinc-800/40 px-3 py-2">
-              <span>{selectedDomain.icon}</span>
-              <span className="text-xs text-zinc-400">{selectedDomain.name}</span>
-              {linkedTaskIds.size > 0 && (
-                <span className="ml-auto text-xs text-zinc-600">{linkedTaskIds.size} tâche{linkedTaskIds.size > 1 ? 's' : ''} liée{linkedTaskIds.size > 1 ? 's' : ''}</span>
-              )}
-            </div>
-          )}
-
-          <div className="flex justify-end gap-2 pt-1">
-            <button type="button" onClick={onClose} className="rounded-lg px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors">Annuler</button>
-            <button type="submit" disabled={!title.trim() || !domainId}
-              className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white transition-colors disabled:opacity-40">
+          {/* Footer */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{
+                padding: '8px 16px',
+                borderRadius: 'var(--r-md)',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              style={{
+                padding: '8px 20px',
+                borderRadius: 'var(--r-md)',
+                border: 'none',
+                background: 'var(--terra)',
+                color: 'var(--paper-1)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: canSubmit ? 'pointer' : 'default',
+                opacity: canSubmit ? 1 : 0.4,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => { if (canSubmit) e.currentTarget.style.background = 'var(--terra-deep)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--terra)' }}
+            >
               {isEdit ? 'Enregistrer' : "Créer l'objectif"}
             </button>
           </div>

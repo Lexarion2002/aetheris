@@ -5,21 +5,21 @@ import type { Task, Priority, TaskStatus } from '../types'
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Props {
-  domainId:       string
-  task?:          Task
-  objectiveId?:   string   // pré-rempli depuis ObjectivesPage
-  milestoneId?:   string   // pré-rempli depuis un jalon
-  plannedDate?:   string   // pré-rempli depuis TodayPage
+  domainId:      string
+  task?:         Task
+  objectiveId?:  string
+  milestoneId?:  string
+  plannedDate?:  string
   onClose: () => void
 }
 
 // ─── Config ───────────────────────────────────────────────────────────────────
 
-const PRIORITIES: { value: Priority; label: string; cls: string }[] = [
-  { value: 'low',    label: 'Basse',   cls: 'border-zinc-700 text-zinc-400 data-[sel=true]:bg-zinc-700/50 data-[sel=true]:border-zinc-500 data-[sel=true]:text-zinc-200' },
-  { value: 'medium', label: 'Moyenne', cls: 'border-zinc-700 text-zinc-400 data-[sel=true]:bg-blue-500/20 data-[sel=true]:border-blue-500/50 data-[sel=true]:text-blue-300' },
-  { value: 'high',   label: 'Haute',   cls: 'border-zinc-700 text-zinc-400 data-[sel=true]:bg-orange-500/20 data-[sel=true]:border-orange-500/50 data-[sel=true]:text-orange-300' },
-  { value: 'urgent', label: 'Urgent',  cls: 'border-zinc-700 text-zinc-400 data-[sel=true]:bg-red-500/20 data-[sel=true]:border-red-500/50 data-[sel=true]:text-red-300' },
+const PRIORITIES: { value: Priority; label: string }[] = [
+  { value: 'low',    label: 'Basse' },
+  { value: 'medium', label: 'Moyenne' },
+  { value: 'high',   label: 'Haute' },
+  { value: 'urgent', label: 'Urgent' },
 ]
 
 const STATUSES: { value: TaskStatus; label: string }[] = [
@@ -37,9 +37,41 @@ const TIME_PRESETS = [
   { label: '4h',  value: 240 },
 ]
 
+// ─── Styles communs ───────────────────────────────────────────────────────────
+
+const labelStyle: React.CSSProperties = {
+  fontFamily: 'var(--font-mono)',
+  fontSize: 10,
+  textTransform: 'uppercase',
+  letterSpacing: '0.08em',
+  color: 'var(--ink-3)',
+  display: 'block',
+  marginBottom: 8,
+}
+
+const fieldStyle: React.CSSProperties = {
+  width: '100%',
+  padding: '8px 10px',
+  borderRadius: 'var(--r-md)',
+  border: '1px solid var(--ink-4)',
+  background: 'var(--paper)',
+  color: 'var(--ink)',
+  fontFamily: 'var(--font-sans)',
+  fontSize: 13,
+  outline: 'none',
+  boxSizing: 'border-box',
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId, milestoneId: prefillMilestoneId, plannedDate: prefillPlannedDate, onClose }: Props) {
+export function TaskFormModal({
+  domainId,
+  task,
+  objectiveId: prefillObjectiveId,
+  milestoneId: prefillMilestoneId,
+  plannedDate: prefillPlannedDate,
+  onClose,
+}: Props) {
   const addTask       = useStore((s) => s.addTask)
   const updateTask    = useStore((s) => s.updateTask)
   const allObjectives = useStore((s) => s.objectives)
@@ -65,13 +97,9 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
   )
 
   const titleRef = useRef<HTMLInputElement>(null)
-  const isEdit = !!task
+  const isEdit   = !!task
 
-  useEffect(() => {
-    titleRef.current?.focus()
-  }, [])
-
-  // Close on Escape
+  useEffect(() => { titleRef.current?.focus() }, [])
   useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
@@ -81,7 +109,6 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim()) return
-
     const payload = {
       domainId,
       title:        title.trim(),
@@ -94,7 +121,6 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
       objectiveId:  objectiveId || undefined,
       milestoneId:  milestoneId || undefined,
     }
-
     if (isEdit) updateTask(task.id, payload)
     else        addTask(payload)
     onClose()
@@ -102,68 +128,102 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+      style={{
+        position: 'fixed', inset: 0, zIndex: 50,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 16,
+        background: 'color-mix(in srgb, var(--ink) 30%, transparent)',
+        backdropFilter: 'blur(4px)',
+      }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
-      <div className="w-full max-w-lg rounded-2xl border border-zinc-700/60 bg-zinc-900 shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-zinc-800 px-5 py-4">
-          <h2 className="text-sm font-semibold text-zinc-200">
-            {isEdit ? 'Modifier la tâche' : 'Nouvelle tâche'}
-          </h2>
-          <button
-            onClick={onClose}
-            className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-          >
-            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
+      <div style={{
+        background: 'var(--paper-1)',
+        borderRadius: 'var(--r-xl)',
+        boxShadow: 'var(--shadow-3)',
+        padding: '28px 32px',
+        maxWidth: 560,
+        width: '100%',
+        maxHeight: '90vh',
+        overflowY: 'auto',
+      }}>
+        {/* Titre */}
+        <h2 style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 22,
+          color: 'var(--ink)',
+          margin: '0 0 24px',
+          fontWeight: 400,
+        }}>
+          {isEdit ? 'Modifier la tâche' : 'Nouvelle tâche'}
+        </h2>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-4 p-5">
-          {/* Title */}
-          <div>
-            <input
-              ref={titleRef}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Titre de la tâche…"
-              className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-100 placeholder-zinc-600 outline-none focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500/30 transition-colors"
-              required
-            />
-          </div>
+        <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
-          {/* Priority */}
+          {/* Titre — ligne éditoriale */}
+          <input
+            ref={titleRef}
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            placeholder="Titre de la tâche…"
+            required
+            style={{
+              width: '100%',
+              fontFamily: 'var(--font-serif)',
+              fontSize: 18,
+              color: 'var(--ink)',
+              background: 'transparent',
+              border: 'none',
+              borderBottom: '1px solid var(--paper-2)',
+              borderRadius: 0,
+              outline: 'none',
+              padding: '4px 0 8px',
+              boxSizing: 'border-box',
+              transition: 'border-color 0.15s',
+            }}
+            onFocus={(e) => { e.target.style.borderBottomColor = 'var(--ink-4)' }}
+            onBlur={(e) => { e.target.style.borderBottomColor = 'var(--paper-2)' }}
+          />
+
+          {/* Priorité */}
           <div>
-            <p className="mb-2 text-xs font-medium text-zinc-500">Priorité</p>
-            <div className="flex gap-2">
-              {PRIORITIES.map((p) => (
-                <button
-                  key={p.value}
-                  type="button"
-                  data-sel={priority === p.value ? 'true' : 'false'}
-                  onClick={() => setPriority(p.value)}
-                  className={[
-                    'flex-1 rounded-lg border px-2 py-1.5 text-xs font-medium transition-all',
-                    p.cls,
-                  ].join(' ')}
-                >
-                  {p.label}
-                </button>
-              ))}
+            <p style={labelStyle}>Priorité</p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              {PRIORITIES.map((p) => {
+                const active = priority === p.value
+                return (
+                  <button
+                    key={p.value}
+                    type="button"
+                    onClick={() => setPriority(p.value)}
+                    style={{
+                      flex: 1,
+                      padding: '6px 10px',
+                      borderRadius: 'var(--r-full)',
+                      border: `1px solid ${active ? 'var(--ink)' : 'var(--paper-2)'}`,
+                      background: active ? 'var(--ink)' : 'transparent',
+                      color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                      fontFamily: 'var(--font-sans)',
+                      fontSize: 12,
+                      cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
+                    {p.label}
+                  </button>
+                )
+              })}
             </div>
           </div>
 
-          {/* Status + Time estimate row */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Statut + Durée */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Statut</label>
+              <label style={labelStyle}>Statut</label>
               <select
                 value={status}
                 onChange={(e) => setStatus(e.target.value as TaskStatus)}
-                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors"
+                style={{ ...fieldStyle, fontFamily: 'var(--font-sans)' }}
               >
                 {STATUSES.map((s) => (
                   <option key={s.value} value={s.value}>{s.label}</option>
@@ -172,50 +232,60 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Durée estimée (min)</label>
-              <div className="relative">
-                <input
-                  type="number"
-                  min="1"
-                  value={timeEstimate}
-                  onChange={(e) => setTimeEstimate(e.target.value)}
-                  placeholder="ex: 45"
-                  className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 placeholder-zinc-600 outline-none focus:border-zinc-500 transition-colors"
-                />
-              </div>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {TIME_PRESETS.map((p) => (
-                  <button
-                    key={p.value}
-                    type="button"
-                    onClick={() => setTimeEstimate(String(p.value))}
-                    className="rounded px-1.5 py-0.5 text-xs text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
-                  >
-                    {p.label}
-                  </button>
-                ))}
+              <label style={labelStyle}>Durée estimée</label>
+              <input
+                type="number"
+                min="1"
+                value={timeEstimate}
+                onChange={(e) => setTimeEstimate(e.target.value)}
+                placeholder="min"
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }}
+              />
+              <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                {TIME_PRESETS.map((p) => {
+                  const active = timeEstimate === String(p.value)
+                  return (
+                    <button
+                      key={p.value}
+                      type="button"
+                      onClick={() => setTimeEstimate(String(p.value))}
+                      style={{
+                        padding: '2px 8px',
+                        borderRadius: 'var(--r-full)',
+                        border: `1px solid ${active ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+                        background: active ? 'var(--paper-2)' : 'transparent',
+                        color: active ? 'var(--ink-2)' : 'var(--ink-3)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: 11,
+                        cursor: 'pointer',
+                      }}
+                    >
+                      {p.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
           </div>
 
-          {/* Dates row */}
-          <div className="grid grid-cols-2 gap-3">
+          {/* Dates */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Planifier pour</label>
+              <label style={labelStyle}>Planifier pour</label>
               <input
                 type="date"
                 value={plannedDate}
                 onChange={(e) => setPlannedDate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]"
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', colorScheme: 'light' }}
               />
             </div>
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Échéance dure</label>
+              <label style={labelStyle}>Échéance dure</label>
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
-                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors [color-scheme:dark]"
+                style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', colorScheme: 'light' }}
               />
             </div>
           </div>
@@ -223,29 +293,48 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
           {/* Objectif lié */}
           {objectives.length > 0 && (
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Lier à un objectif</label>
-              <div className="space-y-1">
-                <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-zinc-800 px-3 py-2 hover:bg-zinc-800/40 transition-colors">
-                  <input type="radio" className="accent-teal-500" name="obj" checked={!objectiveId} onChange={() => setObjectiveId('')} />
-                  <span className="text-xs text-zinc-500">Aucun</span>
+              <label style={labelStyle}>Lier à un objectif</label>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{
+                  display: 'flex', cursor: 'pointer', alignItems: 'center', gap: 8,
+                  padding: '8px 12px', borderRadius: 'var(--r-md)',
+                  border: '1px solid var(--paper-2)',
+                  background: !objectiveId ? 'var(--paper-2)' : 'transparent',
+                }}>
+                  <input
+                    type="radio" name="obj" checked={!objectiveId}
+                    onChange={() => setObjectiveId('')}
+                    style={{ accentColor: 'var(--terra)' }}
+                  />
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>Aucun</span>
                 </label>
-                {objectives.map((o) => {
-                  const pCol = o.progress >= 80 ? 'bg-green-500' : o.progress >= 50 ? 'bg-teal-500' : o.progress >= 25 ? 'bg-blue-500' : 'bg-zinc-600'
-                  return (
-                    <label key={o.id} className={['flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 transition-colors', objectiveId === o.id ? 'border-teal-500/40 bg-teal-500/10' : 'border-zinc-800 hover:bg-zinc-800/40'].join(' ')}>
-                      <input type="radio" className="accent-teal-500" name="obj" checked={objectiveId === o.id} onChange={() => setObjectiveId(o.id)} />
-                      <div className="min-w-0 flex-1">
-                        <span className="text-xs text-zinc-200">{o.title}</span>
-                        <div className="mt-1 flex items-center gap-2">
-                          <div className="h-1 w-16 overflow-hidden rounded-full bg-zinc-800">
-                            <div className={['h-full rounded-full', pCol].join(' ')} style={{ width: `${o.progress}%` }} />
-                          </div>
-                          <span className="text-[10px] tabular-nums text-zinc-600">{o.progress}%</span>
+                {objectives.map((o) => (
+                  <label key={o.id} style={{
+                    display: 'flex', cursor: 'pointer', alignItems: 'center', gap: 8,
+                    padding: '8px 12px', borderRadius: 'var(--r-md)',
+                    border: `1px solid ${objectiveId === o.id ? 'var(--ink-4)' : 'var(--paper-2)'}`,
+                    background: objectiveId === o.id ? 'var(--paper-2)' : 'transparent',
+                  }}>
+                    <input
+                      type="radio" name="obj" checked={objectiveId === o.id}
+                      onChange={() => setObjectiveId(o.id)}
+                      style={{ accentColor: 'var(--terra)' }}
+                    />
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>{o.title}</span>
+                      <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ height: 3, width: 64, overflow: 'hidden', borderRadius: 99, background: 'var(--paper-3)' }}>
+                          <div style={{
+                            height: '100%', width: `${o.progress}%`,
+                            background: o.progress >= 80 ? 'var(--sage)' : 'var(--terra)',
+                            borderRadius: 99,
+                          }} />
                         </div>
+                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, color: 'var(--ink-3)' }}>{o.progress}%</span>
                       </div>
-                    </label>
-                  )
-                })}
+                    </div>
+                  </label>
+                ))}
               </div>
             </div>
           )}
@@ -253,11 +342,11 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
           {/* Jalon lié */}
           {milestonesForObjective.length > 0 && (
             <div>
-              <label className="mb-2 block text-xs font-medium text-zinc-500">Jalon associé</label>
+              <label style={labelStyle}>Jalon associé</label>
               <select
                 value={milestoneId}
                 onChange={(e) => setMilestoneId(e.target.value)}
-                className="w-full rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2 text-sm text-zinc-200 outline-none focus:border-zinc-500 transition-colors"
+                style={{ ...fieldStyle, fontFamily: 'var(--font-sans)' }}
               >
                 <option value="">Aucun</option>
                 {milestonesForObjective.map((m) => (
@@ -269,31 +358,60 @@ export function TaskFormModal({ domainId, task, objectiveId: prefillObjectiveId,
             </div>
           )}
 
-          {/* Notes */}
+          {/* Note rapide */}
           <div>
-            <label className="mb-2 block text-xs font-medium text-zinc-500">Note rapide</label>
+            <label style={labelStyle}>Note rapide</label>
             <textarea
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Ajouter une note…"
-              rows={2}
-              className="w-full resize-none rounded-lg border border-zinc-700/60 bg-zinc-800/50 px-3 py-2.5 text-sm text-zinc-300 placeholder-zinc-600 outline-none focus:border-zinc-500 transition-colors"
+              rows={3}
+              style={{
+                ...fieldStyle,
+                border: '1px solid var(--paper-2)',
+                fontFamily: 'var(--font-sans)',
+                resize: 'vertical',
+                padding: '10px 12px',
+              }}
             />
           </div>
 
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-1">
+          {/* Footer */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, paddingTop: 4 }}>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg px-4 py-2 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
+              style={{
+                padding: '8px 16px',
+                borderRadius: 'var(--r-md)',
+                border: 'none',
+                background: 'transparent',
+                color: 'var(--ink-2)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                cursor: 'pointer',
+              }}
             >
               Annuler
             </button>
             <button
               type="submit"
-              className="rounded-lg bg-zinc-100 px-4 py-2 text-sm font-medium text-zinc-900 hover:bg-white transition-colors disabled:opacity-40"
               disabled={!title.trim()}
+              style={{
+                padding: '8px 20px',
+                borderRadius: 'var(--r-md)',
+                border: 'none',
+                background: 'var(--terra)',
+                color: 'var(--paper-1)',
+                fontFamily: 'var(--font-sans)',
+                fontSize: 14,
+                fontWeight: 500,
+                cursor: title.trim() ? 'pointer' : 'default',
+                opacity: title.trim() ? 1 : 0.4,
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => { if (title.trim()) e.currentTarget.style.background = 'var(--terra-deep)' }}
+              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--terra)' }}
             >
               {isEdit ? 'Enregistrer' : 'Créer la tâche'}
             </button>
