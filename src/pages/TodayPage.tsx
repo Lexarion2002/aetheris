@@ -5,6 +5,7 @@ import { useWritingStore } from '../store/writingStore'
 import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
 import { hasApiKey, suggestTodayTasks, type TodaySuggestion } from '../lib/aiService'
+import { computeDailyStreak, type DailyStreak } from '../utils/streaks'
 import type { Task } from '../types'
 import type { Tache, SousTache } from '../store/droitStore'
 import type { Story } from '../store/writingStore'
@@ -217,6 +218,63 @@ interface ExternalEntry {
   done:       boolean
 }
 
+// ─── StreakLine ───────────────────────────────────────────────────────────────
+
+function StreakLine({ streak }: { streak: DailyStreak }) {
+  const { current, best, activeToday } = streak
+
+  // Pas d'historique → on n'affiche rien (évite le bruit visuel au lancement)
+  if (best === 0) return null
+
+  // Streak en cours
+  if (current > 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
+          <span style={{
+            fontFamily: 'var(--font-serif)', fontVariantNumeric: 'tabular-nums',
+            fontSize: 22, color: 'var(--terra)', fontWeight: 500,
+          }}>
+            {current}
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+            fontSize: 15, color: 'var(--ink-2)',
+          }}>
+            jour{current > 1 ? 's' : ''} d'affilée
+          </span>
+        </div>
+        <div style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10.5,
+          letterSpacing: '0.06em', color: 'var(--ink-3)',
+        }}>
+          {activeToday
+            ? (best > current ? `record · ${best} j` : 'record en cours')
+            : `à maintenir · record ${best} j`}
+        </div>
+      </div>
+    )
+  }
+
+  // current === 0 mais il y a un historique → ton doux qui invite à reprendre
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+      <span style={{
+        fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+        fontSize: 15, color: 'var(--ink-3)',
+      }}>
+        une autre fois.
+      </span>
+      <span style={{
+        fontFamily: 'var(--font-mono)', fontSize: 10.5,
+        letterSpacing: '0.06em', color: 'var(--ink-3)',
+      }}>
+        record · {best} j
+      </span>
+    </div>
+  )
+}
+
 // ─── TodayPage ────────────────────────────────────────────────────────────────
 
 export function TodayPage() {
@@ -224,9 +282,13 @@ export function TodayPage() {
   const objectives   = useStore((s) => s.objectives)
   const milestones   = useStore((s) => s.milestones)
   const domains      = useStore((s) => s.domains)
+  const timeSessions = useStore((s) => s.timeSessions)
   const setTaskStatus = useStore((s) => s.setTaskStatus)
   const updateTask   = useStore((s) => s.updateTask)
   const addTaskAction = useStore((s) => s.addTask)
+
+  // Streak quotidien — recalculé à chaque rendu (peu coûteux)
+  const streak = useMemo(() => computeDailyStreak(tasks, timeSessions), [tasks, timeSessions])
 
   const droitTaches    = useDroitStore((s) => s.taches)
   const writingStories = useWritingStore((s) => s.stories)
@@ -380,18 +442,21 @@ export function TodayPage() {
           <div style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 'clamp(32px, 4vw, 48px)', lineHeight: 1.05, letterSpacing: '-0.015em', color: 'var(--ink)' }}>
             {fmtToday()}
           </div>
-          {totalCount > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, paddingBottom: 4, flexShrink: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
-                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{doneCount}</span>
-                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink-3)', fontStyle: 'italic' }}>sur</span>
-                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{totalCount}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10, paddingBottom: 4, flexShrink: 0 }}>
+            <StreakLine streak={streak} />
+            {totalCount > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 5 }}>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{doneCount}</span>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink-3)', fontStyle: 'italic' }}>sur</span>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 28, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{totalCount}</span>
+                </div>
+                <div style={{ width: 140, height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
+                  <div style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%`, height: '100%', background: 'var(--sage)', transition: 'width 320ms ease' }} />
+                </div>
               </div>
-              <div style={{ width: 140, height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
-                <div style={{ width: `${totalCount > 0 ? (doneCount / totalCount) * 100 : 0}%`, height: '100%', background: 'var(--sage)', transition: 'width 320ms ease' }} />
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </header>
 
