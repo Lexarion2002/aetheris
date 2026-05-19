@@ -13,34 +13,31 @@ import {
   getRayonForCategorie,
 } from '../lib/cuisineConstants'
 
-// ─── Image helpers ─────────────────────────────────────────────────────────────
+// ─── Quantity helpers ──────────────────────────────────────────────────────────
 
-const IMG_PREFIX = 'aetheris-recipe-img-'
+function combineQuantites(q1?: string, q2?: string): string | undefined {
+  if (!q1 && !q2) return undefined
+  if (!q1) return q2
+  if (!q2) return q1
 
-function getRecipeImage(recette: Recette): string | null {
-  if (recette.image?.startsWith('https://')) return recette.image
-  try { return localStorage.getItem(IMG_PREFIX + recette.id) || null } catch { return null }
-}
-
-function setRecipeImage(
-  id: string,
-  src: string,
-  updateRecette: (id: string, u: Partial<Omit<Recette, 'id'>>) => void,
-) {
-  if (src.startsWith('https://') || src.startsWith('http://')) {
-    updateRecette(id, { image: src })
-    try { localStorage.removeItem(IMG_PREFIX + id) } catch {}
-  } else {
-    try { localStorage.setItem(IMG_PREFIX + id, src) } catch {}
+  const parseQty = (s: string): { num: number; unit: string } | null => {
+    const m = s.trim().match(/^(\d+(?:[.,]\d+)?)\s*([a-zA-ZgGkKlLcCmM]+)?$/)
+    if (!m) return null
+    const num = parseFloat(m[1].replace(',', '.'))
+    const unit = (m[2] ?? '').toLowerCase()
+    return isNaN(num) ? null : { num, unit }
   }
-}
 
-function removeRecipeImage(
-  id: string,
-  updateRecette: (id: string, u: Partial<Omit<Recette, 'id'>>) => void,
-) {
-  try { localStorage.removeItem(IMG_PREFIX + id) } catch {}
-  updateRecette(id, { image: undefined })
+  const p1 = parseQty(q1)
+  const p2 = parseQty(q2)
+
+  if (p1 && p2 && p1.unit === p2.unit) {
+    const total = p1.num + p2.num
+    const str = Number.isInteger(total) ? String(total) : total.toFixed(1).replace(/\.0$/, '')
+    return p1.unit ? `${str}${p1.unit}` : str
+  }
+
+  return `${q1} + ${q2}`
 }
 
 // ─── Primitives ────────────────────────────────────────────────────────────────
@@ -264,36 +261,12 @@ function RecipeCard({
   onSetImage: (src: string) => void
   onRemoveImage: () => void
 }) {
-  const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
   const [showImgImport, setShowImgImport] = useState(false)
   const [hovered, setHovered] = useState(false)
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<string | null>).detail
-      setImgSrc(detail)
-    }
-    window.addEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
-    return () => window.removeEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
-  }, [recette.id])
-
-  useEffect(() => {
-    setImgSrc(getRecipeImage(recette))
-  }, [recette.image, recette.id])
-
+  // Image stored directly in the store via recette.image
+  const imgSrc = recette.image || null
   const tint = PLACEHOLDER_TINTS[index % PLACEHOLDER_TINTS.length]
-
-  const handlePick = (src: string) => {
-    onSetImage(src)
-    setImgSrc(src)
-    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: src }))
-  }
-
-  const handleRemove = () => {
-    onRemoveImage()
-    setImgSrc(null)
-    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: null }))
-  }
 
   return (
     <div
@@ -421,8 +394,8 @@ function RecipeCard({
         {showImgImport && (
           <ImageImport
             currentImage={imgSrc}
-            onPick={handlePick}
-            onRemove={handleRemove}
+            onPick={(src) => { onSetImage(src); setShowImgImport(false) }}
+            onRemove={() => { onRemoveImage(); setShowImgImport(false) }}
             onClose={() => setShowImgImport(false)}
           />
         )}
@@ -491,11 +464,8 @@ function AddIngredientForm({
   }
 
   const handleCategorySelect = (val: string) => {
-    if (val === '__new__') {
-      setCreatingCategory(true)
-    } else {
-      setCategorie(val)
-    }
+    if (val === '__new__') setCreatingCategory(true)
+    else setCategorie(val)
   }
 
   const handleCreateCategory = () => {
@@ -531,7 +501,7 @@ function AddIngredientForm({
         Ajouter un ingrédient
       </span>
 
-      {creatingCategory ? (
+      {creatingCategory && (
         <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
           <input
             autoFocus
@@ -577,7 +547,7 @@ function AddIngredientForm({
             Annuler
           </button>
         </div>
-      ) : null}
+      )}
 
       <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
         <input
@@ -651,24 +621,17 @@ function RecipeDetailPanel({
   onRemoveImage: () => void
   onToggleDisponible: (id: string) => void
 }) {
-  const addIngredient      = useCuisineStore((s) => s.addIngredient)
-  const updateIngredient   = useCuisineStore((s) => s.updateIngredient)
-  const deleteIngredient   = useCuisineStore((s) => s.deleteIngredient)
-  const updateRecette      = useCuisineStore((s) => s.updateRecette)
+  const addIngredient    = useCuisineStore((s) => s.addIngredient)
+  const updateIngredient = useCuisineStore((s) => s.updateIngredient)
+  const deleteIngredient = useCuisineStore((s) => s.deleteIngredient)
+  const updateRecette    = useCuisineStore((s) => s.updateRecette)
 
-  const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
   const [showImgImport, setShowImgImport] = useState(false)
 
-  const recetteIngredients = allIngredients.filter((i) => recette.ingredientIds.includes(i.id))
+  // Image lives in the store directly
+  const imgSrc = recette.image || null
 
-  useEffect(() => {
-    const handler = (e: Event) => {
-      const detail = (e as CustomEvent<string | null>).detail
-      setImgSrc(detail)
-    }
-    window.addEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
-    return () => window.removeEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
-  }, [recette.id])
+  const recetteIngredients = allIngredients.filter((i) => recette.ingredientIds.includes(i.id))
 
   useEffect(() => {
     const handleKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -676,31 +639,32 @@ function RecipeDetailPanel({
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
 
-  const handlePickImage = (src: string) => {
-    onSetImage(src)
-    setImgSrc(src)
-    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: src }))
-    setShowImgImport(false)
-  }
-
-  const handleRemoveImage = () => {
-    onRemoveImage()
-    setImgSrc(null)
-    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: null }))
-    setShowImgImport(false)
-  }
-
   const handleAddIngredient = (nom: string, categorie: string, quantite: string) => {
-    const newIng = addIngredient({
-      nom,
-      categorie,
-      quantite: quantite || undefined,
-      disponible: false,
-      recetteIds: [recette.id],
-    })
-    updateRecette(recette.id, {
-      ingredientIds: [...recette.ingredientIds, newIng.id],
-    })
+    const normalizedNom = nom.toLowerCase().trim()
+    const existing = allIngredients.find((i) => i.nom.toLowerCase().trim() === normalizedNom)
+
+    if (existing && !recette.ingredientIds.includes(existing.id)) {
+      // Reuse existing ingredient — link to this recipe and combine quantities
+      updateIngredient(existing.id, {
+        recetteIds: [...existing.recetteIds, recette.id],
+        quantite: combineQuantites(existing.quantite, quantite || undefined),
+      })
+      updateRecette(recette.id, {
+        ingredientIds: [...recette.ingredientIds, existing.id],
+      })
+    } else if (!existing) {
+      const newIng = addIngredient({
+        nom: nom.trim(),
+        categorie,
+        quantite: quantite || undefined,
+        disponible: false,
+        recetteIds: [recette.id],
+      })
+      updateRecette(recette.id, {
+        ingredientIds: [...recette.ingredientIds, newIng.id],
+      })
+    }
+    // If already linked: no-op
   }
 
   const handleRemoveIngredient = (ingredientId: string) => {
@@ -770,7 +734,6 @@ function RecipeDetailPanel({
             {recette.nom}
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
-            {/* Image button */}
             <button
               onClick={() => setShowImgImport((v) => !v)}
               title={imgSrc ? 'Changer l\'image' : 'Ajouter une image'}
@@ -833,8 +796,8 @@ function RecipeDetailPanel({
           <div style={{ position: 'relative', zIndex: 2 }}>
             <ImageImport
               currentImage={imgSrc}
-              onPick={handlePickImage}
-              onRemove={handleRemoveImage}
+              onPick={(src) => { onSetImage(src); setShowImgImport(false) }}
+              onRemove={() => { onRemoveImage(); setShowImgImport(false) }}
               onClose={() => setShowImgImport(false)}
             />
           </div>
@@ -919,7 +882,9 @@ function RecipeDetailPanel({
                 Ingrédients
               </span>
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
-                {recetteIngredients.length > 0 ? `${recetteIngredients.filter(i => i.disponible).length}/${recetteIngredients.length} en stock` : '—'}
+                {recetteIngredients.length > 0
+                  ? `${recetteIngredients.filter((i) => i.disponible).length}/${recetteIngredients.length} en stock`
+                  : '—'}
               </span>
             </div>
 
@@ -978,10 +943,8 @@ function IngredientPanelRow({
         borderRadius: 'var(--r-lg)',
         background: 'var(--paper-1)',
         border: '1px solid var(--paper-2)',
-        transition: 'background var(--dur) var(--ease)',
       }}
     >
-      {/* Disponible dot */}
       <div
         onClick={onToggleDisponible}
         title={ingredient.disponible ? 'En stock — cliquer pour retirer' : 'Manquant — cliquer pour marquer en stock'}
@@ -1047,14 +1010,10 @@ function SectionTabs({
   onChange: (s: 'recettes' | 'courses') => void
 }) {
   return (
-    <div style={{
-      borderBottom: '1px solid var(--paper-2)',
-      display: 'flex',
-      gap: 0,
-    }}>
+    <div style={{ borderBottom: '1px solid var(--paper-2)', display: 'flex', gap: 0 }}>
       {([
-        { id: 'recettes', label: 'Recettes', Icon: BookOpen, count: String(recettesCount) },
-        { id: 'courses',  label: 'Mes stocks',  Icon: ShoppingBasket, count: manquantsCount > 0 ? `${manquantsCount} manquant${manquantsCount > 1 ? 's' : ''}` : '✓ complet' },
+        { id: 'recettes', label: 'Recettes',   Icon: BookOpen,       count: String(recettesCount) },
+        { id: 'courses',  label: 'Mes stocks', Icon: ShoppingBasket, count: manquantsCount > 0 ? `${manquantsCount} manquant${manquantsCount > 1 ? 's' : ''}` : '✓ complet' },
       ] as const).map(({ id, label, Icon, count }) => {
         const active = section === id
         return (
@@ -1132,32 +1091,13 @@ function RecettesView({
   return (
     <div className="cuisine-section-anim" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
-        }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
           cuisine · {recettes.length} recette{recettes.length !== 1 ? 's' : ''}
         </span>
-        <h1 style={{
-          fontFamily: 'var(--font-serif)',
-          fontSize: 32,
-          fontWeight: 400,
-          color: 'var(--ink)',
-          margin: 0,
-          lineHeight: 1.2,
-        }}>
+        <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 400, color: 'var(--ink)', margin: 0, lineHeight: 1.2 }}>
           Ton carnet de cuisine.
         </h1>
-        <p style={{
-          fontFamily: 'var(--font-serif)',
-          fontSize: 15,
-          color: 'var(--ink-3)',
-          fontStyle: 'italic',
-          margin: 0,
-        }}>
+        <p style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--ink-3)', fontStyle: 'italic', margin: 0 }}>
           Recettes, ingrédients et liste de courses.
         </p>
       </div>
@@ -1190,9 +1130,7 @@ function RecettesView({
           const active = activeType === type
           return (
             <span key={type} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-              {i > 0 && (
-                <span style={{ color: 'var(--ink-4)', fontSize: 12, userSelect: 'none' }}>·</span>
-              )}
+              {i > 0 && <span style={{ color: 'var(--ink-4)', fontSize: 12, userSelect: 'none' }}>·</span>}
               <button
                 onClick={() => setActiveType(type)}
                 style={{
@@ -1212,7 +1150,6 @@ function RecettesView({
             </span>
           )
         })}
-
         <button
           onClick={() => setFavoriOnly((v) => !v)}
           style={{
@@ -1242,26 +1179,12 @@ function RecettesView({
           <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink-3)', fontStyle: 'italic', margin: 0 }}>
             Aucune recette pour l'instant.
           </p>
-          <button
-            onClick={onNewRecette}
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: 13,
-              color: 'var(--terra)',
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-            }}
-          >
+          <button onClick={onNewRecette} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--terra)', background: 'none', border: 'none', cursor: 'pointer' }}>
             Créer la première →
           </button>
         </div>
       ) : (
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-          gap: 24,
-        }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 24 }}>
           {filtered.map((r, i) => (
             <RecipeCard
               key={r.id}
@@ -1325,7 +1248,7 @@ function IngredientStockRow({
         </span>
       )}
       {linkedRecettes.length > 0 && (
-        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexShrink: 0 }}>
           {linkedRecettes.map((r) => (
             <span key={r.id} style={{
               display: 'flex',
@@ -1370,20 +1293,13 @@ function StockRayonGroup({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <h2 style={{
-          fontFamily: 'var(--font-serif)',
-          fontSize: 16,
-          fontWeight: 400,
-          color: 'var(--ink-2)',
-          margin: 0,
-        }}>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 400, color: 'var(--ink-2)', margin: 0 }}>
           {rayon}
         </h2>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
           {manquants > 0 ? `${manquants} manquant${manquants > 1 ? 's' : ''}` : '✓'}
         </span>
       </div>
-
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {sorted.map((ing) => {
           const linked = ing.recetteIds.map((id) => recetteMap.get(id)).filter(Boolean) as Recette[]
@@ -1422,7 +1338,6 @@ function ListeDeCoursesView({
       r.ingredientIds.every((id) => ingredients.find((i) => i.id === id)?.disponible === true),
   )
 
-  // Group by rayon preserving order
   const grouped = new Map<string, Ingredient[]>()
   for (const rayon of RAYONS) grouped.set(rayon, [])
 
@@ -1436,26 +1351,12 @@ function ListeDeCoursesView({
 
   return (
     <div className="cuisine-section-anim" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-      {/* Editorial header */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span style={{
-          fontFamily: 'var(--font-mono)',
-          fontSize: 11,
-          letterSpacing: '0.12em',
-          textTransform: 'uppercase',
-          color: 'var(--ink-3)',
-        }}>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
           stocks · {manquants.length} manquant{manquants.length !== 1 ? 's' : ''}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-          <h1 style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: 32,
-            fontWeight: 400,
-            color: 'var(--ink)',
-            margin: 0,
-            lineHeight: 1.2,
-          }}>
+          <h1 style={{ fontFamily: 'var(--font-serif)', fontSize: 32, fontWeight: 400, color: 'var(--ink)', margin: 0, lineHeight: 1.2 }}>
             Tes ingrédients.
           </h1>
           {realisables.length > 0 && (
@@ -1477,13 +1378,7 @@ function ListeDeCoursesView({
             </span>
           )}
         </div>
-        <p style={{
-          fontFamily: 'var(--font-serif)',
-          fontSize: 15,
-          color: 'var(--ink-3)',
-          fontStyle: 'italic',
-          margin: 0,
-        }}>
+        <p style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--ink-3)', fontStyle: 'italic', margin: 0 }}>
           Coche ce que tu as. La liste se met à jour automatiquement.
         </p>
       </div>
@@ -1511,15 +1406,8 @@ function ListeDeCoursesView({
         </div>
       )}
 
-      {/* Manual add hint */}
       {recetteIngredients.length > 0 && (
-        <p style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 12,
-          color: 'var(--ink-4)',
-          margin: 0,
-          fontStyle: 'italic',
-        }}>
+        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-4)', margin: 0, fontStyle: 'italic' }}>
           Pour ajouter des ingrédients, ouvre une recette et complète sa liste.
         </p>
       )}
@@ -1557,13 +1445,7 @@ function NewRecipeModal({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!nom.trim()) return
-    const newRecette = addRecette({
-      nom: nom.trim(),
-      categorie,
-      tempsPreparation,
-      favori: false,
-      ingredientIds: [],
-    })
+    const newRecette = addRecette({ nom: nom.trim(), categorie, tempsPreparation, favori: false, ingredientIds: [] })
     onCreate(newRecette.id)
   }
 
@@ -1600,26 +1482,10 @@ function NewRecipeModal({
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{
-            fontFamily: 'var(--font-serif)',
-            fontSize: 22,
-            fontWeight: 400,
-            color: 'var(--ink)',
-            margin: 0,
-          }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 400, color: 'var(--ink)', margin: 0 }}>
             Nouvelle recette
           </h2>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--ink-3)',
-              display: 'flex',
-            }}
-          >
+          <button type="button" onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'flex' }}>
             <X size={18} />
           </button>
         </div>
@@ -1628,89 +1494,33 @@ function NewRecipeModal({
           <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
             Nom *
           </label>
-          <input
-            autoFocus
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-            placeholder="ex. Risotto aux champignons"
-            style={inputStyle}
-          />
+          <input autoFocus value={nom} onChange={(e) => setNom(e.target.value)} placeholder="ex. Risotto aux champignons" style={inputStyle} />
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-              Type
-            </label>
-            <select
-              value={categorie}
-              onChange={(e) => setCategorie(e.target.value as RecetteCategorie)}
-              style={inputStyle}
-            >
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Type</label>
+            <select value={categorie} onChange={(e) => setCategorie(e.target.value as RecetteCategorie)} style={inputStyle}>
               {RECIPE_TYPES.filter((t) => t !== 'Toutes').map((t) => (
-                <option key={t} value={DISPLAY_TO_CATEGORIE[t] ?? t.toLowerCase()}>
-                  {t}
-                </option>
+                <option key={t} value={DISPLAY_TO_CATEGORIE[t] ?? t.toLowerCase()}>{t}</option>
               ))}
             </select>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-              Temps (min)
-            </label>
-            <input
-              type="number"
-              min={1}
-              value={tempsPreparation}
-              onChange={(e) => setTempsPreparation(Math.max(1, parseInt(e.target.value) || 1))}
-              style={inputStyle}
-            />
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Temps (min)</label>
+            <input type="number" min={1} value={tempsPreparation} onChange={(e) => setTempsPreparation(Math.max(1, parseInt(e.target.value) || 1))} style={inputStyle} />
           </div>
         </div>
 
-        <p style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 12,
-          color: 'var(--ink-4)',
-          margin: 0,
-          fontStyle: 'italic',
-        }}>
+        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-4)', margin: 0, fontStyle: 'italic' }}>
           Tu pourras ajouter une image et des ingrédients après la création.
         </p>
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
-          <button
-            type="button"
-            onClick={onClose}
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: 13,
-              padding: '9px 18px',
-              borderRadius: 'var(--r-lg)',
-              background: 'transparent',
-              color: 'var(--ink-3)',
-              border: '1px solid var(--ink-4)',
-              cursor: 'pointer',
-            }}
-          >
+          <button type="button" onClick={onClose} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, padding: '9px 18px', borderRadius: 'var(--r-lg)', background: 'transparent', color: 'var(--ink-3)', border: '1px solid var(--ink-4)', cursor: 'pointer' }}>
             Annuler
           </button>
-          <button
-            type="submit"
-            disabled={!nom.trim()}
-            style={{
-              fontFamily: 'var(--font-sans)',
-              fontSize: 13,
-              fontWeight: 500,
-              padding: '9px 18px',
-              borderRadius: 'var(--r-lg)',
-              background: 'var(--terra)',
-              color: 'var(--paper-1)',
-              border: 'none',
-              cursor: nom.trim() ? 'pointer' : 'not-allowed',
-              opacity: nom.trim() ? 1 : 0.4,
-            }}
-          >
+          <button type="submit" disabled={!nom.trim()} style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, padding: '9px 18px', borderRadius: 'var(--r-lg)', background: 'var(--terra)', color: 'var(--paper-1)', border: 'none', cursor: nom.trim() ? 'pointer' : 'not-allowed', opacity: nom.trim() ? 1 : 0.4 }}>
             Créer la recette
           </button>
         </div>
@@ -1756,26 +1566,24 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 // ─── CuisinePage ───────────────────────────────────────────────────────────────
 
 export function CuisinePage() {
-  const recettes              = useCuisineStore((s) => s.recettes)
-  const ingredients           = useCuisineStore((s) => s.ingredients)
-  const customCategories      = useCuisineStore((s) => s.customIngredientCategories)
-  const updateRecette         = useCuisineStore((s) => s.updateRecette)
-  const toggleDisponible      = useCuisineStore((s) => s.toggleDisponible)
+  const recettes         = useCuisineStore((s) => s.recettes)
+  const ingredients      = useCuisineStore((s) => s.ingredients)
+  const customCategories = useCuisineStore((s) => s.customIngredientCategories)
+  const updateRecette    = useCuisineStore((s) => s.updateRecette)
+  const toggleDisponible = useCuisineStore((s) => s.toggleDisponible)
 
-  const [section, setSection]           = useState<'recettes' | 'courses'>('recettes')
+  const [section, setSection]             = useState<'recettes' | 'courses'>('recettes')
   const [openRecetteId, setOpenRecetteId] = useState<string | null>(null)
-  const [toast, setToast]               = useState<string | null>(null)
-  const [showNewModal, setShowNewModal]  = useState(false)
+  const [toast, setToast]                 = useState<string | null>(null)
+  const [showNewModal, setShowNewModal]   = useState(false)
 
   const openRecette = recettes.find((r) => r.id === openRecetteId) ?? null
 
-  // All categories: defaults + custom
   const allCategories = [
     ...DEFAULT_INGREDIENT_CATEGORIES,
     ...customCategories.map((name) => ({ value: name, label: name })),
   ]
 
-  // Compute which recipes are "réalisable"
   const canMakeSet = new Set<string>(
     recettes
       .filter(
@@ -1786,7 +1594,6 @@ export function CuisinePage() {
       .map((r) => r.id),
   )
 
-  // Count missing ingredients (linked to at least one recipe)
   const recetteIngredientIdSet = new Set(recettes.flatMap((r) => r.ingredientIds))
   const manquantsCount = ingredients.filter(
     (i) => recetteIngredientIdSet.has(i.id) && !i.disponible,
@@ -1797,19 +1604,19 @@ export function CuisinePage() {
     [recettes, updateRecette],
   )
 
+  // Images stored directly in the store via recette.image
   const handleSetImage = useCallback(
-    (id: string, src: string) => setRecipeImage(id, src, updateRecette),
+    (id: string, src: string) => updateRecette(id, { image: src }),
     [updateRecette],
   )
 
   const handleRemoveImage = useCallback(
-    (id: string) => removeRecipeImage(id, updateRecette),
+    (id: string) => updateRecette(id, { image: undefined }),
     [updateRecette],
   )
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
-      {/* Section tabs */}
       <SectionTabs
         section={section}
         recettesCount={recettes.length}
@@ -1817,7 +1624,6 @@ export function CuisinePage() {
         onChange={setSection}
       />
 
-      {/* Content */}
       <div style={{ padding: '40px 0' }}>
         {section === 'recettes' ? (
           <RecettesView
@@ -1838,7 +1644,6 @@ export function CuisinePage() {
         )}
       </div>
 
-      {/* Recipe detail panel */}
       {openRecette && (
         <RecipeDetailPanel
           recette={openRecette}
@@ -1852,18 +1657,13 @@ export function CuisinePage() {
         />
       )}
 
-      {/* New recipe modal */}
       {showNewModal && (
         <NewRecipeModal
           onClose={() => setShowNewModal(false)}
-          onCreate={(id) => {
-            setShowNewModal(false)
-            setOpenRecetteId(id)
-          }}
+          onCreate={(id) => { setShowNewModal(false); setOpenRecetteId(id) }}
         />
       )}
 
-      {/* Toast */}
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}
     </div>
   )

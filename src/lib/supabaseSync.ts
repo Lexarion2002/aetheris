@@ -85,7 +85,7 @@ export const supabaseStorage: StateStorage = {
 
   setItem: async (name: string, value: string): Promise<void> => {
     const key = scopedKey(name)
-    localStorage.setItem(key, value)
+    try { localStorage.setItem(key, value) } catch { /* quota exceeded — fall through to Supabase */ }
 
     if (!supabase) {
       console.warn(`[Supabase] setItem(${name}) — client null, localStorage only`)
