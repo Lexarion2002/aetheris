@@ -313,6 +313,44 @@ export function AnalyticsPage() {
       .sort((a, b) => b.focusH - a.focusH),
   [domains, monthFocusByDomain, objectives, tasks, monthStartIso])
 
+  // ── Heatmap horaire (30 derniers jours) ────────────────────────────────────
+  const hourlyData = useMemo(() => {
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 30)
+
+    const minutesByHour = Array.from({ length: 24 }, () => 0)
+    for (const s of timeSessions) {
+      const ts = new Date(s.createdAt)
+      if (isNaN(ts.getTime())) continue
+      if (ts < cutoff) continue
+      const hour = ts.getHours()
+      minutesByHour[hour] += s.duration ?? 0
+    }
+
+    return minutesByHour.map((minutes, hour) => ({
+      hour,
+      label: `${String(hour).padStart(2, '0')}h`,
+      minutes,
+    }))
+  }, [timeSessions])
+
+  const peakHour = useMemo(() => {
+    let bestIdx = -1
+    let bestMin = 0
+    for (let i = 0; i < hourlyData.length; i++) {
+      if (hourlyData[i].minutes > bestMin) {
+        bestMin = hourlyData[i].minutes
+        bestIdx = i
+      }
+    }
+    return bestIdx >= 0 ? { hour: bestIdx, minutes: bestMin } : null
+  }, [hourlyData])
+
+  const totalFocusMinutes = useMemo(
+    () => hourlyData.reduce((sum, h) => sum + h.minutes, 0),
+    [hourlyData],
+  )
+
   // ── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -614,6 +652,77 @@ export function AnalyticsPage() {
       {/* ── INSIGHTS ── */}
       {tab === 'insights' && (
         <div className="space-y-5">
+          {/* Heures de focus (heatmap horaire) */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
+            <div className="flex items-baseline justify-between mb-1 gap-4 flex-wrap">
+              <div>
+                <h2 className="text-sm font-semibold text-zinc-200">Heures de focus</h2>
+                <p className="text-xs text-zinc-600">Quand tu travailles bien — sur les 30 derniers jours</p>
+              </div>
+              {peakHour && totalFocusMinutes > 0 && (
+                <div className="text-right">
+                  <div className="text-[10px] uppercase tracking-widest text-zinc-600">Pic</div>
+                  <div className="text-base font-semibold text-amber-400 tabular-nums">
+                    {String(peakHour.hour).padStart(2, '0')}h–{String((peakHour.hour + 1) % 24).padStart(2, '0')}h
+                  </div>
+                </div>
+              )}
+            </div>
+            {totalFocusMinutes === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-2xl mb-2">⏱</p>
+                <p className="text-sm text-zinc-600">Aucune session de focus dans les 30 derniers jours</p>
+                <p className="text-xs text-zinc-700 mt-1">Lance le timer Focus pour voir tes heures de pic apparaître ici</p>
+              </div>
+            ) : (
+              <div className="mt-4" style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={hourlyData} margin={{ top: 8, right: 8, left: -20, bottom: 0 }} barCategoryGap={2}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                    <XAxis
+                      dataKey="hour"
+                      tick={{ fill: '#71717a', fontSize: 10 }}
+                      axisLine={{ stroke: '#3f3f46' }}
+                      tickLine={false}
+                      interval={2}
+                      tickFormatter={(h) => `${String(h).padStart(2, '0')}h`}
+                    />
+                    <YAxis
+                      tick={{ fill: '#71717a', fontSize: 10 }}
+                      axisLine={false}
+                      tickLine={false}
+                      tickFormatter={(v) => `${Math.round(v / 60)}h`}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (!active || !payload?.length) return null
+                        const d = payload[0].payload as { hour: number; minutes: number }
+                        const h = Math.floor(d.minutes / 60)
+                        const m = d.minutes % 60
+                        return (
+                          <div className="rounded-md border border-zinc-700 bg-zinc-900 px-3 py-2 text-xs">
+                            <div className="text-zinc-200 font-medium">
+                              {String(d.hour).padStart(2, '0')}h–{String((d.hour + 1) % 24).padStart(2, '0')}h
+                            </div>
+                            <div className="text-zinc-400 tabular-nums">
+                              {h > 0 ? `${h}h ` : ''}{m}min
+                            </div>
+                          </div>
+                        )
+                      }}
+                      cursor={{ fill: 'rgba(245,158,11,0.08)' }}
+                    />
+                    <Bar
+                      dataKey="minutes"
+                      fill="#f59e0b"
+                      radius={[2, 2, 0, 0]}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
           {/* Dernières réalisations */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
             <h2 className="text-sm font-semibold text-zinc-200 mb-1">Dernières réalisations</h2>

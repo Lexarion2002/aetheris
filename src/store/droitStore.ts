@@ -21,6 +21,24 @@ export interface Tache {
   createdAt: string
 }
 
+// ─── Spaced repetition (flashcards) ──────────────────────────────────────────
+
+export type ReviewQuality = 'again' | 'hard' | 'good' | 'easy'
+
+export interface Flashcard {
+  id:            string
+  matiere:       string
+  question:      string
+  answer:        string
+  // SM-2 state
+  easeFactor:    number   // démarre à 2.5
+  interval:      number   // jours jusqu'à la prochaine révision
+  repetitions:   number   // nb de succès consécutifs
+  nextReview:    string   // YYYY-MM-DD
+  lastReviewed:  string | null
+  createdAt:     string
+}
+
 export interface DroitStore {
   taches: Tache[]
   addTache: (t: Omit<Tache, 'id' | 'createdAt'>) => void
@@ -30,7 +48,59 @@ export interface DroitStore {
   addSousTache: (tacheId: string, label: string) => void
   removeSousTache: (tacheId: string, sousTacheId: string) => void
   setProgressionManuelle: (tacheId: string, value: number) => void
+
+  // Flashcards
+  flashcards: Flashcard[]
+  addFlashcard:    (input: { matiere: string; question: string; answer: string }) => void
+  updateFlashcard: (id: string, updates: Partial<Pick<Flashcard, 'matiere' | 'question' | 'answer'>>) => void
+  deleteFlashcard: (id: string) => void
+  reviewFlashcard: (id: string, quality: ReviewQuality) => void
+
   setHasHydrated: (v: boolean) => void
+}
+
+// ─── SM-2 helpers ────────────────────────────────────────────────────────────
+
+const QUALITY_SCORE: Record<ReviewQuality, number> = {
+  again: 0,  // raté
+  hard:  3,  // dur mais OK
+  good:  4,  // bien
+  easy:  5,  // facile
+}
+
+const todayIsoDate = (): string => new Date().toISOString().split('T')[0]
+
+const addDays = (iso: string, days: number): string => {
+  const d = new Date(iso + 'T00:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toISOString().split('T')[0]
+}
+
+function applySM2(card: Flashcard, quality: ReviewQuality): Flashcard {
+  const q = QUALITY_SCORE[quality]
+  let { easeFactor, interval, repetitions } = card
+
+  if (q < 3) {
+    // Échec — on repart de zéro mais on garde l'easeFactor
+    repetitions = 0
+    interval = 1
+  } else {
+    repetitions += 1
+    if (repetitions === 1)      interval = 1
+    else if (repetitions === 2) interval = 6
+    else                        interval = Math.round(interval * easeFactor)
+  }
+
+  easeFactor = Math.max(1.3, easeFactor + 0.1 - (5 - q) * (0.08 + (5 - q) * 0.02))
+
+  return {
+    ...card,
+    easeFactor,
+    interval,
+    repetitions,
+    nextReview:   addDays(todayIsoDate(), interval),
+    lastReviewed: todayIsoDate(),
+  }
 }
 
 // ─── Données initiales ────────────────────────────────────────────────────────
@@ -117,6 +187,7 @@ export const useDroitStore = createPersistedStore<DroitStore>(
   'aetheris-droit-v2',
   (set) => ({
     taches: DEFAULT_TACHES,
+    flashcards: [],
 
     addTache: (t) =>
       set((s) => ({
@@ -179,6 +250,40 @@ export const useDroitStore = createPersistedStore<DroitStore>(
             ? { ...t, manualProgress: Math.min(100, Math.max(0, value)) }
             : t,
         ),
+      })),
+
+    // ── Flashcards ────────────────────────────────────────────────────────
+
+    addFlashcard: ({ matiere, question, answer }) =>
+      set((s) => ({
+        flashcards: [
+          ...s.flashcards,
+          {
+            id:           crypto.randomUUID(),
+            matiere,
+            question,
+            answer,
+            easeFactor:   2.5,
+            interval:     0,
+            repetitions:  0,
+            nextReview:   todayIsoDate(),  // due dès aujourd'hui
+            lastReviewed: null,
+            createdAt:    new Date().toISOString(),
+          },
+        ],
+      })),
+
+    updateFlashcard: (id, updates) =>
+      set((s) => ({
+        flashcards: s.flashcards.map((c) => (c.id === id ? { ...c, ...updates } : c)),
+      })),
+
+    deleteFlashcard: (id) =>
+      set((s) => ({ flashcards: s.flashcards.filter((c) => c.id !== id) })),
+
+    reviewFlashcard: (id, quality) =>
+      set((s) => ({
+        flashcards: s.flashcards.map((c) => (c.id === id ? applySM2(c, quality) : c)),
       })),
 
     // Appelé par persistenceManager après rehydratation.

@@ -1,7 +1,9 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronRight, Plus, X, Trash2 } from 'lucide-react'
+import { ChevronRight, Plus, X, Trash2, BookOpen, Sparkles } from 'lucide-react'
 import { useDroitStore } from '../store/droitStore'
-import type { Tache, SousTache } from '../store/droitStore'
+import { FlashcardCreateModal } from '../components/FlashcardCreateModal'
+import { FlashcardReviewModal } from '../components/FlashcardReviewModal'
+import type { Tache, SousTache, Flashcard } from '../store/droitStore'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -671,6 +673,235 @@ const AddTaskForm = ({
   )
 }
 
+// ─── RevisionsSection ─────────────────────────────────────────────────────────
+
+const todayIso = () => new Date().toISOString().split('T')[0]
+
+function RevisionsSection() {
+  const flashcards     = useDroitStore((s) => s.flashcards)
+  const deleteFlashcard = useDroitStore((s) => s.deleteFlashcard)
+
+  const [createOpen,   setCreateOpen]   = useState(false)
+  const [createMatiere, setCreateMatiere] = useState<string | undefined>(undefined)
+  const [reviewOpen,   setReviewOpen]   = useState<{ open: boolean; matiere?: string }>({ open: false })
+  const [expandedMatiere, setExpandedMatiere] = useState<string | null>(null)
+
+  const today = todayIso()
+
+  // Groupage par matière + comptes
+  const groupedByMatiere = useMemo(() => {
+    const map = new Map<string, Flashcard[]>()
+    for (const c of flashcards) {
+      if (!map.has(c.matiere)) map.set(c.matiere, [])
+      map.get(c.matiere)!.push(c)
+    }
+    return [...map.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [flashcards])
+
+  const totalDue = flashcards.filter((c) => c.nextReview <= today).length
+  const totalCards = flashcards.length
+
+  return (
+    <section style={{ marginTop: 56 }}>
+      {/* Header */}
+      <div style={{
+        display: 'flex', justifyContent: 'space-between', alignItems: 'baseline',
+        marginBottom: 14, gap: 12, flexWrap: 'wrap',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 12 }}>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 24, fontWeight: 500,
+            color: 'var(--ink)', letterSpacing: '-0.01em', margin: 0,
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+          }}>
+            <BookOpen size={18} style={{ color: 'var(--ink-3)' }} />
+            Révisions
+          </h2>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-3)' }}>
+            {totalCards === 0
+              ? 'aucune carte pour l\'instant'
+              : `${totalDue} due${totalDue > 1 ? 's' : ''} aujourd'hui · ${totalCards} au total`}
+          </span>
+        </div>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {totalDue > 0 && (
+            <button
+              onClick={() => setReviewOpen({ open: true })}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                background: 'var(--terra)', color: 'var(--paper-1)',
+                border: 0, borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              Réviser ({totalDue})
+            </button>
+          )}
+          <button
+            onClick={() => { setCreateMatiere(undefined); setCreateOpen(true) }}
+            style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13,
+              background: 'transparent', color: 'var(--ink)',
+              border: '1px solid var(--ink-4)', borderRadius: 8, padding: '6px 12px',
+              cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Plus size={13} /> Nouvelle carte
+          </button>
+        </div>
+      </div>
+
+      {/* Empty state */}
+      {groupedByMatiere.length === 0 && (
+        <div style={{
+          padding: '24px 22px', background: 'var(--paper-1)',
+          border: '1px solid var(--paper-2)', borderRadius: 12,
+          fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+          fontSize: 14, color: 'var(--ink-3)', lineHeight: 1.5,
+        }}>
+          Pas encore de cartes. Crée-les manuellement ou colle un texte de cours dans le mode <Sparkles size={11} style={{ verticalAlign: 'baseline' }} /> Kit — il en générera 5 à 10 à valider.
+        </div>
+      )}
+
+      {/* Liste par matière */}
+      {groupedByMatiere.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {groupedByMatiere.map(([matiere, cards]) => {
+            const dueCount = cards.filter((c) => c.nextReview <= today).length
+            const isExpanded = expandedMatiere === matiere
+            return (
+              <div
+                key={matiere}
+                style={{
+                  background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+                  borderRadius: 10, overflow: 'hidden',
+                }}
+              >
+                <div style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  padding: '12px 16px', gap: 12,
+                }}>
+                  <button
+                    onClick={() => setExpandedMatiere(isExpanded ? null : matiere)}
+                    style={{
+                      flex: 1, textAlign: 'left',
+                      background: 'transparent', border: 0, cursor: 'pointer', padding: 0,
+                      display: 'flex', alignItems: 'baseline', gap: 12, minWidth: 0,
+                    }}
+                  >
+                    <span style={{
+                      fontFamily: 'var(--font-serif)', fontSize: 17, color: 'var(--ink)',
+                    }}>
+                      {matiere}
+                    </span>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)',
+                    }}>
+                      {cards.length} carte{cards.length > 1 ? 's' : ''}
+                      {dueCount > 0 && <> · <span style={{ color: 'var(--terra)' }}>{dueCount} due{dueCount > 1 ? 's' : ''}</span></>}
+                    </span>
+                  </button>
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    {dueCount > 0 && (
+                      <button
+                        onClick={() => setReviewOpen({ open: true, matiere })}
+                        style={{
+                          fontFamily: 'var(--font-sans)', fontSize: 12,
+                          background: 'var(--terra-soft)', color: 'var(--terra-deep)',
+                          border: 0, borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
+                        }}
+                      >
+                        Réviser
+                      </button>
+                    )}
+                    <button
+                      onClick={() => { setCreateMatiere(matiere); setCreateOpen(true) }}
+                      style={{
+                        fontFamily: 'var(--font-sans)', fontSize: 12,
+                        background: 'transparent', color: 'var(--ink-2)',
+                        border: '1px solid var(--paper-2)', borderRadius: 6,
+                        padding: '4px 10px', cursor: 'pointer',
+                      }}
+                    >
+                      + Carte
+                    </button>
+                  </div>
+                </div>
+
+                {/* Cartes dépliées */}
+                {isExpanded && (
+                  <div style={{ borderTop: '1px solid var(--paper-2)', padding: '10px 16px' }}>
+                    {cards.map((c) => {
+                      const due = c.nextReview <= today
+                      return (
+                        <div
+                          key={c.id}
+                          style={{
+                            display: 'flex', alignItems: 'flex-start', gap: 10,
+                            padding: '8px 0', borderBottom: '1px solid var(--paper-2)',
+                          }}
+                        >
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{
+                              fontFamily: 'var(--font-serif)', fontSize: 14,
+                              color: 'var(--ink)', lineHeight: 1.4,
+                            }}>
+                              {c.question}
+                            </div>
+                            <div style={{
+                              fontFamily: 'var(--font-sans)', fontSize: 12,
+                              color: 'var(--ink-3)', fontStyle: 'italic',
+                              lineHeight: 1.4, marginTop: 2,
+                            }}>
+                              {c.answer}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                            <span style={{
+                              fontFamily: 'var(--font-mono)', fontSize: 10,
+                              color: due ? 'var(--terra)' : 'var(--ink-3)',
+                              whiteSpace: 'nowrap',
+                            }}>
+                              {due ? 'due' : `→ ${c.nextReview.slice(5)}`}
+                            </span>
+                            <button
+                              onClick={() => deleteFlashcard(c.id)}
+                              style={{
+                                background: 'transparent', border: 0, cursor: 'pointer',
+                                color: 'var(--ink-4)', padding: 2,
+                              }}
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* Modals */}
+      {createOpen && (
+        <FlashcardCreateModal
+          defaultMatiere={createMatiere}
+          onClose={() => setCreateOpen(false)}
+        />
+      )}
+      {reviewOpen.open && (
+        <FlashcardReviewModal
+          matiereFilter={reviewOpen.matiere}
+          onClose={() => setReviewOpen({ open: false })}
+        />
+      )}
+    </section>
+  )
+}
+
 // ─── DroitPage ────────────────────────────────────────────────────────────────
 
 export function DroitPage() {
@@ -782,6 +1013,9 @@ export function DroitPage() {
           )}
         </div>
       </section>
+
+      {/* Révisions (flashcards spaced repetition) */}
+      <RevisionsSection />
     </div>
   )
 }

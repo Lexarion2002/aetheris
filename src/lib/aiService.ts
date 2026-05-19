@@ -423,3 +423,68 @@ Génère un plan équilibré de 6 à 12 tâches réparties sur la semaine. Règl
     }
   }).filter(item => item.domainId)
 }
+
+// ─── Feature 4 : génération de flashcards (Droit) ────────────────────────────
+
+export interface GeneratedFlashcard {
+  question: string
+  answer:   string
+}
+
+export async function generateFlashcards(
+  text:    string,
+  matiere: string,
+  maxCards = 10,
+): Promise<GeneratedFlashcard[]> {
+  const tool: AnthropicTool = {
+    name: 'generate_flashcards',
+    description: 'Génère des flashcards de révision depuis un texte de cours.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        cards: {
+          type: 'array',
+          maxItems: maxCards,
+          items: {
+            type: 'object',
+            properties: {
+              question: { type: 'string', description: 'Question courte et précise, en français' },
+              answer:   { type: 'string', description: 'Réponse claire, 1-3 phrases maximum' },
+            },
+            required: ['question', 'answer'],
+          },
+        },
+      },
+      required: ['cards'],
+    },
+  }
+
+  const response = await callAnthropic({
+    model: MODEL,
+    max_tokens: 3000,
+    system: `Tu es Kit. Tu génères des flashcards de révision en droit à partir de textes de cours.
+
+Règles strictes :
+- Questions courtes, précises, en français
+- Réponses 1-3 phrases maximum, sans verbiage
+- Couvre les notions clés du texte, pas les détails anecdotiques
+- Pas de questions oui/non — préfère "Qu'est-ce que…", "Quelle est la différence entre…", "Définis…"
+- Si le texte contient des arrêts ou articles, fais des cartes dessus`,
+    tools: [tool],
+    tool_choice: { type: 'tool', name: 'generate_flashcards' },
+    messages: [
+      {
+        role: 'user',
+        content: `MATIÈRE : ${matiere}
+
+TEXTE :
+${text}
+
+Génère 5 à ${maxCards} flashcards de révision sur ce texte.`,
+      },
+    ],
+  })
+
+  const result = extractToolInput<{ cards: GeneratedFlashcard[] }>(response, 'generate_flashcards')
+  return result.cards
+}
