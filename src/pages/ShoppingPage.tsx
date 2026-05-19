@@ -191,7 +191,15 @@ function CardImage({ itemId }: { itemId: string }) {
   }, [itemId])
 
   const saveImage = useCallback((dataUrl: string) => {
-    localStorage.setItem(storageKey, dataUrl)
+    try {
+      localStorage.setItem(storageKey, dataUrl)
+    } catch {
+      // localStorage plein : on vide les autres images de la wishlist avant de réessayer
+      Object.keys(localStorage)
+        .filter((k) => k.startsWith(STORAGE_PREFIX) && k !== storageKey)
+        .forEach((k) => localStorage.removeItem(k))
+      try { localStorage.setItem(storageKey, dataUrl) } catch { /* abandon silencieux */ }
+    }
     setSrc(dataUrl)
     window.dispatchEvent(new CustomEvent(`aetheris-img-${itemId}`, { detail: dataUrl }))
   }, [storageKey, itemId])
@@ -199,8 +207,23 @@ function CardImage({ itemId }: { itemId: string }) {
   const handleFile = (file: File) => {
     const reader = new FileReader()
     reader.onload = (e) => {
-      const result = e.target?.result as string
-      if (result) saveImage(result)
+      const dataUrl = e.target?.result as string
+      if (!dataUrl) return
+      const img = new Image()
+      img.onload = () => {
+        const MAX = 600
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+        const canvas = document.createElement('canvas')
+        canvas.width  = Math.round(img.width  * scale)
+        canvas.height = Math.round(img.height * scale)
+        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
+        try {
+          saveImage(canvas.toDataURL('image/jpeg', 0.7))
+        } catch {
+          saveImage(dataUrl)
+        }
+      }
+      img.src = dataUrl
     }
     reader.readAsDataURL(file)
   }
