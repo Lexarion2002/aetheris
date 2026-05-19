@@ -6,6 +6,7 @@ import { ChevronLeft, ChevronRight, Target, ClockAlert, Plus } from 'lucide-reac
 import { useStore } from '../store'
 import { useTimerStore } from '../store/timerStore'
 import { TaskFormModal } from '../components/TaskFormModal'
+import { ObjectivesPage } from './ObjectivesPage'
 import type { Domain, Task, TimeSession } from '../types'
 import {
   getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
@@ -796,6 +797,9 @@ export function WeekView() {
 
       {/* ── Backlog ───────────────────────────────────────────────────────── */}
       <Backlog tasks={backlogTasks} domains={domains} onToggle={handleToggle} />
+
+      {/* ── Objectifs ─────────────────────────────────────────────────────── */}
+      <ObjectivesPage />
 
       {/* ── TaskFormModal ─────────────────────────────────────────────────── */}
       {taskModalOpen && firstDomainId && (

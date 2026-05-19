@@ -16,7 +16,6 @@ import type { User } from '@supabase/supabase-js'
 const Dashboard      = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })))
 const DomainView     = lazy(() => import('./pages/DomainView').then((m) => ({ default: m.DomainView })))
 const FocusDashboard = lazy(() => import('./pages/FocusDashboard').then((m) => ({ default: m.FocusDashboard })))
-const ObjectivesPage = lazy(() => import('./pages/ObjectivesPage').then((m) => ({ default: m.ObjectivesPage })))
 const FinancePage    = lazy(() => import('./pages/FinancePage').then((m) => ({ default: m.FinancePage })))
 const AnalyticsPage  = lazy(() => import('./pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })))
 const WeekView       = lazy(() => import('./pages/WeekView').then((m) => ({ default: m.WeekView })))
@@ -140,7 +139,7 @@ export default function App() {
           <Route path="today"     element={<Suspense fallback={<PageLoader />}><TodayPage /></Suspense>} />
           <Route path="domain/:id" element={<Suspense fallback={<PageLoader />}><DomainView /></Suspense>} />
           <Route path="focus" element={<Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>} />
-          <Route path="objectives" element={<Suspense fallback={<PageLoader />}><ObjectivesPage /></Suspense>} />
+          <Route path="objectives" element={<Navigate to="/week" replace />} />
           <Route path="finances" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
           <Route path="week" element={<Suspense fallback={<PageLoader />}><WeekView /></Suspense>} />

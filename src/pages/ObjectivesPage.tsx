@@ -621,25 +621,31 @@ export function ObjectivesPage() {
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
-    <div style={{ padding: '32px 48px 80px', maxWidth: 900, margin: '0 auto' }}>
+    <section style={{ marginTop: 56, maxWidth: 1100 }}>
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 28, gap: 32 }}>
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', marginBottom: 22, gap: 24, flexWrap: 'wrap' }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <span style={labelStyle}>objectifs</span>
-          <h1 style={{
-            fontFamily: 'var(--font-serif)', fontSize: 40, fontWeight: 500,
-            color: 'var(--ink)', letterSpacing: '-0.01em',
-            margin: '6px 0 10px', lineHeight: 1.1,
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 12,
+            letterSpacing: '0.08em', textTransform: 'uppercase',
+            color: 'var(--ink-3)', marginBottom: 4,
+          }}>
+            boussole
+          </div>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 500,
+            color: 'var(--ink)', letterSpacing: '-0.005em',
+            margin: '2px 0 4px', lineHeight: 1.2,
           }}>
             Tes objectifs<span style={{ color: 'var(--terra)' }}>.</span>
-          </h1>
-          <p style={{
-            fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 16,
-            color: 'var(--ink-2)', margin: 0, maxWidth: '56ch', lineHeight: 1.4,
+          </h2>
+          <span style={{
+            fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+            fontSize: 14, color: 'var(--ink-2)',
           }}>
             « Avancer doucement, mais avancer. Cocher peu, mais cocher juste. »
-          </p>
+          </span>
         </div>
         <button onClick={() => setModal({ mode: 'create' })} style={primaryBtn}>
           <Plus size={15} />
@@ -786,7 +792,7 @@ export function ObjectivesPage() {
       {modal?.mode === 'edit' && (
         <ObjectiveFormModal objective={modal.obj} domainId={modal.obj.domainId} onClose={() => setModal(null)} />
       )}
-    </div>
+    </section>
   )
 }
 

@@ -463,58 +463,6 @@ export function TodayPage() {
         )}
       </section>
 
-      {/* ── Objectifs actifs ───────────────────────────────────────────────── */}
-      <ObjectivesSidebar />
     </div>
-  )
-}
-
-// ─── ObjectivesSidebar ────────────────────────────────────────────────────────
-
-function ObjectivesSidebar() {
-  const allObjectives = useStore((s) => s.objectives)
-  const milestones    = useStore((s) => s.milestones)
-  const objectives    = useMemo(
-    () => allObjectives.filter((o) => !o.archived && o.progress < 100),
-    [allObjectives],
-  )
-
-  if (objectives.length === 0) return null
-
-  return (
-    <section>
-      <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, color: 'var(--ink)', margin: '0 0 16px' }}>
-        Objectifs actifs
-      </h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
-        {objectives.map((obj) => {
-          const ms      = milestones.filter((m) => m.objectiveId === obj.id)
-          const doneMs  = ms.filter((m) => m.done).length
-          const nextMs  = ms.filter((m) => !m.done).sort((a, b) => a.position - b.position)[0]
-          return (
-            <div key={obj.id} style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '14px 16px' }}>
-              <div style={{ fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--ink)', marginBottom: 8, lineHeight: 1.3 }}>
-                {obj.title}
-              </div>
-              {ms.length > 0 && (
-                <div style={{ marginBottom: 8 }}>
-                  <div style={{ height: 2, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden', marginBottom: 4 }}>
-                    <div style={{ width: `${ms.length > 0 ? (doneMs / ms.length) * 100 : 0}%`, height: '100%', background: 'var(--terra)', transition: 'width 320ms' }} />
-                  </div>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)' }}>
-                    {doneMs}/{ms.length} jalons
-                  </span>
-                </div>
-              )}
-              {nextMs && (
-                <div style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-                  Prochain : {nextMs.title}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </section>
   )
 }
