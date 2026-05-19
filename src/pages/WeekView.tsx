@@ -1,121 +1,200 @@
+// WeekView — Page Semaine d'Aetheris
+// Design éditorial : palette papier/encre, grille 7 colonnes, backlog, retards
+
 import { useMemo, useState } from 'react'
+import { ChevronLeft, ChevronRight, Target, ClockAlert, Plus } from 'lucide-react'
 import { useStore } from '../store'
 import { useTimerStore } from '../store/timerStore'
-import { getDomainColors, getDomainIcon } from '../utils/domainColors'
-import type { Task } from '../types'
+import { TaskFormModal } from '../components/TaskFormModal'
+import type { Domain, Task, TimeSession } from '../types'
+import {
+  getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
+  minutesToHours, minutesToShort, DOMAIN_COLOR_TONES, type Day,
+} from '../utils/weekUtils'
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
+// ─── Helpers locaux ───────────────────────────────────────────────────────────
 
-function startOfWeek(offset = 0): Date {
-  const d = new Date()
-  d.setHours(0, 0, 0, 0)
-  d.setDate(d.getDate() - ((d.getDay() + 6) % 7) + offset * 7)
-  return d
+function todayIso(): string {
+  return new Date().toISOString().split('T')[0]
 }
 
-function isoDate(d: Date) {
-  return d.toISOString().split('T')[0]
+function getDomainTone(domain: Domain | undefined) {
+  if (!domain) return DOMAIN_COLOR_TONES.gray
+  return DOMAIN_COLOR_TONES[domain.color] ?? DOMAIN_COLOR_TONES.gray
 }
 
-function addDays(d: Date, n: number) {
-  const r = new Date(d)
-  r.setDate(r.getDate() + n)
-  return r
+function prioLevel(priority: string): 1 | 2 | 3 {
+  if (priority === 'urgent' || priority === 'high') return 1
+  if (priority === 'medium') return 2
+  return 3
 }
 
-const DAY_NAMES = ['Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam', 'Dim']
-
-const PRIORITY_DOT: Record<string, string> = {
-  urgent: 'bg-red-500',
-  high:   'bg-orange-400',
-  medium: 'bg-yellow-400',
-  low:    'bg-zinc-500',
+function formatWeekLabel(days: Day[]): string {
+  const startDate = new Date(days[0].iso + 'T00:00:00')
+  const endDate   = new Date(days[6].iso + 'T00:00:00')
+  const startMonth = startDate.toLocaleDateString('fr-FR', { month: 'long' })
+  const endMonth   = endDate.toLocaleDateString('fr-FR', { month: 'long' })
+  if (startMonth === endMonth) return `${days[0].date} → ${days[6].date} ${startMonth}`
+  return `${days[0].date} ${startMonth} → ${days[6].date} ${endMonth}`
 }
 
-const STATUS_STYLE: Record<string, string> = {
-  done:        'line-through text-zinc-600 opacity-60',
-  cancelled:   'line-through text-zinc-700 opacity-40',
-  in_progress: '',
-  todo:        '',
+// ─── Checkbox ────────────────────────────────────────────────────────────────
+
+function Checkbox({ checked, onClick }: { checked: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        width: 16, height: 16, borderRadius: 4, marginTop: 1,
+        border: '1.5px solid var(--ink-4)',
+        background: checked ? 'var(--sage-soft)' : 'transparent',
+        cursor: 'pointer', flexShrink: 0,
+        display: 'grid', placeItems: 'center', padding: 0,
+        transition: 'background var(--dur) var(--ease)',
+      }}
+    >
+      {checked && (
+        <svg viewBox="0 0 12 12" width="10" height="10" fill="none"
+          stroke="var(--sage-deep)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="2,6.5 5,9.5 10,3" />
+        </svg>
+      )}
+    </button>
+  )
 }
 
-// ─── Task card in a day column ────────────────────────────────────────────────
+// ─── Task Card ────────────────────────────────────────────────────────────────
 
-function TaskCard({ task, onStatusToggle }: {
+function WeekTaskCard({
+  task, domain, dimmed, onToggle, variant,
+}: {
   task: Task
-  onStatusToggle: (id: string) => void
+  domain: Domain | undefined
+  dimmed?: boolean
+  onToggle: (id: string) => void
+  variant?: 'backlog'
 }) {
-  const domains    = useStore((s) => s.domains)
+  const [hover, setHover] = useState(false)
   const timerStore = useTimerStore()
-  const domain     = domains.find((d) => d.id === task.domainId)
-  const c          = domain ? getDomainColors(domain.color) : null
-  const DomainIcon = domain ? getDomainIcon(domain.name) : null
+  const tone     = getDomainTone(domain)
+  const prio     = prioLevel(task.priority)
+  const isDone   = task.status === 'done'
+  const today    = todayIso()
+  const isOverdue = !isDone && !!task.dueDate && task.dueDate < today
+  const overdueDays = isOverdue && task.dueDate
+    ? Math.round((new Date(today + 'T00:00:00').getTime() - new Date(task.dueDate + 'T00:00:00').getTime()) / 86400000)
+    : 0
+  const isBacklog  = variant === 'backlog'
   const isRunning  = timerStore.taskId === task.id && timerStore.running
 
-  const today = isoDate(new Date())
-  const isOverdue = task.dueDate && task.dueDate < today && task.status !== 'done' && task.status !== 'cancelled'
-
-  const startFocus = () => {
+  const startFocus = (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (timerStore.running) timerStore.pause()
     timerStore.setTask(task.id)
     timerStore.start()
   }
 
   return (
-    <div className={[
-      'group rounded-lg border px-2.5 py-2 text-xs transition-all cursor-default select-none',
-      isOverdue ? 'border-red-500/40 bg-red-500/5' : 'border-zinc-800 bg-zinc-900 hover:border-zinc-700',
-    ].join(' ')}>
-      <div className="flex items-start gap-1.5">
-        {/* Checkbox */}
-        <button
-          onClick={() => onStatusToggle(task.id)}
-          className={[
-            'mt-0.5 h-3.5 w-3.5 shrink-0 rounded border transition-colors',
-            task.status === 'done'
-              ? 'border-teal-500 bg-teal-500/30'
-              : 'border-zinc-600 hover:border-zinc-400',
-          ].join(' ')}
-        >
-          {task.status === 'done' && (
-            <svg className="h-full w-full text-teal-400" fill="none" viewBox="0 0 12 12" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M2 6l3 3 5-5" />
-            </svg>
-          )}
-        </button>
-
-        {/* Title */}
-        <span className={['flex-1 leading-snug min-w-0 break-words', STATUS_STYLE[task.status]].join(' ')}>
-          {task.title}
-        </span>
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: 'var(--paper-1)',
+        border: '1px solid ' + (hover ? 'var(--ink-4)' : 'var(--paper-2)'),
+        borderRadius: 10,
+        padding: isBacklog ? '12px 12px' : '9px 10px',
+        display: 'flex', flexDirection: 'column', gap: 6,
+        opacity: isDone ? 0.55 : (dimmed ? 0.7 : 1),
+        transition: 'border-color var(--dur) var(--ease)',
+        cursor: 'default',
+        position: 'relative',
+      }}
+    >
+      {/* Ligne 1 : checkbox + trait domaine + titre */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <Checkbox checked={isDone} onClick={() => onToggle(task.id)} />
+        <div style={{
+          width: 2, alignSelf: 'stretch', minHeight: 18, marginTop: 2,
+          background: tone.color, borderRadius: 1, flexShrink: 0,
+        }} />
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{
+            fontFamily: 'var(--font-sans)', fontSize: 13.5,
+            color: isDone ? 'var(--ink-3)' : 'var(--ink)',
+            fontWeight: prio === 1 && !isDone ? 500 : 400,
+            lineHeight: 1.35, letterSpacing: '-0.005em',
+            textDecoration: isDone ? 'line-through' : 'none',
+            textDecorationColor: 'var(--ink-3)',
+            textDecorationThickness: '1px',
+            overflowWrap: 'anywhere', wordBreak: 'normal',
+            textWrap: 'pretty',
+          } as React.CSSProperties}>
+            {task.title}
+          </div>
+        </div>
       </div>
 
-      {/* Meta row */}
-      <div className="mt-1.5 flex items-center gap-1.5">
-        <span className={['h-1.5 w-1.5 rounded-full shrink-0', PRIORITY_DOT[task.priority]].join(' ')} />
-        {domain && c && (
-          <span className={['flex items-center justify-center text-[9px] rounded px-1 py-0.5 border leading-none', c.bg, c.border, c.text].join(' ')}>
-            {DomainIcon ? <DomainIcon size={10} /> : domain.icon}
-          </span>
+      {/* Ligne 2 : dot prio + domaine + estimation + retard + focus */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 8,
+        paddingLeft: 28, flexWrap: 'wrap',
+      }}>
+        {prio <= 2 && !isDone && (
+          <span style={{
+            width: 6, height: 6, borderRadius: 999, flexShrink: 0,
+            background: prio === 1 ? 'var(--terra)' : 'transparent',
+            border: prio === 2 ? '1px solid var(--ink-3)' : 'none',
+          }} />
         )}
-        {task.timeEstimate && (
-          <span className="text-[9px] text-zinc-600">{task.timeEstimate}m</span>
-        )}
-        {isOverdue && <span className="text-[9px] text-red-400 ml-auto">En retard</span>}
 
-        {/* Focus button - visible on hover or if running */}
-        {task.status !== 'done' && task.status !== 'cancelled' && (
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontSize: 10,
+          letterSpacing: '0.1em', textTransform: 'uppercase',
+          color: tone.deep,
+        }}>
+          {domain?.name ?? '—'}
+        </span>
+
+        <span style={{ color: 'var(--ink-4)' }}>·</span>
+
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+          fontSize: 11, color: 'var(--ink-2)', letterSpacing: '0.02em',
+        }}>
+          {minutesToShort(task.timeEstimate ?? 0)}
+        </span>
+
+        {isOverdue && (
+          <>
+            <span style={{ color: 'var(--ink-4)' }}>·</span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              color: 'var(--danger)', padding: '2px 6px',
+              borderRadius: 3, background: 'var(--terra-soft)',
+            }}>
+              en retard · {overdueDays} j
+            </span>
+          </>
+        )}
+
+        {!isDone && (
           <button
             onClick={startFocus}
-            className={[
-              'ml-auto flex items-center gap-0.5 rounded px-1 py-0.5 text-[9px] transition-colors',
-              isRunning
-                ? 'bg-teal-500/20 text-teal-400 border border-teal-500/30'
-                : 'opacity-0 group-hover:opacity-100 text-zinc-500 hover:text-teal-400 hover:bg-teal-500/10',
-            ].join(' ')}
-            title="Démarrer le timer"
+            style={{
+              marginLeft: 'auto',
+              fontFamily: 'var(--font-sans)', fontSize: 11.5,
+              padding: '2px 8px', borderRadius: 4,
+              background: isRunning || hover ? 'var(--ink)' : 'transparent',
+              color: isRunning || hover ? 'var(--paper-1)' : 'var(--ink-3)',
+              border: '1px solid ' + (isRunning || hover ? 'var(--ink)' : 'transparent'),
+              cursor: 'pointer',
+              opacity: hover || isRunning ? 1 : 0,
+              transition: 'opacity var(--dur) var(--ease), background var(--dur) var(--ease), color var(--dur) var(--ease)',
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+            }}
           >
-            {isRunning ? '◉' : '▶'}
+            <Target size={11} /> Focus
           </button>
         )}
       </div>
@@ -123,241 +202,732 @@ function TaskCard({ task, onStatusToggle }: {
   )
 }
 
-// ─── Page ──────────────────────────────────────────────────────────────────────
+// ─── Overdue Row ──────────────────────────────────────────────────────────────
+
+function OverdueRow({
+  task, domain, onToggle,
+}: {
+  task: Task
+  domain: Domain | undefined
+  onToggle: (id: string) => void
+}) {
+  const [hover, setHover] = useState(false)
+  const tone = getDomainTone(domain)
+  const today = todayIso()
+  const overdueDays = task.dueDate
+    ? Math.round((new Date(today + 'T00:00:00').getTime() - new Date(task.dueDate + 'T00:00:00').getTime()) / 86400000)
+    : 0
+
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display: 'flex', alignItems: 'flex-start', gap: 10,
+        padding: '8px 10px', borderRadius: 8,
+        background: hover ? 'var(--paper-1)' : 'transparent',
+        border: '1px solid ' + (hover ? 'var(--paper-2)' : 'transparent'),
+        transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+      }}
+    >
+      <Checkbox checked={task.status === 'done'} onClick={() => onToggle(task.id)} />
+      <div style={{
+        width: 2, alignSelf: 'stretch', minHeight: 14, marginTop: 2,
+        background: tone.color, borderRadius: 1,
+      }} />
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)', lineHeight: 1.3 }}>
+          {task.title}
+        </div>
+        <div style={{ marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 9.5,
+            letterSpacing: '0.1em', textTransform: 'uppercase', color: tone.deep,
+          }}>
+            {domain?.name ?? '—'}
+          </span>
+          <span style={{ color: 'var(--ink-4)' }}>·</span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+            fontSize: 10.5, color: 'var(--danger)',
+          }}>
+            +{overdueDays} j
+          </span>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Overdue Banner ───────────────────────────────────────────────────────────
+
+function OverdueBanner({
+  tasks, domains, expanded, onExpand, onToggle,
+}: {
+  tasks: Task[]
+  domains: Domain[]
+  expanded: boolean
+  onExpand: () => void
+  onToggle: (id: string) => void
+}) {
+  const sorted   = [...tasks].sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
+  const shown    = expanded ? sorted : sorted.slice(0, 5)
+  const rest     = sorted.length - shown.length
+  const total    = tasks.length
+
+  return (
+    <div style={{
+      marginTop: 20,
+      background: 'color-mix(in srgb, var(--terra-soft) 50%, var(--paper-1))',
+      border: '1px solid #DEB89C',
+      borderRadius: 12,
+      padding: '14px 18px',
+      display: 'flex', flexDirection: 'column', gap: 12,
+    }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div style={{
+          width: 26, height: 26, borderRadius: 6,
+          background: 'var(--terra-soft)', color: 'var(--terra-deep)',
+          display: 'grid', placeItems: 'center', flexShrink: 0,
+        }}>
+          <ClockAlert size={15} />
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14.5, fontWeight: 500, color: 'var(--ink)' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontWeight: 600 }}>{total}</span>
+            {' '}tâche{total > 1 ? 's' : ''} en retard
+          </div>
+          <div style={{ fontFamily: 'var(--font-sans)', fontStyle: 'italic', fontSize: 12.5, color: 'var(--ink-2)' }}>
+            à reprogrammer ou à clore — calmement.
+          </div>
+        </div>
+        {(rest > 0 || expanded) && (
+          <button
+            onClick={onExpand}
+            style={{
+              fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-2)',
+              background: 'transparent', border: '1px solid var(--ink-4)',
+              padding: '5px 10px', borderRadius: 6, cursor: 'pointer',
+            }}
+          >
+            {expanded ? 'Replier' : `Voir les ${rest} autres`}
+          </button>
+        )}
+      </div>
+
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+        gap: 8,
+      }}>
+        {shown.map(t => (
+          <OverdueRow
+            key={t.id}
+            task={t}
+            domain={domains.find(d => d.id === t.domainId)}
+            onToggle={onToggle}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// ─── Day Column ───────────────────────────────────────────────────────────────
+
+type FocusSegment = { domainId: string; domain: Domain | undefined; mins: number; pct: number }
+
+function WeekDayColumn({
+  day, tasks, domains, focusSegments, focusTotal, isToday, isPast, onToggle,
+}: {
+  day: Day
+  tasks: Task[]
+  domains: Domain[]
+  focusSegments: FocusSegment[]
+  focusTotal: number
+  isToday: boolean
+  isPast: boolean
+  onToggle: (id: string) => void
+}) {
+  const sorted = [...tasks].sort((a, b) => {
+    const aDone = a.status === 'done' ? 1 : 0
+    const bDone = b.status === 'done' ? 1 : 0
+    if (aDone !== bDone) return aDone - bDone
+    return prioLevel(a.priority) - prioLevel(b.priority)
+  })
+  const total = tasks.length
+  const done  = tasks.filter(t => t.status === 'done').length
+
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', minWidth: 0,
+      borderLeft: day.i === 0 ? '1px solid var(--paper-2)' : 'none',
+      borderRight: '1px solid var(--paper-2)',
+      background: isToday ? 'var(--paper-1)' : 'transparent',
+      transition: 'background var(--dur) var(--ease)',
+    }}>
+      {/* En-tête du jour */}
+      <div style={{
+        padding: '12px 12px 10px',
+        borderBottom: '1px solid var(--paper-2)',
+        background: isToday ? 'var(--paper-1)' : 'var(--paper)',
+        position: 'sticky', top: 0, zIndex: 2,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 }}>
+            <span style={{
+              fontFamily: 'var(--font-sans)', fontSize: 12.5,
+              color: isToday ? 'var(--terra)' : (isPast ? 'var(--ink-3)' : 'var(--ink-2)'),
+              fontWeight: isToday ? 500 : 400,
+              textTransform: 'lowercase',
+              whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+            }}>
+              {day.long}
+            </span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+              fontSize: 14, fontWeight: isToday ? 600 : 500,
+              color: isToday ? 'var(--terra)' : (isPast ? 'var(--ink-3)' : 'var(--ink)'),
+            }}>
+              {day.date}
+            </span>
+            {isToday && (
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontSize: 9.5,
+                letterSpacing: '0.14em', textTransform: 'uppercase',
+                color: 'var(--terra)', marginLeft: 2,
+              }}>
+                auj.
+              </span>
+            )}
+          </div>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+            fontSize: 11, letterSpacing: '0.04em',
+            color: total === 0 ? 'var(--ink-4)'
+                 : done === total ? 'var(--sage-deep)'
+                 : 'var(--ink-2)',
+            flexShrink: 0, whiteSpace: 'nowrap',
+          }}>
+            {done}/{total}
+          </span>
+        </div>
+
+        {/* Barre de focus proportionnelle par domaine */}
+        <div style={{
+          marginTop: 8, height: 3, borderRadius: 2, overflow: 'hidden',
+          background: 'var(--paper-2)', display: 'flex',
+        }}>
+          {focusSegments.map((s, idx) => (
+            <div
+              key={s.domainId}
+              title={`${s.domain?.name ?? s.domainId} · ${minutesToShort(s.mins)}`}
+              style={{
+                width: s.pct + '%',
+                background: getDomainTone(s.domain).color,
+                borderRight: idx < focusSegments.length - 1 ? '1px solid var(--paper)' : 'none',
+              }}
+            />
+          ))}
+        </div>
+
+        {/* Total focus du jour */}
+        <div style={{ marginTop: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline' }}>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontSize: 10,
+            letterSpacing: '0.08em', color: 'var(--ink-3)', textTransform: 'uppercase',
+          }}>
+            focus
+          </span>
+          <span style={{
+            fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+            fontSize: 10.5, color: 'var(--ink-3)', letterSpacing: '0.02em',
+          }}>
+            {focusTotal ? minutesToShort(focusTotal) : '—'}
+          </span>
+        </div>
+      </div>
+
+      {/* Tâches du jour */}
+      <div style={{
+        padding: '10px 8px 24px',
+        display: 'flex', flexDirection: 'column', gap: 6,
+        flex: 1,
+        background: isToday
+          ? 'color-mix(in srgb, var(--paper-1) 70%, var(--paper))'
+          : 'transparent',
+      }}>
+        {sorted.length === 0 ? (
+          <div style={{
+            fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+            color: 'var(--ink-3)', fontSize: 13, padding: '12px 4px',
+            textAlign: 'center', lineHeight: 1.4,
+          }}>
+            {isPast ? '— jour libre —' : 'rien de prévu'}
+          </div>
+        ) : (
+          sorted.map(t => (
+            <WeekTaskCard
+              key={t.id}
+              task={t}
+              domain={domains.find(d => d.id === t.domainId)}
+              dimmed={isPast && t.status !== 'done'}
+              onToggle={onToggle}
+            />
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ─── Backlog ──────────────────────────────────────────────────────────────────
+
+function Backlog({
+  tasks, domains, onToggle,
+}: {
+  tasks: Task[]
+  domains: Domain[]
+  onToggle: (id: string) => void
+}) {
+  return (
+    <section style={{ marginTop: 40 }}>
+      <div style={{
+        display: 'flex', alignItems: 'baseline', justifyContent: 'space-between',
+        marginBottom: 14,
+      }}>
+        <div>
+          <div style={{
+            fontFamily: 'var(--font-mono)', fontSize: 12,
+            letterSpacing: '0.08em', textTransform: 'uppercase',
+            color: 'var(--ink-3)', marginBottom: 4,
+          }}>
+            plus tard
+          </div>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 500,
+            color: 'var(--ink)', letterSpacing: '-0.005em', margin: '2px 0 0', lineHeight: 1.2,
+          }}>
+            En réserve.
+          </h2>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <span style={{
+            fontFamily: 'var(--font-sans)', fontStyle: 'italic',
+            fontSize: 13.5, color: 'var(--ink-2)',
+          }}>
+            {tasks.length === 0
+              ? 'Aucune tâche sans deadline.'
+              : 'Sans deadline — pioche quand tu veux.'}
+          </span>
+          {tasks.length > 0 && (
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+              fontSize: 12, color: 'var(--ink-3)',
+            }}>
+              {tasks.length}/20
+            </span>
+          )}
+        </div>
+      </div>
+
+      {tasks.length === 0 ? null : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+          gap: 10,
+        }}>
+          {tasks.map(t => (
+            <WeekTaskCard
+              key={t.id}
+              task={t}
+              domain={domains.find(d => d.id === t.domainId)}
+              variant="backlog"
+              onToggle={onToggle}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ─── Page principale ──────────────────────────────────────────────────────────
 
 export function WeekView() {
-  const tasks         = useStore((s) => s.tasks)
-  const timeSessions  = useStore((s) => s.timeSessions)
-  const domains       = useStore((s) => s.domains)
-  const setTaskStatus = useStore((s) => s.setTaskStatus)
+  const tasks        = useStore(s => s.tasks)
+  const timeSessions = useStore(s => s.timeSessions)
+  const domains      = useStore(s => s.domains)
+  const setTaskStatus = useStore(s => s.setTaskStatus)
 
-  const [weekOffset, setWeekOffset] = useState(0)
+  const [weekOffset, setWeekOffset]       = useState(0)
+  const [showAllOverdue, setShowAllOverdue] = useState(false)
+  const [taskModalOpen, setTaskModalOpen]   = useState(false)
+  const [taskModalPlannedDate, setTaskModalPlannedDate] = useState<string | undefined>(undefined)
 
-  const weekStart = useMemo(() => startOfWeek(weekOffset), [weekOffset])
-  const weekDays  = useMemo(() =>
-    Array.from({ length: 7 }, (_, i) => {
-      const d = addDays(weekStart, i)
-      return { date: isoDate(d), label: DAY_NAMES[i], day: d.getDate(), d }
-    }), [weekStart])
+  // ── Calcul des jours de la semaine ──────────────────────────────────────────
+  const days      = useMemo(() => getWeekDays(weekOffset), [weekOffset])
+  const bounds    = useMemo(() => getWeekBounds(weekOffset), [weekOffset])
+  const today     = todayIso()
+  const todayIndex = useMemo(() => {
+    const idx = days.findIndex(d => d.iso === today)
+    return idx >= 0 ? idx : null
+  }, [days, today])
+  const weekNum  = useMemo(() => getISOWeekNumber(new Date(days[0].iso + 'T00:00:00')), [days])
+  const weekYear = days[0].iso.slice(0, 4)
+  const weekLabel = useMemo(() => formatWeekLabel(days), [days])
 
-  const todayIso = isoDate(new Date())
+  // ── Tâches planifiées cette semaine ─────────────────────────────────────────
+  const weekTasks = useMemo(
+    () => tasks.filter(t => t.dueDate && t.dueDate >= bounds.start && t.dueDate <= bounds.end),
+    [tasks, bounds],
+  )
 
-  const tasksByDay = useMemo(() => {
-    const map = new Map<string, Task[]>()
-    for (const { date } of weekDays) map.set(date, [])
-    for (const t of tasks) {
-      if (t.dueDate && map.has(t.dueDate)) {
-        map.get(t.dueDate)!.push(t)
-      }
-    }
-    return map
-  }, [tasks, weekDays])
+  // ── Tâches en retard (avant weekStart) ──────────────────────────────────────
+  const overdueTasks = useMemo(
+    () => tasks.filter(t =>
+      t.dueDate && t.dueDate < bounds.start &&
+      t.status !== 'done' && t.status !== 'cancelled'
+    ),
+    [tasks, bounds],
+  )
 
-  // Focus minutes per domain per day (from timeSessions)
-  const focusByDay = useMemo(() => {
-    const taskDomainMap = new Map(tasks.map((t) => [t.id, t.domainId]))
-    const map = new Map<string, Map<string, number>>() // date → domainId → minutes
-    for (const { date } of weekDays) map.set(date, new Map())
-    for (const s of timeSessions) {
-      if (!map.has(s.date)) continue
-      const did = taskDomainMap.get(s.taskId)
-      if (!did) continue
-      const dayMap = map.get(s.date)!
-      dayMap.set(did, (dayMap.get(did) ?? 0) + s.duration)
-    }
-    return map
-  }, [timeSessions, tasks, weekDays])
-
-  // Tasks without dueDate (backlog)
-  const backlogTasks = useMemo(() =>
-    tasks.filter((t) =>
+  // ── Backlog (sans dueDate, pas terminées) ────────────────────────────────────
+  const backlogTasks = useMemo(
+    () => tasks.filter(t =>
       !t.dueDate &&
       t.status !== 'done' &&
       t.status !== 'cancelled'
     ).slice(0, 20),
-  [tasks])
+    [tasks],
+  )
 
-  // Overdue tasks (dueDate < weekStart and not done)
-  const overdueTasks = useMemo(() =>
-    tasks.filter((t) =>
-      t.dueDate &&
-      t.dueDate < weekDays[0].date &&
-      t.status !== 'done' &&
-      t.status !== 'cancelled'
-    ).sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? '')),
-  [tasks, weekDays])
+  // ── Métriques ───────────────────────────────────────────────────────────────
+  const planned      = weekTasks.length
+  const completed    = weekTasks.filter(t => t.status === 'done').length
+  const focusMinutes = weekTasks.reduce((acc, t) => acc + (t.timeEstimate ?? 0), 0)
+  const focusDone    = useMemo(
+    () => timeSessions
+      .filter(s => s.date >= bounds.start && s.date <= bounds.end)
+      .reduce((acc, s) => acc + s.duration, 0),
+    [timeSessions, bounds],
+  )
 
-  const handleStatusToggle = (id: string) => {
-    const t = tasks.find((t) => t.id === id)
+  // ── Données par jour pour les colonnes ─────────────────────────────────────
+  const dayData = useMemo(() => {
+    return days.map(day => {
+      const dayTasks = weekTasks.filter(t => t.dueDate === day.iso)
+      const daySessions: TimeSession[] = timeSessions.filter(s => s.date === day.iso)
+
+      // Barre focus : sessions réelles si dispo, sinon estimations
+      const focusByDomainId: Record<string, number> = {}
+      if (daySessions.length > 0) {
+        daySessions.forEach(s => {
+          const task = tasks.find(t => t.id === s.taskId)
+          if (task) {
+            focusByDomainId[task.domainId] = (focusByDomainId[task.domainId] ?? 0) + s.duration
+          }
+        })
+      } else {
+        dayTasks.forEach(t => {
+          const est = t.timeEstimate ?? 0
+          if (est > 0) {
+            focusByDomainId[t.domainId] = (focusByDomainId[t.domainId] ?? 0) + est
+          }
+        })
+      }
+
+      const focusTotal = Object.values(focusByDomainId).reduce((a, b) => a + b, 0)
+      const focusSegments: FocusSegment[] = Object.entries(focusByDomainId)
+        .sort(([, a], [, b]) => b - a)
+        .map(([domainId, mins]) => ({
+          domainId,
+          domain: domains.find(d => d.id === domainId),
+          mins,
+          pct: focusTotal ? (mins / focusTotal) * 100 : 0,
+        }))
+
+      return { day, dayTasks, focusSegments, focusTotal }
+    })
+  }, [days, weekTasks, timeSessions, tasks, domains])
+
+  // ── Handlers ────────────────────────────────────────────────────────────────
+  const handleToggle = (id: string) => {
+    const t = tasks.find(t => t.id === id)
     if (!t) return
     setTaskStatus(id, t.status === 'done' ? 'todo' : 'done')
   }
 
-  const weekLabel = () => {
-    const start = weekDays[0]
-    const end   = weekDays[6]
-    const s = start.d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
-    const e = end.d.toLocaleDateString('fr-FR',   { day: 'numeric', month: 'short', year: 'numeric' })
-    return `${s} – ${e}`
+  const openNewTask = (plannedDate?: string) => {
+    setTaskModalPlannedDate(plannedDate)
+    setTaskModalOpen(true)
   }
 
-  const totalTasksThisWeek  = Array.from(tasksByDay.values()).flat().length
-  const doneTasksThisWeek   = Array.from(tasksByDay.values()).flat().filter((t) => t.status === 'done').length
-  const focusMinsThisWeek   = Array.from(focusByDay.values()).flatMap((m) => [...m.values()]).reduce((a, b) => a + b, 0)
-  const focusHours          = Math.round(focusMinsThisWeek / 6) / 10
+  const firstDomainId = domains[0]?.id ?? ''
+  const pctDone = planned ? Math.round((completed / planned) * 100) : 0
 
   return (
-    <div className="space-y-5 px-4 py-6 md:px-6">
-      {/* Header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-bold text-zinc-100">Semaine</h1>
-          <p className="text-sm text-zinc-500">{weekLabel()}</p>
+    <div style={{
+      padding: '24px 32px 64px',
+      maxWidth: 1640, margin: '0 auto',
+      background: 'var(--paper)',
+      minHeight: '100%',
+    }}>
+
+      {/* ── Header ────────────────────────────────────────────────────────── */}
+      <div>
+        {/* Titre + navigation */}
+        <div style={{
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+          gap: 24, marginBottom: 20,
+        }}>
+          <div>
+            <div style={{
+              fontFamily: 'var(--font-mono)', fontSize: 12,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              color: 'var(--ink-3)', marginBottom: 4,
+            }}>
+              semaine · S{weekNum} · {weekYear}
+            </div>
+            <h1 style={{
+              fontFamily: 'var(--font-serif)', fontSize: 34, fontWeight: 500,
+              color: 'var(--ink)', letterSpacing: '-0.01em',
+              margin: '4px 0 2px', lineHeight: 1.15, whiteSpace: 'nowrap',
+            }}>
+              Semaine du{' '}
+              <span style={{
+                fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+                fontSize: 32, fontWeight: 500, letterSpacing: '-0.005em',
+              }}>
+                {weekLabel}
+              </span>
+            </h1>
+            <span style={{
+              fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+              fontSize: 15, color: 'var(--ink-2)',
+            }}>
+              sept jours, à tenir comme une page de carnet.
+            </span>
+          </div>
+
+          {/* Navigation */}
+          <WeekNav
+            weekOffset={weekOffset}
+            onPrev={() => setWeekOffset(o => o - 1)}
+            onNext={() => setWeekOffset(o => o + 1)}
+            onToday={() => setWeekOffset(0)}
+            onNewTask={() => openNewTask()}
+            hasNoDomains={domains.length === 0}
+          />
         </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setWeekOffset((o) => o - 1)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-          >
-            ‹ Préc.
-          </button>
-          {weekOffset !== 0 && (
-            <button
-              onClick={() => setWeekOffset(0)}
-              className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-            >
-              Auj.
-            </button>
-          )}
-          <button
-            onClick={() => setWeekOffset((o) => o + 1)}
-            className="rounded-lg border border-zinc-700 bg-zinc-900 px-3 py-1.5 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors"
-          >
-            Suiv. ›
-          </button>
+
+        {/* Métriques */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)',
+          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+          borderRadius: 14, overflow: 'hidden',
+        }}>
+          <Metric
+            label="planifiées"
+            value={planned}
+            suffix="tâches"
+            detail={`${completed} déjà faite${completed > 1 ? 's' : ''}`}
+          />
+          <Metric
+            label="terminées"
+            value={completed}
+            suffix={`sur ${planned}`}
+            detail={`${pctDone} % de la semaine`}
+            bar={pctDone}
+            barColor="var(--sage)"
+          />
+          <Metric
+            label="heures de focus"
+            value={minutesToHours(focusMinutes)}
+            suffix="estimées"
+            detail={`${minutesToHours(focusDone)} déjà passées`}
+            last
+          />
         </div>
       </div>
 
-      {/* Summary stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-center">
-          <p className="text-lg font-bold text-zinc-100">{totalTasksThisWeek}</p>
-          <p className="text-[10px] text-zinc-500 mt-0.5">tâches planifiées</p>
-        </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-center">
-          <p className="text-lg font-bold text-teal-400">{doneTasksThisWeek}</p>
-          <p className="text-[10px] text-zinc-500 mt-0.5">terminées</p>
-        </div>
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-3 text-center">
-          <p className="text-lg font-bold text-zinc-100">{focusHours}h</p>
-          <p className="text-[10px] text-zinc-500 mt-0.5">focus cette semaine</p>
-        </div>
-      </div>
-
-      {/* Overdue */}
+      {/* ── Bandeau retards ───────────────────────────────────────────────── */}
       {overdueTasks.length > 0 && (
-        <div className="rounded-xl border border-red-500/25 bg-red-500/5 p-4">
-          <p className="text-xs font-semibold text-red-400 mb-2">⚠ {overdueTasks.length} tâche{overdueTasks.length > 1 ? 's' : ''} en retard</p>
-          <div className="space-y-1.5">
-            {overdueTasks.slice(0, 5).map((t) => (
-              <TaskCard key={t.id} task={t} onStatusToggle={handleStatusToggle} />
-            ))}
-            {overdueTasks.length > 5 && (
-              <p className="text-[10px] text-zinc-600 text-center">+{overdueTasks.length - 5} de plus…</p>
-            )}
-          </div>
-        </div>
+        <OverdueBanner
+          tasks={overdueTasks}
+          domains={domains}
+          expanded={showAllOverdue}
+          onExpand={() => setShowAllOverdue(v => !v)}
+          onToggle={handleToggle}
+        />
       )}
 
-      {/* 7-day grid */}
-      <div className="overflow-x-auto -mx-4 px-4">
-        <div className="grid min-w-[700px] grid-cols-7 gap-2">
-          {weekDays.map(({ date, label, day }) => {
-            const dayTasks   = tasksByDay.get(date) ?? []
-            const isToday    = date === todayIso
-            const isPast     = date < todayIso
-            const focusMap   = focusByDay.get(date) ?? new Map()
-            const totalMins  = [...focusMap.values()].reduce((a, b) => a + b, 0)
-
-            return (
-              <div key={date} className={[
-                'flex flex-col rounded-xl border min-h-[200px]',
-                isToday  ? 'border-teal-500/40 bg-teal-500/5' :
-                isPast   ? 'border-zinc-800/60 bg-zinc-900/40' :
-                           'border-zinc-800 bg-zinc-900',
-              ].join(' ')}>
-                {/* Day header */}
-                <div className={[
-                  'flex items-center justify-between rounded-t-xl px-2.5 py-2 border-b',
-                  isToday ? 'border-teal-500/30' : 'border-zinc-800',
-                ].join(' ')}>
-                  <div>
-                    <span className={['text-[10px] font-semibold uppercase tracking-wide', isToday ? 'text-teal-400' : 'text-zinc-500'].join(' ')}>
-                      {label}
-                    </span>
-                    <span className={['ml-1.5 text-xs font-bold tabular-nums', isToday ? 'text-teal-300' : isPast ? 'text-zinc-600' : 'text-zinc-200'].join(' ')}>
-                      {day}
-                    </span>
-                  </div>
-                  {dayTasks.length > 0 && (
-                    <span className="text-[9px] tabular-nums text-zinc-600">
-                      {dayTasks.filter((t) => t.status === 'done').length}/{dayTasks.length}
-                    </span>
-                  )}
-                </div>
-
-                {/* Focus bar (domains) */}
-                {totalMins > 0 && (
-                  <div className="flex h-1 overflow-hidden mx-2 mt-1.5 rounded-full gap-px" title={`${Math.round(totalMins / 6) / 10}h focus`}>
-                    {domains.filter((d) => (focusMap.get(d.id) ?? 0) > 0).map((d) => {
-                      const c = getDomainColors(d.color)
-                      return (
-                        <div
-                          key={d.id}
-                          className={['h-full', c.dot].join(' ')}
-                          style={{ width: `${(focusMap.get(d.id)! / totalMins) * 100}%` }}
-                        />
-                      )
-                    })}
-                  </div>
-                )}
-
-                {/* Tasks */}
-                <div className="flex flex-col gap-1.5 p-2 flex-1">
-                  {dayTasks.length === 0 ? (
-                    <div className="flex-1 flex items-center justify-center">
-                      <span className="text-[10px] text-zinc-700">—</span>
-                    </div>
-                  ) : (
-                    dayTasks
-                      .sort((a, b) => {
-                        const PRI = { urgent: 0, high: 1, medium: 2, low: 3 }
-                        return PRI[a.priority] - PRI[b.priority]
-                      })
-                      .map((t) => (
-                        <TaskCard key={t.id} task={t} onStatusToggle={handleStatusToggle} />
-                      ))
-                  )}
-                </div>
-              </div>
-            )
-          })}
+      {/* ── Grille 7 colonnes ─────────────────────────────────────────────── */}
+      <div style={{
+        marginTop: 20,
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        borderRadius: 14,
+        overflow: 'hidden',
+      }}>
+        <div style={{ overflowX: 'auto', overflowY: 'visible' }}>
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(7, minmax(195px, 1fr))',
+            minWidth: 1365,
+            minHeight: 540,
+          }}>
+            {dayData.map(({ day, dayTasks, focusSegments, focusTotal }) => (
+              <WeekDayColumn
+                key={day.i}
+                day={day}
+                tasks={dayTasks}
+                domains={domains}
+                focusSegments={focusSegments}
+                focusTotal={focusTotal}
+                isToday={todayIndex === day.i}
+                isPast={day.iso < today}
+                onToggle={handleToggle}
+              />
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Backlog: tasks without a due date */}
-      {backlogTasks.length > 0 && (
-        <div>
-          <h2 className="text-sm font-semibold text-zinc-400 mb-2">
-            Sans deadline <span className="text-zinc-600 font-normal">({backlogTasks.length})</span>
-          </h2>
-          <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
-            {backlogTasks.map((t) => (
-              <TaskCard key={t.id} task={t} onStatusToggle={handleStatusToggle} />
-            ))}
-          </div>
+      {/* ── Backlog ───────────────────────────────────────────────────────── */}
+      <Backlog tasks={backlogTasks} domains={domains} onToggle={handleToggle} />
+
+      {/* ── TaskFormModal ─────────────────────────────────────────────────── */}
+      {taskModalOpen && firstDomainId && (
+        <TaskFormModal
+          domainId={firstDomainId}
+          plannedDate={taskModalPlannedDate}
+          onClose={() => setTaskModalOpen(false)}
+        />
+      )}
+    </div>
+  )
+}
+
+// ─── WeekNav ──────────────────────────────────────────────────────────────────
+
+function WeekNav({
+  weekOffset, onPrev, onNext, onToday, onNewTask, hasNoDomains,
+}: {
+  weekOffset: number
+  onPrev: () => void
+  onNext: () => void
+  onToday: () => void
+  onNewTask: () => void
+  hasNoDomains: boolean
+}) {
+  const [hoverIdx, setHoverIdx] = useState(-1)
+
+  const navBtn = (i: number, primary = false) => ({
+    fontFamily: 'var(--font-sans)' as const, fontSize: 13,
+    padding: '7px 12px',
+    background: hoverIdx === i ? 'var(--paper-2)' : 'transparent',
+    color: 'var(--ink)',
+    border: '1px solid ' + (primary && hoverIdx !== i ? 'var(--ink-4)' : hoverIdx === i ? 'var(--ink-4)' : 'transparent'),
+    borderRadius: 8, cursor: 'pointer' as const,
+    display: 'inline-flex' as const, alignItems: 'center' as const, gap: 6,
+    transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
+  })
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexShrink: 0, whiteSpace: 'nowrap' }}>
+      <button style={navBtn(0)} onMouseEnter={() => setHoverIdx(0)} onMouseLeave={() => setHoverIdx(-1)} onClick={onPrev}>
+        <ChevronLeft size={14} /> Préc.
+      </button>
+
+      {!isCurrentWeek(weekOffset) && (
+        <button style={navBtn(1, true)} onMouseEnter={() => setHoverIdx(1)} onMouseLeave={() => setHoverIdx(-1)} onClick={onToday}>
+          Auj.
+        </button>
+      )}
+
+      <button style={navBtn(2)} onMouseEnter={() => setHoverIdx(2)} onMouseLeave={() => setHoverIdx(-1)} onClick={onNext}>
+        Suiv. <ChevronRight size={14} />
+      </button>
+
+      <div style={{ width: 1, height: 22, background: 'var(--paper-2)', margin: '0 6px' }} />
+
+      <button
+        onClick={onNewTask}
+        disabled={hasNoDomains}
+        style={{
+          fontFamily: 'var(--font-sans)', fontSize: 13,
+          padding: '7px 12px',
+          background: hoverIdx === 3 ? 'var(--terra-deep)' : 'var(--terra)',
+          color: 'var(--paper-1)',
+          border: '1px solid transparent',
+          borderRadius: 8, cursor: hasNoDomains ? 'not-allowed' : 'pointer',
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          transition: 'background var(--dur) var(--ease)',
+          opacity: hasNoDomains ? 0.5 : 1,
+          whiteSpace: 'nowrap',
+        }}
+        onMouseEnter={() => setHoverIdx(3)}
+        onMouseLeave={() => setHoverIdx(-1)}
+      >
+        <Plus size={14} /> Nouvelle tâche
+      </button>
+    </div>
+  )
+}
+
+// ─── Metric ───────────────────────────────────────────────────────────────────
+
+function Metric({
+  label, value, suffix, detail, bar, barColor, last,
+}: {
+  label: string
+  value: string | number
+  suffix: string
+  detail: string
+  bar?: number
+  barColor?: string
+  last?: boolean
+}) {
+  return (
+    <div style={{
+      padding: '18px 22px',
+      borderRight: last ? 'none' : '1px solid var(--paper-2)',
+      display: 'flex', flexDirection: 'column', gap: 4,
+    }}>
+      <div style={{
+        fontFamily: 'var(--font-mono)', fontSize: 12,
+        letterSpacing: '0.08em', textTransform: 'uppercase',
+        color: 'var(--ink-3)',
+      }}>
+        {label}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginTop: 2 }}>
+        <span style={{
+          fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+          fontSize: 36, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.01em',
+          fontFamilySerif: 'var(--font-serif)',
+        } as React.CSSProperties}>
+          {value}
+        </span>
+        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)' }}>
+          {suffix}
+        </span>
+      </div>
+      {bar !== undefined && (
+        <div style={{
+          height: 3, borderRadius: 2, background: 'var(--paper-2)',
+          marginTop: 6, marginBottom: 4, overflow: 'hidden',
+        }}>
+          <div style={{
+            width: bar + '%', height: '100%',
+            background: barColor, transition: 'width var(--dur-slow) var(--ease)',
+          }} />
         </div>
       )}
+      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12.5, color: 'var(--ink-2)' }}>
+        {detail}
+      </span>
     </div>
   )
 }
