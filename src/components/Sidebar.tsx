@@ -143,6 +143,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           <span className="text-xs w-4 text-center">⊹</span>
           Dashboard
         </NavLink>
+        <NavLink to="/schedule" onClick={onNavigate} className={linkCls}>
+          <span className="text-xs w-4 text-center">⊞</span>
+          Emploi du temps
+        </NavLink>
         <NavLink to="/week" onClick={onNavigate} className={linkCls}>
           <span className="text-xs w-4 text-center">▦</span>
           Semaine

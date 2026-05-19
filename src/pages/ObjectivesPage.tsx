@@ -438,6 +438,62 @@ function MilestonesSection({
   )
 }
 
+// ─── CounterMeta ───────────────────────────────────────────────────────────────
+
+function CounterMeta({ obj }: { obj: Objective }) {
+  const incrementCounter = useStore((s) => s.incrementCounter)
+  const decrementCounter = useStore((s) => s.decrementCounter)
+  const target = obj.target ?? 0
+  const current = obj.current ?? 0
+  const isComplete = current >= target
+
+  const cadenceLabel = obj.cadence === 'daily' ? '/ jour'
+    : obj.cadence === 'weekly' ? '/ semaine'
+    : obj.cadence === 'monthly' ? '/ mois'
+    : ''
+
+  return (
+    <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+      <button
+        onClick={(e) => { e.stopPropagation(); decrementCounter(obj.id) }}
+        disabled={current === 0}
+        style={{
+          width: 24, height: 24, borderRadius: 6,
+          border: '1px solid var(--ink-4)',
+          background: 'transparent', color: 'var(--ink-2)',
+          cursor: current === 0 ? 'not-allowed' : 'pointer',
+          opacity: current === 0 ? 0.4 : 1,
+          fontFamily: 'var(--font-mono)', fontSize: 14, lineHeight: 1,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+        aria-label="Décrémenter"
+      >
+        −
+      </button>
+      <button
+        onClick={(e) => { e.stopPropagation(); incrementCounter(obj.id) }}
+        disabled={isComplete}
+        style={{
+          padding: '4px 12px', borderRadius: 6,
+          border: '1px solid ' + (isComplete ? 'var(--paper-2)' : 'var(--terra)'),
+          background: isComplete ? 'transparent' : 'var(--terra)',
+          color: isComplete ? 'var(--ink-3)' : 'var(--paper-1)',
+          cursor: isComplete ? 'default' : 'pointer',
+          fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+          display: 'inline-flex', alignItems: 'center', gap: 4,
+        }}
+      >
+        {isComplete ? '✓ Atteint' : '+ Ajouter'}
+      </button>
+      {cadenceLabel && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+          {cadenceLabel}
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ─── ObjectiveCard ─────────────────────────────────────────────────────────────
 
 function ObjectiveCard({
@@ -536,14 +592,20 @@ function ObjectiveCard({
               )}
             </div>
 
-            {/* Droite : sparkline + anneau */}
+            {/* Droite : sparkline + anneau (ou compteur) */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, paddingTop: 2 }}>
               <Sparkline values={sparkValues} />
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Ring value={obj.progress} color={ringColor} />
-                <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: 'var(--ink)', minWidth: 38, textAlign: 'right' }}>
-                  {obj.progress}&nbsp;%
-                </span>
+                {obj.kind === 'counter' && obj.target ? (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: 'var(--ink)', minWidth: 56, textAlign: 'right' }}>
+                    {obj.current ?? 0}&nbsp;/&nbsp;{obj.target}
+                  </span>
+                ) : (
+                  <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 14, color: 'var(--ink)', minWidth: 38, textAlign: 'right' }}>
+                    {obj.progress}&nbsp;%
+                  </span>
+                )}
               </div>
             </div>
           </div>
@@ -551,10 +613,14 @@ function ObjectiveCard({
           {/* Méta bas */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, gap: 16 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 16, color: 'var(--ink-2)' }}>
-              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{doneMs}/{totalMs}</span>
-                <span style={{ fontSize: 13 }}>jalons</span>
-              </span>
+              {obj.kind === 'counter' ? (
+                <CounterMeta obj={obj} />
+              ) : (
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12 }}>{doneMs}/{totalMs}</span>
+                  <span style={{ fontSize: 13 }}>jalons</span>
+                </span>
+              )}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               {obj.targetDate ? (

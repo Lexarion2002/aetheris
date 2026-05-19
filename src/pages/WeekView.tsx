@@ -340,13 +340,14 @@ function OverdueBanner({
 type FocusSegment = { domainId: string; domain: Domain | undefined; mins: number; pct: number }
 
 function WeekDayColumn({
-  day, tasks, domains, focusSegments, focusTotal, isToday, isPast, onToggle,
+  day, tasks, domains, focusSegments, focusTotal, scheduleBlocks, isToday, isPast, onToggle,
 }: {
   day: Day
   tasks: Task[]
   domains: Domain[]
   focusSegments: FocusSegment[]
   focusTotal: number
+  scheduleBlocks: import('../types').ScheduleBlock[]
   isToday: boolean
   isPast: boolean
   onToggle: (id: string) => void
@@ -448,6 +449,35 @@ function WeekDayColumn({
             {focusTotal ? minutesToShort(focusTotal) : '—'}
           </span>
         </div>
+
+        {/* Plages bloquées (emploi du temps récurrent) */}
+        {scheduleBlocks.length > 0 && (
+          <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 3 }}>
+            {scheduleBlocks
+              .sort((a, b) => a.startTime.localeCompare(b.startTime))
+              .map((b) => (
+                <div
+                  key={b.id}
+                  title={`${b.title} · ${b.startTime}–${b.endTime}`}
+                  style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 10.5,
+                    padding: '3px 6px', borderRadius: 4,
+                    background: 'var(--paper-2)', color: 'var(--ink-2)',
+                    borderLeft: '2px solid ' + (
+                      b.kind === 'class' ? 'var(--terra)'
+                      : b.kind === 'work' ? 'var(--ink-3)'
+                      : b.kind === 'commitment' ? 'var(--sage)'
+                      : 'var(--ink-4)'
+                    ),
+                    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+                  }}
+                >
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, color: 'var(--ink-3)' }}>{b.startTime}</span>
+                  {' '}{b.title}
+                </div>
+              ))}
+          </div>
+        )}
       </div>
 
       {/* Tâches du jour */}
@@ -748,6 +778,7 @@ export function WeekView() {
   const domains      = useStore(s => s.domains)
   const objectives   = useStore(s => s.objectives)
   const milestones   = useStore(s => s.milestones)
+  const scheduleBlocks = useStore(s => s.scheduleBlocks)
   const setTaskStatus = useStore(s => s.setTaskStatus)
   const addTaskAction = useStore(s => s.addTask)
   const kitEnabled   = useStore(s => !!s.anthropicApiKey)
@@ -866,7 +897,9 @@ export function WeekView() {
     try {
       const active = objectives.filter(o => !o.archived && o.progress < 100)
       const items = await generateWeekPlan({
-        domains, objectives: active, milestones, recentTasks: tasks.slice(-30),
+        domains, objectives: active, milestones,
+        recentTasks: tasks.slice(-30),
+        scheduleBlocks,
       }, bounds.start)
       setKitPlanItems(items)
     } catch (err) {
@@ -1017,6 +1050,7 @@ export function WeekView() {
                 domains={domains}
                 focusSegments={focusSegments}
                 focusTotal={focusTotal}
+                scheduleBlocks={scheduleBlocks.filter((b) => b.daysOfWeek.includes(day.i))}
                 isToday={todayIndex === day.i}
                 isPast={day.iso < today}
                 onToggle={handleToggle}

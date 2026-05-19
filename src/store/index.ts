@@ -1,7 +1,7 @@
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
 import { createPersistedStore } from '../lib/persistenceManager'
-import type { Domain, Task, SubTask, Objective, Milestone, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings } from '../types'
+import type { Domain, Task, SubTask, Objective, Milestone, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings, ScheduleBlock } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -71,6 +71,11 @@ interface AetherisState {
   archiveObjective: (id: string, archived: boolean) => void
   recomputeObjectiveProgress: (objectiveId: string) => void
 
+  // Counter (kind === 'counter')
+  incrementCounter: (id: string, by?: number) => void
+  decrementCounter: (id: string, by?: number) => void
+  setCounterValue:  (id: string, value: number) => void
+
   // Milestone actions
   addMilestone: (milestone: Omit<Milestone, 'id' | 'createdAt'>) => Milestone
   updateMilestone: (id: string, updates: Partial<Omit<Milestone, 'id' | 'createdAt'>>) => void
@@ -118,9 +123,20 @@ interface AetherisState {
   userContext:     string
   setUserContext:  (ctx: string) => void
 
+  // Emploi du temps récurrent
+  scheduleBlocks:      ScheduleBlock[]
+  addScheduleBlock:    (block: Omit<ScheduleBlock, 'id' | 'createdAt'>) => ScheduleBlock
+  updateScheduleBlock: (id: string, updates: Partial<Omit<ScheduleBlock, 'id' | 'createdAt'>>) => void
+  deleteScheduleBlock: (id: string) => void
+
   // Kit (IA) — clé Anthropic stockée dans le store sync Supabase
   anthropicApiKey:    string
   setAnthropicApiKey: (key: string) => void
+
+  // Migrations one-shot (booléens persistants pour éviter double-migration)
+  _migratedSportObjectives?: boolean
+  _migratedBookAnnualGoal?:  boolean
+  setMigrationFlag:          (key: '_migratedSportObjectives' | '_migratedBookAnnualGoal', v: boolean) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -168,6 +184,7 @@ export const useStore = createPersistedStore<AetherisState>(
       },
       userContext: '',
       anthropicApiKey: '',
+      scheduleBlocks: [],
 
       // ── Seed / Onboarding ────────────────────────────────────────────────────
 
@@ -312,6 +329,11 @@ export const useStore = createPersistedStore<AetherisState>(
 
       addObjective: (objective) => {
         const newObj: Objective = { id: nanoid(), createdAt: now(), updatedAt: now(), ...objective }
+        // Pour counter : progress dérivé de current/target
+        if (newObj.kind === 'counter' && newObj.target && newObj.target > 0) {
+          newObj.current = newObj.current ?? 0
+          newObj.progress = Math.min(100, Math.round((newObj.current / newObj.target) * 100))
+        }
         // Track initial progress in history
         if (newObj.progress > 0) {
           newObj.progressHistory = trackProgress(newObj.progressHistory, newObj.progress)
@@ -361,6 +383,53 @@ export const useStore = createPersistedStore<AetherisState>(
           objectives: s.objectives.map((o) =>
             o.id === id ? { ...o, archived, updatedAt: now() } : o,
           ),
+        })),
+
+      // ── Counter actions ────────────────────────────────────────────────────
+
+      setCounterValue: (id, value) =>
+        set((s) => ({
+          objectives: s.objectives.map((o) => {
+            if (o.id !== id || o.kind !== 'counter') return o
+            const target = o.target ?? 1
+            const current = Math.max(0, Math.min(target, value))
+            const progress = Math.min(100, Math.round((current / target) * 100))
+            return {
+              ...o, current, progress,
+              progressHistory: trackProgress(o.progressHistory, progress),
+              updatedAt: now(),
+            }
+          }),
+        })),
+
+      incrementCounter: (id, by = 1) =>
+        set((s) => ({
+          objectives: s.objectives.map((o) => {
+            if (o.id !== id || o.kind !== 'counter') return o
+            const target = o.target ?? 1
+            const current = Math.max(0, Math.min(target, (o.current ?? 0) + by))
+            const progress = Math.min(100, Math.round((current / target) * 100))
+            return {
+              ...o, current, progress,
+              progressHistory: trackProgress(o.progressHistory, progress),
+              updatedAt: now(),
+            }
+          }),
+        })),
+
+      decrementCounter: (id, by = 1) =>
+        set((s) => ({
+          objectives: s.objectives.map((o) => {
+            if (o.id !== id || o.kind !== 'counter') return o
+            const target = o.target ?? 1
+            const current = Math.max(0, Math.min(target, (o.current ?? 0) - by))
+            const progress = Math.min(100, Math.round((current / target) * 100))
+            return {
+              ...o, current, progress,
+              progressHistory: trackProgress(o.progressHistory, progress),
+              updatedAt: now(),
+            }
+          }),
         })),
 
       recomputeObjectiveProgress: (objectiveId) =>
@@ -558,6 +627,22 @@ export const useStore = createPersistedStore<AetherisState>(
       // ── Kit (IA) ─────────────────────────────────────────────────────────────
 
       setAnthropicApiKey: (key) => set({ anthropicApiKey: key.trim() }),
+
+      setMigrationFlag: (key, v) => set({ [key]: v } as Partial<AetherisState>),
+
+      // ── Schedule blocks ────────────────────────────────────────────────────
+
+      addScheduleBlock: (block) => {
+        const newBlock: ScheduleBlock = { ...block, id: nanoid(), createdAt: now() }
+        set((s) => ({ scheduleBlocks: [...s.scheduleBlocks, newBlock] }))
+        return newBlock
+      },
+      updateScheduleBlock: (id, updates) =>
+        set((s) => ({
+          scheduleBlocks: s.scheduleBlocks.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+        })),
+      deleteScheduleBlock: (id) =>
+        set((s) => ({ scheduleBlocks: s.scheduleBlocks.filter((b) => b.id !== id) })),
   }),
 )
 

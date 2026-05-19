@@ -429,8 +429,11 @@ export function TodayPage() {
         for (const id of autoplan.taskIds) deleteTaskAction(id)
       }
 
+      const scheduleBlocks = useStore.getState().scheduleBlocks
       const items = await suggestTodayTasks({
-        domains, objectives: activeObjectives, milestones, recentTasks: tasks.slice(-30),
+        domains, objectives: activeObjectives, milestones,
+        recentTasks: tasks.slice(-30),
+        scheduleBlocks,
       }, 5)
 
       const newIds: string[] = []

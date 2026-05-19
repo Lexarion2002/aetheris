@@ -8,6 +8,7 @@ import { ResetPasswordPage } from './pages/ResetPasswordPage'
 import { watchOnlineStatus, setCurrentUserId } from './lib/supabaseSync'
 import { getCurrentUser, onAuthStateChange } from './lib/supabaseAuth'
 import { isSupabaseReady } from './lib/supabase'
+import { runAllMigrations } from './lib/migrations'
 import { useStore } from './store'
 import type { User } from '@supabase/supabase-js'
 
@@ -31,6 +32,7 @@ const EcriturePage      = lazy(() => import('./pages/EcriturePage').then((m) => 
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
 const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
 const TodayPage         = lazy(() => import('./pages/TodayPage').then((m) => ({ default: m.TodayPage })))
+const SchedulePage      = lazy(() => import('./pages/SchedulePage').then((m) => ({ default: m.SchedulePage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -114,6 +116,13 @@ export default function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  // Migrations one-shot des objectifs domain-spécifiques vers le store principal.
+  // Délai pour laisser le sportStore / bookStore s'hydrater depuis Supabase.
+  useEffect(() => {
+    const t = setTimeout(() => runAllMigrations(), 1500)
+    return () => clearTimeout(t)
+  }, [])
+
 
   // ── Auth guard ────────────────────────────────────────────────────────────
   // Pendant la vérification auth → spinner
@@ -153,6 +162,7 @@ export default function App() {
           <Route path="finances" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
           <Route path="week" element={<Suspense fallback={<PageLoader />}><WeekView /></Suspense>} />
+          <Route path="schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           <Route path="categories" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
           <Route path="musique" element={<Suspense fallback={<PageLoader />}><MusicPage /></Suspense>} />

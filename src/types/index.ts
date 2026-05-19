@@ -62,17 +62,28 @@ export interface ProgressEntry {
   value: number  // 0–100
 }
 
+export type ObjectiveKind    = 'single' | 'counter'
+export type ObjectiveCadence = 'daily' | 'weekly' | 'monthly' | 'free'
+
 export interface Objective {
   id: string
   domainId: string
   title: string
   description: string
   targetDate: string | null    // ISO date string
-  progress: number             // 0–100
+  progress: number             // 0–100 (calculé auto pour counter)
   archived?: boolean
   progressHistory?: ProgressEntry[]
   createdAt: string
   updatedAt: string
+
+  // Type d'objectif. Si absent → 'single' (legacy : un titre + une date cible).
+  kind?: ObjectiveKind
+
+  // Champs counter (uniquement si kind === 'counter')
+  target?:  number              // ex: 52 (livres à lire)
+  current?: number              // ex: 7 (déjà lus)
+  cadence?: ObjectiveCadence    // rythme attendu pour rester dans les clous
 }
 
 // ─── Expense ──────────────────────────────────────────────────────────────────
@@ -146,6 +157,29 @@ export interface PomodoroSettings {
   longBreakDuration:       number   // minutes, default 15
   sessionsBeforeLongBreak: number   // default 4
   soundEnabled:            boolean
+}
+
+// ─── ScheduleBlock ────────────────────────────────────────────────────────────
+
+/**
+ * Bloc récurrent d'emploi du temps. Représente les cours, l'alternance, les
+ * routines hebdomadaires — toutes les plages déjà occupées dans la semaine
+ * de l'utilisateur, pour que Kit puisse planifier autour.
+ */
+export type ScheduleBlockKind = 'class' | 'work' | 'commitment' | 'routine'
+
+export interface ScheduleBlock {
+  id:          string
+  title:       string                // "Cours · Droit fiscal", "Cabinet (alternance)"
+  kind:        ScheduleBlockKind
+  daysOfWeek:  number[]              // 0=lun, 6=dim (style ISO)
+  startTime:   string                // "09:00"
+  endTime:     string                // "17:00"
+  startDate?:  string | null         // optionnel : début de validité YYYY-MM-DD
+  endDate?:    string | null         // optionnel : fin de validité YYYY-MM-DD
+  domainId?:   string                // domaine associé (optionnel)
+  notes?:      string
+  createdAt:   string
 }
 
 // ─── TimeSession ──────────────────────────────────────────────────────────────

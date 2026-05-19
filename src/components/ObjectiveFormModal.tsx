@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Circle } from 'lucide-react'
 import { useStore } from '../store'
 import { getDomainIcon } from '../utils/domainColors'
-import type { Domain, Objective } from '../types'
+import type { Domain, Objective, ObjectiveKind, ObjectiveCadence } from '../types'
 
 const STATIC_DOMAINS: Domain[] = [
   { id: 'musique',  name: 'Musique',        color: 'purple', icon: '', description: '' },
@@ -65,6 +65,12 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
   const [domainId,     setDomainId]     = useState(propDomainId ?? objective?.domainId ?? '')
   const [showTaskLink, setShowTaskLink] = useState(false)
 
+  // Counter
+  const [kind,        setKind]        = useState<ObjectiveKind>(objective?.kind ?? 'single')
+  const [counterTarget,  setCounterTarget]  = useState<number>(objective?.target ?? 52)
+  const [counterCurrent, setCounterCurrent] = useState<number>(objective?.current ?? 0)
+  const [counterCadence, setCounterCadence] = useState<ObjectiveCadence>(objective?.cadence ?? 'weekly')
+
   const [linkedTaskIds, setLinkedTaskIds] = useState<Set<string>>(() =>
     new Set(objective ? tasks.filter((t) => t.objectiveId === objective.id).map((t) => t.id) : [])
   )
@@ -97,12 +103,24 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!title.trim() || !domainId) return
-    const payload = {
+    if (kind === 'counter' && (!counterTarget || counterTarget < 1)) return
+
+    const computedProgress = kind === 'counter' && counterTarget > 0
+      ? Math.min(100, Math.round((counterCurrent / counterTarget) * 100))
+      : progress
+
+    const payload: Omit<Objective, 'id' | 'createdAt' | 'updatedAt'> = {
       domainId,
       title:       title.trim(),
       description: description.trim(),
       targetDate:  targetDate || null,
-      progress,
+      progress:    computedProgress,
+      kind,
+      ...(kind === 'counter' ? {
+        target:  counterTarget,
+        current: counterCurrent,
+        cadence: counterCadence,
+      } : {}),
     }
     if (isEdit) {
       updateObjective(objective.id, payload)
@@ -233,47 +251,152 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
             }}
           />
 
-          {/* Date cible */}
+          {/* Type d'objectif — toggle */}
           <div>
-            <label style={labelStyle}>Date cible</label>
-            <input
-              type="date"
-              value={targetDate}
-              onChange={(e) => setTargetDate(e.target.value)}
-              style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', colorScheme: 'light' }}
-            />
-          </div>
-
-          {/* Progression — 5 chips */}
-          <div>
-            <label style={labelStyle}>Progression actuelle</label>
-            <div style={{ display: 'flex', gap: 8 }}>
-              {[0, 25, 50, 75, 100].map((v) => {
-                const active = progress === v
+            <label style={labelStyle}>Type</label>
+            <div style={{ display: 'inline-flex', background: 'var(--paper)', border: '1px solid var(--paper-2)', borderRadius: 8, padding: 3, gap: 2 }}>
+              {([
+                { value: 'single',  label: 'Ponctuel',  hint: 'titre + date' },
+                { value: 'counter', label: 'Compteur',  hint: 'X sur Y' },
+              ] as Array<{ value: ObjectiveKind; label: string; hint: string }>).map((opt) => {
+                const active = kind === opt.value
                 return (
                   <button
-                    key={v}
+                    key={opt.value}
                     type="button"
-                    onClick={() => setProgress(v)}
+                    onClick={() => setKind(opt.value)}
                     style={{
-                      flex: 1,
-                      padding: '6px 8px',
-                      borderRadius: 'var(--r-full)',
-                      border: `1px solid ${active ? 'var(--terra)' : 'var(--paper-2)'}`,
-                      background: active ? 'var(--terra)' : 'transparent',
-                      color: active ? 'var(--paper-1)' : 'var(--ink-2)',
-                      fontFamily: 'var(--font-mono)',
-                      fontSize: 12,
+                      padding: '6px 14px', borderRadius: 5, border: 0,
                       cursor: 'pointer',
+                      background: active ? 'var(--paper-3)' : 'transparent',
+                      color: active ? 'var(--ink)' : 'var(--ink-2)',
+                      fontFamily: 'var(--font-sans)', fontSize: 13,
+                      display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', gap: 2,
                       transition: 'all 0.15s',
                     }}
                   >
-                    {v}%
+                    <span style={{ fontWeight: active ? 500 : 400 }}>{opt.label}</span>
+                    <span style={{ fontSize: 10, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>{opt.hint}</span>
                   </button>
                 )
               })}
             </div>
           </div>
+
+          {/* Champs spécifiques au type */}
+          {kind === 'single' ? (
+            <>
+              {/* Date cible */}
+              <div>
+                <label style={labelStyle}>Date cible</label>
+                <input
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', colorScheme: 'light' }}
+                />
+              </div>
+
+              {/* Progression — 5 chips */}
+              <div>
+                <label style={labelStyle}>Progression actuelle</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  {[0, 25, 50, 75, 100].map((v) => {
+                    const active = progress === v
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        onClick={() => setProgress(v)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          borderRadius: 'var(--r-full)',
+                          border: `1px solid ${active ? 'var(--terra)' : 'var(--paper-2)'}`,
+                          background: active ? 'var(--terra)' : 'transparent',
+                          color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                          fontFamily: 'var(--font-mono)',
+                          fontSize: 12,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {v}%
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {/* Counter : target + current + cadence */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                <div>
+                  <label style={labelStyle}>Cible</label>
+                  <input
+                    type="number"
+                    min={1}
+                    value={counterTarget}
+                    onChange={(e) => setCounterTarget(Math.max(1, parseInt(e.target.value || '1', 10)))}
+                    style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Déjà fait</label>
+                  <input
+                    type="number"
+                    min={0}
+                    max={counterTarget}
+                    value={counterCurrent}
+                    onChange={(e) => setCounterCurrent(Math.max(0, Math.min(counterTarget, parseInt(e.target.value || '0', 10))))}
+                    style={{ ...fieldStyle, fontFamily: 'var(--font-mono)' }}
+                  />
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Cadence attendue</label>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {([
+                    { value: 'daily',   label: 'Quotidienne' },
+                    { value: 'weekly',  label: 'Hebdomadaire' },
+                    { value: 'monthly', label: 'Mensuelle' },
+                    { value: 'free',    label: 'Libre' },
+                  ] as Array<{ value: ObjectiveCadence; label: string }>).map((opt) => {
+                    const active = counterCadence === opt.value
+                    return (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => setCounterCadence(opt.value)}
+                        style={{
+                          flex: 1,
+                          padding: '6px 8px',
+                          borderRadius: 'var(--r-full)',
+                          border: `1px solid ${active ? 'var(--terra)' : 'var(--paper-2)'}`,
+                          background: active ? 'var(--terra)' : 'transparent',
+                          color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                          fontFamily: 'var(--font-sans)', fontSize: 12,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        {opt.label}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div>
+                <label style={labelStyle}>Échéance globale (optionnel)</label>
+                <input
+                  type="date"
+                  value={targetDate}
+                  onChange={(e) => setTargetDate(e.target.value)}
+                  style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', colorScheme: 'light' }}
+                />
+              </div>
+            </>
+          )}
 
           {/* Lier des tâches */}
           {domainId && linkableTasks.length > 0 && (

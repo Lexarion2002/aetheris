@@ -1,5 +1,5 @@
 import { useStore } from '../store'
-import type { Domain, Objective, Milestone, Task } from '../types'
+import type { Domain, Objective, Milestone, Task, ScheduleBlock } from '../types'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -115,10 +115,11 @@ function extractToolInput<T>(response: AnthropicResponse, toolName: string): T {
 // ─── Context builder ─────────────────────────────────────────────────────────
 
 interface Ctx {
-  domains:     Domain[]
-  objectives:  Objective[]
-  milestones:  Milestone[]
-  recentTasks: Task[]
+  domains:        Domain[]
+  objectives:     Objective[]
+  milestones:     Milestone[]
+  recentTasks:    Task[]
+  scheduleBlocks?: ScheduleBlock[]
 }
 
 function buildContext(ctx: Ctx): string {
@@ -149,6 +150,22 @@ function buildContext(ctx: Ctx): string {
     })
     .join('\n')
 
+  // Emploi du temps récurrent — groupé par jour
+  const dayNames = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+  const blocksByDay: Record<number, string[]> = {}
+  for (const b of ctx.scheduleBlocks ?? []) {
+    for (const d of b.daysOfWeek) {
+      if (!blocksByDay[d]) blocksByDay[d] = []
+      blocksByDay[d].push(`${b.startTime}-${b.endTime} ${b.title}`)
+    }
+  }
+  const scheduleText = Object.keys(blocksByDay).length > 0
+    ? Object.entries(blocksByDay)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([d, items]) => `${dayNames[Number(d)]} : ${items.join(' / ')}`)
+        .join('\n')
+    : '(aucune plage récurrente — l\'utilisateur n\'a pas saisi son emploi du temps)'
+
   return `Date du jour : ${today}
 
 DOMAINES ACTIFS de l'utilisateur :
@@ -156,6 +173,9 @@ ${activeDomains || '(aucun)'}
 
 OBJECTIFS EN COURS :
 ${activeObjectives || '(aucun)'}
+
+EMPLOI DU TEMPS RÉCURRENT (plages déjà occupées chaque semaine — NE PAS planifier de tâches dessus) :
+${scheduleText}
 
 TÂCHES RÉCEMMENT TERMINÉES (pour comprendre le rythme) :
 ${recentDone || '(aucune)'}`
@@ -224,7 +244,11 @@ export async function suggestTodayTasks(ctx: Ctx, maxItems = 5): Promise<TodaySu
         role: 'user',
         content: `${userContext}
 
-Propose 3 à ${maxItems} tâches concrètes pour aujourd'hui, ancrées dans les objectifs actifs et les domaines. Priorise ce qui débloque les objectifs en retard. Diversifie les domaines si possible. Chaque tâche doit pouvoir être faite en une session de focus (10–120 min).`,
+Propose 3 à ${maxItems} tâches concrètes pour aujourd'hui, ancrées dans les objectifs actifs et les domaines. Priorise ce qui débloque les objectifs en retard. Diversifie les domaines si possible. Chaque tâche doit pouvoir être faite en une session de focus (10–120 min).
+
+CONTRAINTES :
+- Tiens compte de l'emploi du temps récurrent : si l'utilisateur est en cours / au travail / engagé une bonne partie de la journée, propose moins de tâches et plus courtes.
+- Ne propose pas de tâches qui empièteraient sur les plages bloquées.`,
       },
     ],
   })
@@ -387,7 +411,12 @@ Génère un plan équilibré de 6 à 12 tâches réparties sur la semaine. Règl
 - Une tâche par objectif actif au minimum si l'objectif a une échéance proche
 - Évite le dimanche pour le travail intense
 - Total < 2h par jour idéalement
-- Les tâches doivent débloquer concrètement les objectifs (pas de "réfléchir à X")`,
+- Les tâches doivent débloquer concrètement les objectifs (pas de "réfléchir à X")
+
+CONTRAINTES D'EMPLOI DU TEMPS :
+- Respecte les plages récurrentes : pour un jour majoritairement occupé par des cours / du travail, propose moins de tâches (1 max) et courtes (30 min).
+- Pour les jours libres, tu peux en mettre 2 ou 3.
+- Le créneau utile = la portion du jour qui n'est PAS dans une plage bloquée.`,
       },
     ],
   })
