@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Heart, X, Check, BookOpen, ShoppingBasket, ImageUp, Replace, Link, Utensils } from 'lucide-react'
+import { Plus, Heart, X, Check, BookOpen, ShoppingBasket, ImageUp, Replace, Link, Utensils, Trash2 } from 'lucide-react'
 import { useCuisineStore } from '../store/cuisineStore'
 import type { Recette, Ingredient, RecetteCategorie } from '../types/cuisine'
 import {
@@ -611,6 +611,7 @@ function RecipeDetailPanel({
   onSetImage,
   onRemoveImage,
   onToggleDisponible,
+  onDelete,
 }: {
   recette: Recette
   allIngredients: Ingredient[]
@@ -620,6 +621,7 @@ function RecipeDetailPanel({
   onSetImage: (src: string) => void
   onRemoveImage: () => void
   onToggleDisponible: (id: string) => void
+  onDelete: () => void
 }) {
   const addIngredient    = useCuisineStore((s) => s.addIngredient)
   const updateIngredient = useCuisineStore((s) => s.updateIngredient)
@@ -627,6 +629,7 @@ function RecipeDetailPanel({
   const updateRecette    = useCuisineStore((s) => s.updateRecette)
 
   const [showImgImport, setShowImgImport] = useState(false)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   // Image lives in the store directly
   const imgSrc = recette.image || null
@@ -734,6 +737,62 @@ function RecipeDetailPanel({
             {recette.nom}
           </span>
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {confirmDelete ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>
+                  Supprimer ?
+                </span>
+                <button
+                  onClick={() => { onDelete(); onClose() }}
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 12,
+                    fontWeight: 500,
+                    padding: '4px 12px',
+                    borderRadius: 'var(--r-lg)',
+                    background: '#C0392B',
+                    color: 'white',
+                    border: 'none',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Confirmer
+                </button>
+                <button
+                  onClick={() => setConfirmDelete(false)}
+                  style={{
+                    fontFamily: 'var(--font-sans)',
+                    fontSize: 12,
+                    padding: '4px 10px',
+                    borderRadius: 'var(--r-lg)',
+                    background: 'transparent',
+                    color: 'var(--ink-3)',
+                    border: '1px solid var(--ink-4)',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Annuler
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDelete(true)}
+                title="Supprimer la recette"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  padding: 6,
+                  borderRadius: 'var(--r-full)',
+                  color: 'var(--ink-4)',
+                }}
+              >
+                <Trash2 size={15} />
+              </button>
+            )}
             <button
               onClick={() => setShowImgImport((v) => !v)}
               title={imgSrc ? 'Changer l\'image' : 'Ajouter une image'}
@@ -1570,6 +1629,7 @@ export function CuisinePage() {
   const ingredients      = useCuisineStore((s) => s.ingredients)
   const customCategories = useCuisineStore((s) => s.customIngredientCategories)
   const updateRecette    = useCuisineStore((s) => s.updateRecette)
+  const deleteRecette    = useCuisineStore((s) => s.deleteRecette)
   const toggleDisponible = useCuisineStore((s) => s.toggleDisponible)
 
   const [section, setSection]             = useState<'recettes' | 'courses'>('recettes')
@@ -1654,6 +1714,7 @@ export function CuisinePage() {
           onSetImage={(src) => handleSetImage(openRecette.id, src)}
           onRemoveImage={() => handleRemoveImage(openRecette.id)}
           onToggleDisponible={toggleDisponible}
+          onDelete={() => deleteRecette(openRecette.id)}
         />
       )}
 

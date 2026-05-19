@@ -55,15 +55,25 @@ export const useCuisineStore = createPersistedStore<CuisineState>(
         })),
 
       deleteRecette: (id) =>
-        set((s) => ({
-          recettes:     s.recettes.filter((r) => r.id !== id),
-          listeCourses: s.listeCourses.filter((rId) => rId !== id),
-          // Nettoyer le recetteId dans les ingrédients liés
-          ingredients:  s.ingredients.map((i) => ({
-            ...i,
-            recetteIds: i.recetteIds.filter((rId) => rId !== id),
-          })),
-        })),
+        set((s) => {
+          const recette = s.recettes.find((r) => r.id === id)
+          const linkedIds = new Set(recette?.ingredientIds ?? [])
+
+          // Delete ingredients that become orphaned, update the rest
+          const updatedIngredients = s.ingredients
+            .filter((i) => {
+              if (!linkedIds.has(i.id)) return true
+              // Keep if still linked to other recipes
+              return i.recetteIds.filter((rId) => rId !== id).length > 0
+            })
+            .map((i) => ({ ...i, recetteIds: i.recetteIds.filter((rId) => rId !== id) }))
+
+          return {
+            recettes:     s.recettes.filter((r) => r.id !== id),
+            listeCourses: s.listeCourses.filter((rId) => rId !== id),
+            ingredients:  updatedIngredients,
+          }
+        }),
 
       // ── Ingredient ───────────────────────────────────────────────────────────
 
