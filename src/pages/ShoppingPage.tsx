@@ -23,7 +23,10 @@ const CAT_SWATCHES = [
   '#B5532A', '#EAD1BE', '#7E9A7A', '#D5DFD0',
   '#6B5B48', '#DFD2B5', '#A08B72', '#3A2E22',
 ]
-const STORAGE_PREFIX = 'aetheris-wish-img-'
+const STORAGE_PREFIX   = 'aetheris-wish-img-'
+const WISH_CARD_W      = 260
+const WISH_CAROUSEL_GAP = 16
+const WISH_ARROW_W     = 36
 const FRENCH_MONTHS = ['jan', 'fév', 'mar', 'avr', 'mai', 'jun', 'jul', 'aoû', 'sep', 'oct', 'nov', 'déc']
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -370,7 +373,7 @@ function CardImage({ itemId }: { itemId: string }) {
         onDrop={handleDrop}
         style={{
           margin: '-20px -20px 4px',
-          height: 160,
+          height: 260,
           position: 'relative',
           overflow: 'hidden',
           borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
@@ -524,7 +527,7 @@ function CardImage({ itemId }: { itemId: string }) {
         <div
           style={{
             margin: '-20px -20px 4px',
-            height: 160,
+            height: 260,
             borderRadius: 'var(--r-lg) var(--r-lg) 0 0',
             border: '2px dashed var(--terra)',
             display: 'flex',
@@ -1692,6 +1695,28 @@ export function ShoppingPage() {
   const [decidingItem, setDecidingItem] = useState<ShoppingItem | null>(null)
   const [showAddPanel, setShowAddPanel] = useState(false)
 
+  // ── Wishlist carousel ─────────────────────────────────────────────────────
+  const wishWrapRef   = useRef<HTMLDivElement>(null)
+  const wishScrollRef = useRef<HTMLDivElement>(null)
+  const [wishCanPrev, setWishCanPrev] = useState(false)
+  const [wishCanNext, setWishCanNext] = useState(false)
+
+  const updateWishArrows = useCallback(() => {
+    const el = wishScrollRef.current
+    if (!el) return
+    setWishCanPrev(el.scrollLeft > 4)
+    setWishCanNext(el.scrollLeft + el.clientWidth < el.scrollWidth - 4)
+  }, [])
+
+  useEffect(() => {
+    updateWishArrows()
+  }, [wishlist.length, updateWishArrows])
+
+  const scrollWishBy = (dir: 1 | -1) => {
+    const pageW = WISH_CARD_W * 3 + WISH_CAROUSEL_GAP * 2
+    wishScrollRef.current?.scrollBy({ left: dir * (pageW + WISH_CAROUSEL_GAP), behavior: 'smooth' })
+  }
+
   const handleDecide = useCallback((item: ShoppingItem) => {
     setShowAddPanel(false)
     setDecidingItem(item)
@@ -1816,23 +1841,58 @@ export function ShoppingPage() {
             </button>
           </div>
         ) : (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: 16,
-            }}
-          >
-            {wishlist.map((item, i) => (
-              <WishCard
-                key={item.id}
-                item={item}
-                categories={categories}
-                index={i}
-                onDecide={handleDecide}
-                onDelete={() => removeWishlistItem(item.id)}
-              />
-            ))}
+          <div ref={wishWrapRef} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => scrollWishBy(-1)}
+              disabled={!wishCanPrev}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: WISH_ARROW_W, height: WISH_ARROW_W, borderRadius: '50%',
+                border: '1px solid var(--paper-2)', background: 'var(--paper-1)', color: 'var(--ink)',
+                cursor: 'pointer', flexShrink: 0, fontSize: 16,
+                opacity: wishCanPrev ? 1 : 0.3, pointerEvents: wishCanPrev ? 'auto' : 'none',
+                transition: 'opacity var(--dur) var(--ease)',
+              }}
+            >←</button>
+
+            <style>{`.wish-carousel::-webkit-scrollbar { display: none }`}</style>
+            <div
+              ref={wishScrollRef}
+              onScroll={updateWishArrows}
+              className="wish-carousel"
+              style={{
+                flex: 1, overflowX: 'auto', overflowY: 'hidden',
+                display: 'grid',
+                gridAutoFlow: 'column',
+                gridAutoColumns: WISH_CARD_W,
+                gap: WISH_CAROUSEL_GAP,
+                scrollbarWidth: 'none',
+              }}
+            >
+              {wishlist.map((item, i) => (
+                <WishCard
+                  key={item.id}
+                  item={item}
+                  categories={categories}
+                  index={i}
+                  onDecide={handleDecide}
+                  onDelete={() => removeWishlistItem(item.id)}
+                />
+              ))}
+            </div>
+
+            <button
+              onClick={() => scrollWishBy(1)}
+              disabled={!wishCanNext}
+              style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                width: WISH_ARROW_W, height: WISH_ARROW_W, borderRadius: '50%',
+                border: '1px solid var(--paper-2)', background: 'var(--paper-1)', color: 'var(--ink)',
+                cursor: 'pointer', flexShrink: 0, fontSize: 16,
+                opacity: wishCanNext ? 1 : 0.3, pointerEvents: wishCanNext ? 'auto' : 'none',
+                transition: 'opacity var(--dur) var(--ease)',
+              }}
+            >→</button>
           </div>
         )}
       </section>
