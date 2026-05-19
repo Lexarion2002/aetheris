@@ -117,6 +117,10 @@ interface AetherisState {
   // Dashboard context
   userContext:     string
   setUserContext:  (ctx: string) => void
+
+  // Kit (IA) — clé Anthropic stockée dans le store sync Supabase
+  anthropicApiKey:    string
+  setAnthropicApiKey: (key: string) => void
 }
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -163,6 +167,7 @@ export const useStore = createPersistedStore<AetherisState>(
         soundEnabled:            true,
       },
       userContext: '',
+      anthropicApiKey: '',
 
       // ── Seed / Onboarding ────────────────────────────────────────────────────
 
@@ -549,6 +554,10 @@ export const useStore = createPersistedStore<AetherisState>(
       // ── Dashboard context ────────────────────────────────────────────────────
 
       setUserContext: (ctx) => set({ userContext: ctx }),
+
+      // ── Kit (IA) ─────────────────────────────────────────────────────────────
+
+      setAnthropicApiKey: (key) => set({ anthropicApiKey: key.trim() }),
   }),
 )
 

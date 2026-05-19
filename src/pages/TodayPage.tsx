@@ -4,7 +4,7 @@ import { useDroitStore } from '../store/droitStore'
 import { useWritingStore } from '../store/writingStore'
 import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
-import { hasApiKey, suggestTodayTasks } from '../lib/aiService'
+import { suggestTodayTasks } from '../lib/aiService'
 import { computeDailyStreak, type DailyStreak } from '../utils/streaks'
 import type { Task } from '../types'
 import type { Tache, SousTache } from '../store/droitStore'
@@ -396,7 +396,8 @@ export function TodayPage() {
   // Au premier ouverture du jour, Kit crée 3-5 tâches dans Planning du jour
   // sans rien demander. La raison de chaque tâche est stockée dans task.notes.
 
-  const kitEnabled = hasApiKey()
+  const anthropicApiKey = useStore((s) => s.anthropicApiKey)
+  const kitEnabled = !!anthropicApiKey
   const activeObjectives = useMemo(
     () => objectives.filter((o) => !o.archived && o.progress < 100),
     [objectives],

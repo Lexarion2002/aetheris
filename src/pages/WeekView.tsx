@@ -7,7 +7,7 @@ import { useStore } from '../store'
 import { useTimerStore } from '../store/timerStore'
 import { TaskFormModal } from '../components/TaskFormModal'
 import { ObjectivesPage } from './ObjectivesPage'
-import { hasApiKey, generateWeekPlan, type WeekPlanItem } from '../lib/aiService'
+import { generateWeekPlan, type WeekPlanItem } from '../lib/aiService'
 import type { Domain, Task, TimeSession } from '../types'
 import {
   getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
@@ -750,6 +750,7 @@ export function WeekView() {
   const milestones   = useStore(s => s.milestones)
   const setTaskStatus = useStore(s => s.setTaskStatus)
   const addTaskAction = useStore(s => s.addTask)
+  const kitEnabled   = useStore(s => !!s.anthropicApiKey)
 
   const [weekOffset, setWeekOffset]       = useState(0)
   const [showAllOverdue, setShowAllOverdue] = useState(false)
@@ -946,7 +947,7 @@ export function WeekView() {
             onNext={() => setWeekOffset(o => o + 1)}
             onToday={() => setWeekOffset(0)}
             onNewTask={() => openNewTask()}
-            onGeneratePlan={hasApiKey() ? generatePlan : undefined}
+            onGeneratePlan={kitEnabled ? generatePlan : undefined}
             kitLoading={kitPlanLoading}
             hasNoDomains={domains.length === 0}
           />

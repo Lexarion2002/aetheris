@@ -1,20 +1,40 @@
+import { useStore } from '../store'
 import type { Domain, Objective, Milestone, Task } from '../types'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
 const MODEL = 'claude-sonnet-4-5-20250929'  // Sonnet 4.5 (id complet pour version pinning)
 const API_URL = 'https://api.anthropic.com/v1/messages'
-const STORAGE_KEY = 'aetheris-anthropic-key'
+const LEGACY_STORAGE_KEY = 'aetheris-anthropic-key'
 
+/**
+ * Lit la clé Anthropic depuis le store principal (sync Supabase).
+ * Fallback : si une ancienne clé existe encore dans le localStorage isolé,
+ * on la migre dans le store et on supprime l'ancienne — opération une fois.
+ */
 export function getApiKey(): string | null {
-  if (typeof window === 'undefined') return null
-  return window.localStorage.getItem(STORAGE_KEY)
+  const fromStore = useStore.getState().anthropicApiKey
+  if (fromStore) return fromStore
+
+  // Migration douce depuis l'ancienne clé localStorage isolée
+  if (typeof window !== 'undefined') {
+    const legacy = window.localStorage.getItem(LEGACY_STORAGE_KEY)
+    if (legacy) {
+      useStore.getState().setAnthropicApiKey(legacy)
+      try { window.localStorage.removeItem(LEGACY_STORAGE_KEY) } catch { /* ignore */ }
+      return legacy
+    }
+  }
+
+  return null
 }
 
 export function setApiKey(key: string): void {
-  if (typeof window === 'undefined') return
-  if (key.trim()) window.localStorage.setItem(STORAGE_KEY, key.trim())
-  else window.localStorage.removeItem(STORAGE_KEY)
+  useStore.getState().setAnthropicApiKey(key)
+  // Si une ancienne clé existait encore, on la nettoie
+  if (typeof window !== 'undefined') {
+    try { window.localStorage.removeItem(LEGACY_STORAGE_KEY) } catch { /* ignore */ }
+  }
 }
 
 export function hasApiKey(): boolean {

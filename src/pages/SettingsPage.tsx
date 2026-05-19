@@ -1,8 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { getDomainIcon } from '../utils/domainColors'
-import { getApiKey, setApiKey } from '../lib/aiService'
 import type { DomainColor } from '../types'
 import type { AppTheme, AppLanguage, AetherisData } from '../store'
 
@@ -86,13 +85,11 @@ export function SettingsPage() {
   // Notifications
   const [notifDeadlines,  setNotifDeadlines]       = useState(false)
 
-  // Anthropic API key
-  const [apiKey,          setApiKeyLocal]          = useState('')
-  const [apiKeySaved,     setApiKeySaved]          = useState(false)
-  useEffect(() => {
-    const existing = getApiKey()
-    if (existing) setApiKeyLocal(existing)
-  }, [])
+  // Anthropic API key — lue/écrite dans le store sync Supabase
+  const storedApiKey       = useStore((s) => s.anthropicApiKey)
+  const setAnthropicApiKey = useStore((s) => s.setAnthropicApiKey)
+  const [apiKey,      setApiKeyLocal] = useState(storedApiKey)
+  const [apiKeySaved, setApiKeySaved] = useState(false)
 
   // Import/export
   const [importStatus,    setImportStatus]         = useState<'idle' | 'success' | 'error'>('idle')
@@ -541,7 +538,7 @@ export function SettingsPage() {
               autoComplete="off"
             />
             <button
-              onClick={() => { setApiKey(apiKey); setApiKeySaved(true); setTimeout(() => setApiKeySaved(false), 2000) }}
+              onClick={() => { setAnthropicApiKey(apiKey); setApiKeySaved(true); setTimeout(() => setApiKeySaved(false), 2000) }}
               className={actionBtn}
             >
               {apiKeySaved ? '✓ Enregistré' : 'Enregistrer'}

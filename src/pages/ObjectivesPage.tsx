@@ -9,7 +9,7 @@ import {
   fmtLong, daysUntil, relativeDate, urgencyBucket,
   URGENCY_ORDER, URGENCY_LABEL, type UrgencyBucket,
 } from '../utils/objectiveUtils'
-import { hasApiKey, suggestMilestoneRecovery, type MilestoneRecovery } from '../lib/aiService'
+import { suggestMilestoneRecovery, type MilestoneRecovery } from '../lib/aiService'
 import type { Objective, Milestone } from '../types'
 
 // ─── KitRecoveryBanner — suggestion de reprise pour un objectif en retard ────
@@ -454,6 +454,7 @@ function ObjectiveCard({
   const [confirmDel, setConfirmDel] = useState(false)
   const domains      = useStore(s => s.domains)
   const allMilestones = useStore(s => s.milestones)
+  const kitEnabled   = useStore(s => !!s.anthropicApiKey)
 
   const milestones = useMemo(
     () => allMilestones.filter(m => m.objectiveId === obj.id),
@@ -597,7 +598,7 @@ function ObjectiveCard({
         </button>
 
         {/* ── Bandeau Kit pour objectifs en retard ── */}
-        {isOverdue && hasApiKey() && <KitRecoveryBanner obj={obj} />}
+        {isOverdue && kitEnabled && <KitRecoveryBanner obj={obj} />}
 
         {/* ── Corps déplié — jalons ── */}
         <div style={{

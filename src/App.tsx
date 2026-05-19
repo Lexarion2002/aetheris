@@ -93,6 +93,16 @@ export default function App() {
   useEffect(() => {
     const LEGACY_KEYS = ['aetheris-v2', 'aetheris-store']
     LEGACY_KEYS.forEach((k) => localStorage.removeItem(k))
+
+    // Migration : clé Anthropic isolée → store sync Supabase
+    const legacyAnthropicKey = localStorage.getItem('aetheris-anthropic-key')
+    if (legacyAnthropicKey) {
+      const state = useStore.getState()
+      if (!state.anthropicApiKey) {
+        state.setAnthropicApiKey(legacyAnthropicKey)
+      }
+      try { localStorage.removeItem('aetheris-anthropic-key') } catch { /* ignore */ }
+    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
