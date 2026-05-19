@@ -218,7 +218,9 @@ function CardImage({ itemId }: { itemId: string }) {
         canvas.height = Math.round(img.height * scale)
         canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
         try {
-          saveImage(canvas.toDataURL('image/jpeg', 0.7))
+          const compressed = canvas.toDataURL('image/jpeg', 0.7)
+          // Safari retourne "data:," (< 50 chars) quand le canvas est bloqué (anti-fingerprinting)
+          saveImage(compressed.length > 50 ? compressed : dataUrl)
         } catch {
           saveImage(dataUrl)
         }

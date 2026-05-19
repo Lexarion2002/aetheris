@@ -50,7 +50,7 @@
   --danger:         #9B3A1C;
 
   /* ---------- Typographie ---------- */
-  --font-serif:     'Newsreader', 'Iowan Old Style', Georgia, serif;
+  --font-serif:     'Newsreader', Georgia, 'Times New Roman', serif;
   --font-sans:      'Geist', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', sans-serif;
   --font-mono:      'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
 
