@@ -1,4 +1,5 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react'
+import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } from 'react'
+import { saveImage as dbSaveImage, loadImage as dbLoadImage, deleteImage as dbDeleteImage } from '../lib/imageDb'
 import { Plus, ArrowRight, X, Check, ImagePlus, Link2 } from 'lucide-react'
 import { useShoppingStore } from '../store/shoppingStore'
 import { useStore } from '../store'
@@ -174,61 +175,53 @@ function IconBtn({
 // ─── CardImage ────────────────────────────────────────────────────────────────
 
 function CardImage({ itemId }: { itemId: string }) {
-  const storageKey = STORAGE_PREFIX + itemId
-  const [src, setSrc] = useState<string>(() => localStorage.getItem(storageKey) ?? '')
+  const dbKey = STORAGE_PREFIX + itemId
+  const [src, setSrc] = useState<string>('')
   const [showUrl, setShowUrl] = useState(false)
   const [url, setUrl] = useState('')
   const [dragActive, setDragActive] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
+  const objectUrlRef = useRef<string | null>(null)
 
+  // Libère l'object URL précédent pour éviter les fuites mémoire
+  const setAndTrackSrc = useCallback((newSrc: string) => {
+    if (objectUrlRef.current && objectUrlRef.current !== newSrc) {
+      URL.revokeObjectURL(objectUrlRef.current)
+      objectUrlRef.current = null
+    }
+    if (newSrc.startsWith('blob:')) objectUrlRef.current = newSrc
+    setSrc(newSrc)
+  }, [])
+
+  // Charge l'image depuis IndexedDB au montage
+  useLayoutEffect(() => {
+    let cancelled = false
+    dbLoadImage(dbKey).then((loaded) => {
+      if (!cancelled && loaded) setAndTrackSrc(loaded)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [dbKey, setAndTrackSrc])
+
+  // Synchronisation entre cartes du même item
   useEffect(() => {
     const handler = (e: Event) => {
-      const detail = (e as CustomEvent).detail
-      if (detail) setSrc(detail)
+      const detail = (e as CustomEvent<string>).detail
+      if (detail) setAndTrackSrc(detail)
     }
     window.addEventListener(`aetheris-img-${itemId}`, handler)
     return () => window.removeEventListener(`aetheris-img-${itemId}`, handler)
-  }, [itemId])
+  }, [itemId, setAndTrackSrc])
 
-  const saveImage = useCallback((dataUrl: string) => {
-    try {
-      localStorage.setItem(storageKey, dataUrl)
-    } catch {
-      // localStorage plein : on vide les autres images de la wishlist avant de réessayer
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith(STORAGE_PREFIX) && k !== storageKey)
-        .forEach((k) => localStorage.removeItem(k))
-      try { localStorage.setItem(storageKey, dataUrl) } catch { /* abandon silencieux */ }
-    }
-    setSrc(dataUrl)
-    window.dispatchEvent(new CustomEvent(`aetheris-img-${itemId}`, { detail: dataUrl }))
-  }, [storageKey, itemId])
+  const persistAndShow = useCallback((blob: Blob, previewUrl: string) => {
+    dbSaveImage(dbKey, blob).catch(() => {})
+    setAndTrackSrc(previewUrl)
+    window.dispatchEvent(new CustomEvent(`aetheris-img-${itemId}`, { detail: previewUrl }))
+  }, [dbKey, itemId, setAndTrackSrc])
 
-  const handleFile = (file: File) => {
-    const reader = new FileReader()
-    reader.onload = (e) => {
-      const dataUrl = e.target?.result as string
-      if (!dataUrl) return
-      const img = new Image()
-      img.onload = () => {
-        const MAX = 600
-        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-        const canvas = document.createElement('canvas')
-        canvas.width  = Math.round(img.width  * scale)
-        canvas.height = Math.round(img.height * scale)
-        canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height)
-        try {
-          const compressed = canvas.toDataURL('image/jpeg', 0.7)
-          // Safari retourne "data:," (< 50 chars) quand le canvas est bloqué (anti-fingerprinting)
-          saveImage(compressed.length > 50 ? compressed : dataUrl)
-        } catch {
-          saveImage(dataUrl)
-        }
-      }
-      img.src = dataUrl
-    }
-    reader.readAsDataURL(file)
-  }
+  const handleFile = useCallback((file: File) => {
+    const previewUrl = URL.createObjectURL(file)
+    persistAndShow(file, previewUrl)
+  }, [persistAndShow])
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
@@ -240,15 +233,20 @@ function CardImage({ itemId }: { itemId: string }) {
   const handleUrlSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (!url.trim()) return
-    saveImage(url.trim())
+    const u = url.trim()
+    // Pour les URLs externes on stocke la chaîne directement (pas de Blob)
+    dbSaveImage(dbKey, new Blob([u], { type: 'text/plain' })).catch(() => {})
+    setAndTrackSrc(u)
+    window.dispatchEvent(new CustomEvent(`aetheris-img-${itemId}`, { detail: u }))
     setShowUrl(false)
     setUrl('')
   }
 
   const removeImage = (e: React.MouseEvent) => {
     e.stopPropagation()
-    localStorage.removeItem(storageKey)
-    setSrc('')
+    dbDeleteImage(dbKey).catch(() => {})
+    setAndTrackSrc('')
+    window.dispatchEvent(new CustomEvent(`aetheris-img-${itemId}`, { detail: '' }))
   }
 
   if (src) {
