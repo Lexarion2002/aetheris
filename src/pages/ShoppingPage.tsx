@@ -219,7 +219,7 @@ function CropModal({ src, onConfirm, onClose }: {
         position: 'fixed', inset: 0, zIndex: 9999,
         background: 'rgba(30,24,18,0.7)',
         display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: 24,
+        padding: 16,
       }}
     >
       <div
@@ -230,16 +230,20 @@ function CropModal({ src, onConfirm, onClose }: {
           padding: 20,
           display: 'flex',
           flexDirection: 'column',
-          gap: 16,
-          maxWidth: '90vw',
-          maxHeight: '90vh',
+          gap: 12,
+          maxWidth: 'min(90vw, 640px)',
+          width: '100%',
+          // Hauteur contrainte : flex parent qui pousse les boutons en bas
+          maxHeight: 'calc(100dvh - 32px)',
+          overflow: 'hidden',
           boxShadow: 'var(--shadow-2)',
         }}
       >
-        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, color: 'var(--ink)' }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, color: 'var(--ink)', flexShrink: 0 }}>
           Recadrer l'image
         </div>
-        <div style={{ overflow: 'auto', maxHeight: 'calc(90vh - 120px)' }}>
+        {/* Zone scrollable qui prend tout l'espace disponible */}
+        <div style={{ flex: 1, overflow: 'auto', minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <ReactCrop
             crop={crop}
             onChange={(c) => setCrop(c)}
@@ -250,7 +254,7 @@ function CropModal({ src, onConfirm, onClose }: {
               ref={imgRef}
               src={src}
               onLoad={onImageLoad}
-              style={{ maxWidth: '70vw', maxHeight: '70vh', display: 'block' }}
+              style={{ maxWidth: '100%', maxHeight: 'calc(100dvh - 180px)', display: 'block', objectFit: 'contain' }}
               alt=""
             />
           </ReactCrop>
