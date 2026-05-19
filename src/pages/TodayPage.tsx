@@ -4,7 +4,7 @@ import { useDroitStore } from '../store/droitStore'
 import { useWritingStore } from '../store/writingStore'
 import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
-import { hasApiKey, suggestTodayTasks, type TodaySuggestion } from '../lib/aiService'
+import { hasApiKey, suggestTodayTasks } from '../lib/aiService'
 import { computeDailyStreak, type DailyStreak } from '../utils/streaks'
 import type { Task } from '../types'
 import type { Tache, SousTache } from '../store/droitStore'
@@ -132,8 +132,17 @@ function TaskRow({ task, objective, onToggle, onUnplan }: {
             </span>
           )}
         </div>
+        {task.notes && (
+          <div style={{
+            fontFamily: 'var(--font-sans)', fontStyle: 'italic',
+            fontSize: 12, color: 'var(--ink-3)',
+            marginTop: 3, lineHeight: 1.4,
+          }}>
+            {task.notes}
+          </div>
+        )}
         {task.timeEstimate && (
-          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', marginTop: 2, display: 'inline-block' }}>
             {task.timeEstimate}m
           </span>
         )}
@@ -293,6 +302,7 @@ export function TodayPage() {
   const setTaskStatus = useStore((s) => s.setTaskStatus)
   const updateTask   = useStore((s) => s.updateTask)
   const addTaskAction = useStore((s) => s.addTask)
+  const deleteTaskAction = useStore((s) => s.deleteTask)
 
   const droitTaches    = useDroitStore((s) => s.taches)
   const writingStories = useWritingStore((s) => s.stories)
@@ -382,11 +392,9 @@ export function TodayPage() {
   const doneCount = plannedTasks.filter((t) => t.status === 'done').length + externalItems.filter((e) => e.done).length
   const totalCount = allItems.length
 
-  // ── Kit : suggestions du jour ─────────────────────────────────────────────
-  const [kitItems,    setKitItems]    = useState<TodaySuggestion[]>([])
-  const [kitLoading,  setKitLoading]  = useState(false)
-  const [kitError,    setKitError]    = useState<string | null>(null)
-  const [kitDismissed, setKitDismissed] = useState<Set<number>>(new Set())
+  // ── Kit : auto-plan du jour ───────────────────────────────────────────────
+  // Au premier ouverture du jour, Kit crée 3-5 tâches dans Planning du jour
+  // sans rien demander. La raison de chaque tâche est stockée dans task.notes.
 
   const kitEnabled = hasApiKey()
   const activeObjectives = useMemo(
@@ -394,60 +402,77 @@ export function TodayPage() {
     [objectives],
   )
 
-  const cacheKey = `aetheris-kit-today-${today}`
+  const AUTOPLAN_KEY = `aetheris-kit-autoplan-${today}`
 
-  const fetchKit = async () => {
-    if (!kitEnabled || activeObjectives.length === 0) return
-    setKitLoading(true)
-    setKitError(null)
+  interface AutoplanRecord {
+    ranAt:   string    // ISO timestamp
+    taskIds: string[]  // IDs des tâches créées par Kit
+  }
+
+  const [autoplan, setAutoplan] = useState<AutoplanRecord | null>(() => {
+    if (typeof window === 'undefined') return null
+    const raw = window.localStorage.getItem(AUTOPLAN_KEY)
+    if (!raw) return null
+    try { return JSON.parse(raw) as AutoplanRecord } catch { return null }
+  })
+  const [autoplanLoading, setAutoplanLoading] = useState(false)
+  const [autoplanError,   setAutoplanError]   = useState<string | null>(null)
+
+  const runAutoplan = async (regenerate = false) => {
+    if (autoplanLoading || !kitEnabled || activeObjectives.length === 0) return
+    setAutoplanLoading(true)
+    setAutoplanError(null)
     try {
-      const recent = tasks.slice(-30)
+      // Si on regénère, on supprime d'abord les tâches Kit précédentes
+      if (regenerate && autoplan) {
+        for (const id of autoplan.taskIds) deleteTaskAction(id)
+      }
+
       const items = await suggestTodayTasks({
-        domains, objectives: activeObjectives, milestones, recentTasks: recent,
+        domains, objectives: activeObjectives, milestones, recentTasks: tasks.slice(-30),
       }, 5)
-      setKitItems(items)
-      setKitDismissed(new Set())
-      window.localStorage.setItem(cacheKey, JSON.stringify(items))
+
+      const newIds: string[] = []
+      for (const item of items) {
+        const created = addTaskAction({
+          domainId:     item.domainId,
+          title:        item.title,
+          notes:        item.reason,
+          status:       'todo',
+          priority:     'medium',
+          timeEstimate: item.timeEstimate,
+          dueDate:      null,
+          plannedDate:  today,
+          objectiveId:  item.objectiveId,
+          milestoneId:  item.milestoneId,
+        })
+        newIds.push(created.id)
+      }
+
+      const record: AutoplanRecord = { ranAt: new Date().toISOString(), taskIds: newIds }
+      window.localStorage.setItem(AUTOPLAN_KEY, JSON.stringify(record))
+      setAutoplan(record)
     } catch (err) {
-      setKitError(err instanceof Error ? err.message : 'Erreur Kit')
+      setAutoplanError(err instanceof Error ? err.message : 'Erreur Kit')
     } finally {
-      setKitLoading(false)
+      setAutoplanLoading(false)
     }
   }
 
-  // Auto-fetch au premier chargement de la journée
+  // Auto-déclenchement au premier ouverture du jour
   useEffect(() => {
     if (!kitEnabled || activeObjectives.length === 0) return
-    const cached = window.localStorage.getItem(cacheKey)
-    if (cached) {
-      try { setKitItems(JSON.parse(cached) as TodaySuggestion[]) }
-      catch { /* ignore */ }
-    } else {
-      void fetchKit()
-    }
+    if (autoplan) return                  // déjà tourné aujourd'hui
+    if (plannedTasks.length >= 3) return  // utilisateur déjà bien planifié
+    void runAutoplan(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [today])
+  }, [today, kitEnabled, activeObjectives.length])
 
-  const acceptKitSuggestion = (s: TodaySuggestion, idx: number) => {
-    addTaskAction({
-      domainId:     s.domainId,
-      title:        s.title,
-      status:       'todo',
-      priority:     'medium',
-      timeEstimate: s.timeEstimate,
-      dueDate:      null,
-      plannedDate:  today,
-      objectiveId:  s.objectiveId,
-      milestoneId:  s.milestoneId,
-    })
-    setKitDismissed((prev) => new Set(prev).add(idx))
-  }
-
-  const dismissKitSuggestion = (idx: number) => {
-    setKitDismissed((prev) => new Set(prev).add(idx))
-  }
-
-  const visibleKit = kitItems.map((s, i) => ({ ...s, idx: i })).filter(s => !kitDismissed.has(s.idx))
+  // Compte de tâches Kit encore présentes (pour l'affichage du bandeau)
+  const kitTasksRemaining = useMemo(() => {
+    if (!autoplan) return 0
+    return autoplan.taskIds.filter(id => plannedTasks.some(t => t.id === id)).length
+  }, [autoplan, plannedTasks])
 
   return (
     <div style={{ padding: '8px 0 80px' }}>
@@ -479,115 +504,56 @@ export function TodayPage() {
         </div>
       </header>
 
-      {/* ── Suggestions de Kit ──────────────────────────────────────────────── */}
-      {kitEnabled && (visibleKit.length > 0 || kitLoading || kitError) && (
-        <section style={{ marginBottom: 32 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 14 }}>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
-                ✦ kit suggère
+      {/* ── Bandeau Kit (auto-plan) ─────────────────────────────────────────── */}
+      {kitEnabled && (autoplan || autoplanLoading || autoplanError) && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 16, marginBottom: 24, padding: '10px 16px',
+          background: autoplanError ? 'var(--terra-soft)' : 'var(--paper-1)',
+          border: '1px solid ' + (autoplanError ? '#DEB89C' : 'var(--paper-2)'),
+          borderRadius: 10, flexWrap: 'wrap',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, minWidth: 0 }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
+              ✦ kit
+            </span>
+            {autoplanLoading ? (
+              <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
+                organise ta journée…
               </span>
-              {kitLoading && (
-                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-                  réflexion…
+            ) : autoplanError ? (
+              <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)' }}>
+                {autoplanError}
+              </span>
+            ) : autoplan ? (
+              <>
+                <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--ink-2)' }}>
+                  a planifié à <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+                    {new Date(autoplan.ranAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
                 </span>
-              )}
-            </div>
+                <span style={{ color: 'var(--ink-4)' }}>·</span>
+                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+                  {kitTasksRemaining}/{autoplan.taskIds.length} restantes
+                </span>
+              </>
+            ) : null}
+          </div>
+          <div style={{ display: 'flex', gap: 8 }}>
             <button
-              onClick={() => void fetchKit()}
-              disabled={kitLoading}
+              onClick={() => void runAutoplan(true)}
+              disabled={autoplanLoading}
               style={{
-                fontFamily: 'var(--font-sans)', fontSize: 11.5, color: 'var(--ink-3)',
-                background: 'transparent', border: 0, cursor: kitLoading ? 'not-allowed' : 'pointer',
-                padding: '4px 8px', borderRadius: 4,
+                fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
+                background: 'transparent', border: '1px solid var(--paper-2)',
+                borderRadius: 6, padding: '4px 10px',
+                cursor: autoplanLoading ? 'not-allowed' : 'pointer',
               }}
             >
-              {kitLoading ? '…' : '↻ regénérer'}
+              ↻ Regénérer
             </button>
           </div>
-
-          {kitError && (
-            <div style={{
-              fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)',
-              padding: '10px 14px', borderRadius: 8,
-              background: 'var(--terra-soft)', border: '1px solid #DEB89C',
-            }}>
-              {kitError}
-            </div>
-          )}
-
-          {!kitError && visibleKit.length > 0 && (
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 10 }}>
-              {visibleKit.map((s) => {
-                const dom = domains.find((d) => d.id === s.domainId)
-                return (
-                  <div
-                    key={s.idx}
-                    style={{
-                      background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-                      borderRadius: 10, padding: '12px 14px',
-                      display: 'flex', flexDirection: 'column', gap: 6,
-                      position: 'relative',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10,
-                        letterSpacing: '0.1em', textTransform: 'uppercase',
-                        color: 'var(--ink-3)',
-                      }}>
-                        {dom?.name ?? '?'}
-                      </span>
-                      <span style={{ color: 'var(--ink-4)' }}>·</span>
-                      <span style={{
-                        fontFamily: 'var(--font-mono)', fontSize: 10.5,
-                        color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums',
-                      }}>
-                        {s.timeEstimate}m
-                      </span>
-                    </div>
-                    <div style={{
-                      fontFamily: 'var(--font-serif)', fontSize: 15, color: 'var(--ink)',
-                      lineHeight: 1.3, letterSpacing: '-0.005em',
-                    }}>
-                      {s.title}
-                    </div>
-                    <div style={{
-                      fontFamily: 'var(--font-sans)', fontSize: 12,
-                      fontStyle: 'italic', color: 'var(--ink-3)',
-                      lineHeight: 1.4,
-                    }}>
-                      {s.reason}
-                    </div>
-                    <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                      <button
-                        onClick={() => acceptKitSuggestion(s, s.idx)}
-                        style={{
-                          flex: 1,
-                          fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
-                          background: 'var(--terra)', color: 'var(--paper-1)',
-                          border: 0, borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
-                        }}
-                      >
-                        + Planifier
-                      </button>
-                      <button
-                        onClick={() => dismissKitSuggestion(s.idx)}
-                        style={{
-                          fontFamily: 'var(--font-sans)', fontSize: 12,
-                          background: 'transparent', color: 'var(--ink-3)',
-                          border: '1px solid var(--paper-2)', borderRadius: 6, padding: '5px 10px', cursor: 'pointer',
-                        }}
-                      >
-                        Passer
-                      </button>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </section>
+        </div>
       )}
 
       {/* ── Liste des items ─────────────────────────────────────────────────── */}
