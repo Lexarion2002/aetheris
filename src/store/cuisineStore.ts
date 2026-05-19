@@ -6,6 +6,7 @@ import { createPersistedStore } from '../lib/persistenceManager'
 interface CuisineState {
   recettes:    Recette[]
   ingredients: Ingredient[]
+  customIngredientCategories: string[]
 
   // Recette actions
   addRecette:    (r: Omit<Recette, 'id'>) => Recette
@@ -18,8 +19,12 @@ interface CuisineState {
   deleteIngredient: (id: string) => void
   toggleDisponible: (id: string) => void
 
-  // Liste de courses
-  listeCourses:           string[]   // recetteIds planifiées pour les courses
+  // Custom categories
+  addIngredientCategory:    (name: string) => void
+  removeIngredientCategory: (name: string) => void
+
+  // Liste de courses (kept for backward compat)
+  listeCourses:           string[]
   addToListeCourses:      (recetteId: string) => void
   removeFromListeCourses: (recetteId: string) => void
   clearListeCourses:      () => void
@@ -33,6 +38,7 @@ export const useCuisineStore = createPersistedStore<CuisineState>(
   (set, get) => ({
       recettes:    [],
       ingredients: [],
+      customIngredientCategories: [],
       listeCourses: [],
 
       // ── Recette ──────────────────────────────────────────────────────────────
@@ -87,6 +93,19 @@ export const useCuisineStore = createPersistedStore<CuisineState>(
           ingredients: s.ingredients.map((i) =>
             i.id === id ? { ...i, disponible: !i.disponible } : i,
           ),
+        })),
+
+      // ── Custom categories ─────────────────────────────────────────────────────
+
+      addIngredientCategory: (name) =>
+        set((s) => {
+          if (s.customIngredientCategories.includes(name)) return s
+          return { customIngredientCategories: [...s.customIngredientCategories, name] }
+        }),
+
+      removeIngredientCategory: (name) =>
+        set((s) => ({
+          customIngredientCategories: s.customIngredientCategories.filter((c) => c !== name),
         })),
 
       // ── Liste de courses ─────────────────────────────────────────────────────

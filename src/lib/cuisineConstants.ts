@@ -23,6 +23,32 @@ export const INGREDIENT_TO_RAYON: Record<string, string> = {
   boisson: 'Épicerie', autre: 'Autre',
 }
 
+export const DEFAULT_INGREDIENT_CATEGORIES: Array<{ value: string; label: string }> = [
+  { value: 'legume',          label: 'Légume' },
+  { value: 'fruit',           label: 'Fruit' },
+  { value: 'viande',          label: 'Viande' },
+  { value: 'poisson',         label: 'Poisson' },
+  { value: 'produit_laitier', label: 'Produit laitier' },
+  { value: 'oeuf',            label: 'Œuf' },
+  { value: 'cereale',         label: 'Céréale' },
+  { value: 'legumineuse',     label: 'Légumineuse' },
+  { value: 'herbe',           label: 'Herbe aromatique' },
+  { value: 'epice',           label: 'Épice' },
+  { value: 'huile',           label: 'Huile' },
+  { value: 'condiment',       label: 'Condiment' },
+  { value: 'conserve',        label: 'Conserve' },
+  { value: 'boisson',         label: 'Boisson' },
+  { value: 'autre',           label: 'Autre' },
+]
+
+export function getCategorieLabel(value: string): string {
+  return DEFAULT_INGREDIENT_CATEGORIES.find(c => c.value === value)?.label ?? value
+}
+
+export function getRayonForCategorie(categorie: string): string {
+  return INGREDIENT_TO_RAYON[categorie] ?? 'Autre'
+}
+
 export const PLACEHOLDER_TINTS = [
   { bg: 'var(--terra-soft)', ink: '#8E3D1C' },
   { bg: 'var(--sage-soft)',  ink: '#3F5A3C' },

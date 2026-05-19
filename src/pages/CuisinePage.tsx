@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Plus, Heart, X, Check, BookOpen, ShoppingBasket, ImageUp, Replace, Trash2, Link } from 'lucide-react'
+import { Plus, Heart, X, Check, BookOpen, ShoppingBasket, ImageUp, Replace, Link, Utensils } from 'lucide-react'
 import { useCuisineStore } from '../store/cuisineStore'
 import type { Recette, Ingredient, RecetteCategorie } from '../types/cuisine'
 import {
@@ -7,31 +7,11 @@ import {
   RAYONS,
   CATEGORIE_TO_DISPLAY,
   DISPLAY_TO_CATEGORIE,
-  INGREDIENT_TO_RAYON,
   PLACEHOLDER_TINTS,
+  DEFAULT_INGREDIENT_CATEGORIES,
+  getCategorieLabel,
+  getRayonForCategorie,
 } from '../lib/cuisineConstants'
-
-// ─── Local shopping list ───────────────────────────────────────────────────────
-
-interface CourseItem {
-  id: string
-  name: string
-  qty: string
-  rayon: string
-  checked: boolean
-  fromRecipe: string | null
-}
-
-const COURSES_LS_KEY = 'aetheris-courses-v1'
-
-function loadCourses(): CourseItem[] {
-  try {
-    const raw = localStorage.getItem(COURSES_LS_KEY)
-    return raw ? (JSON.parse(raw) as CourseItem[]) : []
-  } catch {
-    return []
-  }
-}
 
 // ─── Image helpers ─────────────────────────────────────────────────────────────
 
@@ -68,7 +48,7 @@ function removeRecipeImage(
 function CheckBox({ checked, onClick }: { checked: boolean; onClick: () => void }) {
   return (
     <button
-      onClick={onClick}
+      onClick={(e) => { e.stopPropagation(); onClick() }}
       style={{
         width: 18,
         height: 18,
@@ -134,7 +114,6 @@ function ImageImport({
         gap: 10,
       }}
     >
-      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 4 }}>
           {(['url', 'file'] as const).map((t) => (
@@ -271,6 +250,7 @@ function ImageImport({
 function RecipeCard({
   recette,
   index,
+  canMake,
   onOpen,
   onToggleFavorite,
   onSetImage,
@@ -278,6 +258,7 @@ function RecipeCard({
 }: {
   recette: Recette
   index: number
+  canMake: boolean
   onOpen: () => void
   onToggleFavorite: () => void
   onSetImage: (src: string) => void
@@ -287,7 +268,6 @@ function RecipeCard({
   const [showImgImport, setShowImgImport] = useState(false)
   const [hovered, setHovered] = useState(false)
 
-  // Listen for cross-component image sync
   useEffect(() => {
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<string | null>).detail
@@ -297,7 +277,6 @@ function RecipeCard({
     return () => window.removeEventListener(`aetheris-cuisine-img-${recette.id}`, handler)
   }, [recette.id])
 
-  // Refresh imgSrc when recette.image changes (e.g. https:// URL stored in store)
   useEffect(() => {
     setImgSrc(getRecipeImage(recette))
   }, [recette.image, recette.id])
@@ -415,6 +394,30 @@ function RecipeCard({
           {imgSrc ? 'Changer' : 'Ajouter une image'}
         </button>
 
+        {/* Réalisable badge */}
+        {recette.ingredientIds.length > 0 && canMake && (
+          <div style={{
+            position: 'absolute',
+            bottom: 10,
+            left: 10,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 4,
+            background: '#3F5A3C',
+            color: 'white',
+            padding: '3px 9px',
+            borderRadius: 'var(--r-full)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: 10,
+            letterSpacing: '0.06em',
+            opacity: showImgImport ? 0 : 1,
+            transition: 'opacity var(--dur) var(--ease)',
+          }}>
+            <Check size={10} strokeWidth={3} />
+            Réalisable
+          </div>
+        )}
+
         {showImgImport && (
           <ImageImport
             currentImage={imgSrc}
@@ -427,7 +430,6 @@ function RecipeCard({
 
       {/* Content */}
       <div style={{ padding: '14px 16px 16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {/* Badge + time */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{
             fontFamily: 'var(--font-mono)',
@@ -446,7 +448,6 @@ function RecipeCard({
           </span>
         </div>
 
-        {/* Title */}
         <h3 style={{
           fontFamily: 'var(--font-serif)',
           fontSize: 17,
@@ -463,28 +464,202 @@ function RecipeCard({
   )
 }
 
+// ─── AddIngredientForm ─────────────────────────────────────────────────────────
+
+function AddIngredientForm({
+  allCategories,
+  onAdd,
+}: {
+  allCategories: Array<{ value: string; label: string }>
+  onAdd: (nom: string, categorie: string, quantite: string) => void
+}) {
+  const addIngredientCategory = useCuisineStore((s) => s.addIngredientCategory)
+  const [nom, setNom] = useState('')
+  const [categorie, setCategorie] = useState('autre')
+  const [quantite, setQuantite] = useState('')
+  const [creatingCategory, setCreatingCategory] = useState(false)
+  const [newCategoryName, setNewCategoryName] = useState('')
+  const nomRef = useRef<HTMLInputElement>(null)
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!nom.trim()) return
+    onAdd(nom.trim(), categorie, quantite.trim())
+    setNom('')
+    setQuantite('')
+    nomRef.current?.focus()
+  }
+
+  const handleCategorySelect = (val: string) => {
+    if (val === '__new__') {
+      setCreatingCategory(true)
+    } else {
+      setCategorie(val)
+    }
+  }
+
+  const handleCreateCategory = () => {
+    if (!newCategoryName.trim()) return
+    addIngredientCategory(newCategoryName.trim())
+    setCategorie(newCategoryName.trim())
+    setCreatingCategory(false)
+    setNewCategoryName('')
+  }
+
+  const inputStyle: React.CSSProperties = {
+    fontFamily: 'var(--font-sans)',
+    fontSize: 13,
+    padding: '8px 12px',
+    borderRadius: 'var(--r-lg)',
+    border: '1px solid var(--paper-2)',
+    background: 'var(--paper)',
+    color: 'var(--ink)',
+    outline: 'none',
+  }
+
+  return (
+    <div style={{ borderTop: '1px solid var(--paper-2)', paddingTop: 16, marginTop: 4 }}>
+      <span style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: 10,
+        letterSpacing: '0.1em',
+        textTransform: 'uppercase',
+        color: 'var(--ink-3)',
+        display: 'block',
+        marginBottom: 10,
+      }}>
+        Ajouter un ingrédient
+      </span>
+
+      {creatingCategory ? (
+        <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+          <input
+            autoFocus
+            value={newCategoryName}
+            onChange={(e) => setNewCategoryName(e.target.value)}
+            placeholder="Nom de la catégorie…"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCreateCategory() } }}
+            style={{ ...inputStyle, flex: 1 }}
+          />
+          <button
+            type="button"
+            onClick={handleCreateCategory}
+            disabled={!newCategoryName.trim()}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              fontWeight: 500,
+              padding: '8px 14px',
+              borderRadius: 'var(--r-lg)',
+              background: 'var(--terra)',
+              color: 'var(--paper-1)',
+              border: 'none',
+              cursor: 'pointer',
+              opacity: newCategoryName.trim() ? 1 : 0.4,
+            }}
+          >
+            Créer
+          </button>
+          <button
+            type="button"
+            onClick={() => setCreatingCategory(false)}
+            style={{
+              fontFamily: 'var(--font-sans)',
+              fontSize: 12,
+              padding: '8px 14px',
+              borderRadius: 'var(--r-lg)',
+              background: 'transparent',
+              color: 'var(--ink-3)',
+              border: '1px solid var(--ink-4)',
+              cursor: 'pointer',
+            }}
+          >
+            Annuler
+          </button>
+        </div>
+      ) : null}
+
+      <form onSubmit={handleSubmit} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <input
+          ref={nomRef}
+          value={nom}
+          onChange={(e) => setNom(e.target.value)}
+          placeholder="Nom de l'ingrédient…"
+          style={{ ...inputStyle, flex: '2 1 160px' }}
+        />
+        <select
+          value={categorie}
+          onChange={(e) => handleCategorySelect(e.target.value)}
+          style={{ ...inputStyle, flex: '1 1 140px' }}
+        >
+          {allCategories.map((c) => (
+            <option key={c.value} value={c.value}>{c.label}</option>
+          ))}
+          <option value="__new__">+ Nouvelle catégorie…</option>
+        </select>
+        <input
+          value={quantite}
+          onChange={(e) => setQuantite(e.target.value)}
+          placeholder="Quantité"
+          style={{ ...inputStyle, flex: '1 1 90px' }}
+        />
+        <button
+          type="submit"
+          disabled={!nom.trim()}
+          style={{
+            fontFamily: 'var(--font-sans)',
+            fontSize: 13,
+            fontWeight: 500,
+            padding: '8px 16px',
+            borderRadius: 'var(--r-lg)',
+            background: 'var(--terra)',
+            color: 'var(--paper-1)',
+            border: 'none',
+            cursor: nom.trim() ? 'pointer' : 'not-allowed',
+            opacity: nom.trim() ? 1 : 0.4,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          <Plus size={14} />
+          Ajouter
+        </button>
+      </form>
+    </div>
+  )
+}
+
 // ─── RecipeDetailPanel ─────────────────────────────────────────────────────────
 
 function RecipeDetailPanel({
   recette,
   allIngredients,
-  courses,
+  allCategories,
   onClose,
   onToggleFavorite,
-  onAddToCourses,
+  onSetImage,
+  onRemoveImage,
+  onToggleDisponible,
 }: {
   recette: Recette
   allIngredients: Ingredient[]
-  courses: CourseItem[]
+  allCategories: Array<{ value: string; label: string }>
   onClose: () => void
   onToggleFavorite: () => void
-  onAddToCourses: (recetteNom: string, items: CourseItem[]) => void
+  onSetImage: (src: string) => void
+  onRemoveImage: () => void
+  onToggleDisponible: (id: string) => void
 }) {
-  const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
+  const addIngredient      = useCuisineStore((s) => s.addIngredient)
+  const updateIngredient   = useCuisineStore((s) => s.updateIngredient)
+  const deleteIngredient   = useCuisineStore((s) => s.deleteIngredient)
+  const updateRecette      = useCuisineStore((s) => s.updateRecette)
 
-  // selected ingredient ids for adding to courses
+  const [imgSrc, setImgSrc] = useState<string | null>(() => getRecipeImage(recette))
+  const [showImgImport, setShowImgImport] = useState(false)
+
   const recetteIngredients = allIngredients.filter((i) => recette.ingredientIds.includes(i.id))
-  const [selected, setSelected] = useState<Set<string>>(new Set(recetteIngredients.map((i) => i.id)))
 
   useEffect(() => {
     const handler = (e: Event) => {
@@ -501,29 +676,47 @@ function RecipeDetailPanel({
     return () => document.removeEventListener('keydown', handleKey)
   }, [onClose])
 
-  const toggleSelected = (id: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+  const handlePickImage = (src: string) => {
+    onSetImage(src)
+    setImgSrc(src)
+    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: src }))
+    setShowImgImport(false)
+  }
+
+  const handleRemoveImage = () => {
+    onRemoveImage()
+    setImgSrc(null)
+    window.dispatchEvent(new CustomEvent(`aetheris-cuisine-img-${recette.id}`, { detail: null }))
+    setShowImgImport(false)
+  }
+
+  const handleAddIngredient = (nom: string, categorie: string, quantite: string) => {
+    const newIng = addIngredient({
+      nom,
+      categorie,
+      quantite: quantite || undefined,
+      disponible: false,
+      recetteIds: [recette.id],
+    })
+    updateRecette(recette.id, {
+      ingredientIds: [...recette.ingredientIds, newIng.id],
     })
   }
 
-  const courseNameSet = new Set(courses.map((c) => c.name.trim().toLowerCase()))
+  const handleRemoveIngredient = (ingredientId: string) => {
+    const ing = allIngredients.find((i) => i.id === ingredientId)
+    if (!ing) return
 
-  const handleAddToCourses = () => {
-    const items: CourseItem[] = recetteIngredients
-      .filter((i) => selected.has(i.id))
-      .map((i) => ({
-        id: crypto.randomUUID(),
-        name: i.nom,
-        qty: i.quantite || '—',
-        rayon: INGREDIENT_TO_RAYON[i.categorie] || 'Autre',
-        checked: false,
-        fromRecipe: recette.nom,
-      }))
-    onAddToCourses(recette.nom, items)
+    updateRecette(recette.id, {
+      ingredientIds: recette.ingredientIds.filter((id) => id !== ingredientId),
+    })
+
+    const newRecetteIds = ing.recetteIds.filter((id) => id !== recette.id)
+    if (newRecetteIds.length === 0) {
+      deleteIngredient(ingredientId)
+    } else {
+      updateIngredient(ingredientId, { recetteIds: newRecetteIds })
+    }
   }
 
   return (
@@ -576,7 +769,26 @@ function RecipeDetailPanel({
           <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)' }}>
             {recette.nom}
           </span>
-          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 4 }}>
+            {/* Image button */}
+            <button
+              onClick={() => setShowImgImport((v) => !v)}
+              title={imgSrc ? 'Changer l\'image' : 'Ajouter une image'}
+              style={{
+                background: showImgImport ? 'var(--paper-2)' : 'none',
+                border: 'none',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: 6,
+                borderRadius: 'var(--r-full)',
+                color: 'var(--ink-3)',
+                transition: 'background var(--dur) var(--ease)',
+              }}
+            >
+              {imgSrc ? <Replace size={16} /> : <ImageUp size={16} />}
+            </button>
             <button
               onClick={onToggleFavorite}
               style={{
@@ -615,6 +827,18 @@ function RecipeDetailPanel({
             </button>
           </div>
         </div>
+
+        {/* Image import popover */}
+        {showImgImport && (
+          <div style={{ position: 'relative', zIndex: 2 }}>
+            <ImageImport
+              currentImage={imgSrc}
+              onPick={handlePickImage}
+              onRemove={handleRemoveImage}
+              onClose={() => setShowImgImport(false)}
+            />
+          </div>
+        )}
 
         {/* Image or terra bar */}
         {imgSrc ? (
@@ -683,8 +907,8 @@ function RecipeDetailPanel({
           </div>
 
           {/* Ingrédients */}
-          {recetteIngredients.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{
                 fontFamily: 'var(--font-mono)',
                 fontSize: 10.5,
@@ -694,94 +918,118 @@ function RecipeDetailPanel({
               }}>
                 Ingrédients
               </span>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                {recetteIngredients.map((ing) => {
-                  const alreadyInCourses = courseNameSet.has(ing.nom.trim().toLowerCase())
-                  const isSelected = selected.has(ing.id)
-                  return (
-                    <div
-                      key={ing.id}
-                      onClick={() => toggleSelected(ing.id)}
-                      style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 12,
-                        padding: '10px 14px',
-                        borderRadius: 'var(--r-lg)',
-                        background: isSelected ? 'var(--paper-1)' : 'transparent',
-                        border: '1px solid',
-                        borderColor: isSelected ? 'var(--paper-2)' : 'transparent',
-                        cursor: 'pointer',
-                        transition: 'background var(--dur) var(--ease)',
-                      }}
-                    >
-                      <CheckBox checked={isSelected} onClick={() => toggleSelected(ing.id)} />
-                      <span style={{
-                        fontFamily: 'var(--font-sans)',
-                        fontSize: 14,
-                        color: 'var(--ink)',
-                        flex: 1,
-                      }}>
-                        {ing.nom}
-                      </span>
-                      {ing.quantite && (
-                        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
-                          {ing.quantite}
-                        </span>
-                      )}
-                      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.04em' }}>
-                        {INGREDIENT_TO_RAYON[ing.categorie] || 'Autre'}
-                      </span>
-                      {alreadyInCourses && (
-                        <span style={{
-                          fontFamily: 'var(--font-mono)',
-                          fontSize: 10,
-                          color: 'var(--sage)',
-                          letterSpacing: '0.06em',
-                          textTransform: 'uppercase',
-                        }}>
-                          ✓ liste
-                        </span>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-
-              {/* Footer action */}
-              <button
-                onClick={handleAddToCourses}
-                style={{
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 13,
-                  fontWeight: 500,
-                  padding: '10px 20px',
-                  borderRadius: 'var(--r-lg)',
-                  background: 'var(--terra)',
-                  color: 'var(--paper-1)',
-                  border: 'none',
-                  cursor: 'pointer',
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 8,
-                  width: 'fit-content',
-                }}
-              >
-                <ShoppingBasket size={15} />
-                Ajouter à la liste
-              </button>
+              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
+                {recetteIngredients.length > 0 ? `${recetteIngredients.filter(i => i.disponible).length}/${recetteIngredients.length} en stock` : '—'}
+              </span>
             </div>
-          )}
 
-          {recetteIngredients.length === 0 && (
-            <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-              Aucun ingrédient enregistré pour cette recette.
-            </p>
-          )}
+            {recetteIngredients.length > 0 && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {recetteIngredients.map((ing) => (
+                  <IngredientPanelRow
+                    key={ing.id}
+                    ingredient={ing}
+                    onToggleDisponible={() => onToggleDisponible(ing.id)}
+                    onRemove={() => handleRemoveIngredient(ing.id)}
+                  />
+                ))}
+              </div>
+            )}
+
+            {recetteIngredients.length === 0 && (
+              <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-4)', fontStyle: 'italic', margin: 0 }}>
+                Aucun ingrédient pour l'instant.
+              </p>
+            )}
+
+            <AddIngredientForm
+              allCategories={allCategories}
+              onAdd={handleAddIngredient}
+            />
+          </div>
         </div>
       </div>
     </>
+  )
+}
+
+// ─── IngredientPanelRow ────────────────────────────────────────────────────────
+
+function IngredientPanelRow({
+  ingredient,
+  onToggleDisponible,
+  onRemove,
+}: {
+  ingredient: Ingredient
+  onToggleDisponible: () => void
+  onRemove: () => void
+}) {
+  const [hovered, setHovered] = useState(false)
+
+  return (
+    <div
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        padding: '9px 14px',
+        borderRadius: 'var(--r-lg)',
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        transition: 'background var(--dur) var(--ease)',
+      }}
+    >
+      {/* Disponible dot */}
+      <div
+        onClick={onToggleDisponible}
+        title={ingredient.disponible ? 'En stock — cliquer pour retirer' : 'Manquant — cliquer pour marquer en stock'}
+        style={{
+          width: 10,
+          height: 10,
+          borderRadius: '50%',
+          background: ingredient.disponible ? '#3F5A3C' : 'var(--ink-4)',
+          flexShrink: 0,
+          cursor: 'pointer',
+          transition: 'background var(--dur) var(--ease)',
+        }}
+      />
+      <span style={{
+        fontFamily: 'var(--font-sans)',
+        fontSize: 14,
+        color: ingredient.disponible ? 'var(--ink-3)' : 'var(--ink)',
+        flex: 1,
+        textDecoration: ingredient.disponible ? 'line-through' : 'none',
+        textDecorationColor: 'var(--ink-4)',
+        transition: 'color var(--dur) var(--ease)',
+      }}>
+        {ingredient.nom}
+      </span>
+      {ingredient.quantite && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
+          {ingredient.quantite}
+        </span>
+      )}
+      <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)', letterSpacing: '0.04em' }}>
+        {getCategorieLabel(ingredient.categorie)}
+      </span>
+      <button
+        onClick={onRemove}
+        style={{
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          display: 'flex',
+          color: 'var(--ink-4)',
+          padding: 2,
+          opacity: hovered ? 1 : 0,
+          transition: 'opacity var(--dur) var(--ease)',
+        }}
+      >
+        <X size={13} />
+      </button>
+    </div>
   )
 }
 
@@ -790,14 +1038,12 @@ function RecipeDetailPanel({
 function SectionTabs({
   section,
   recettesCount,
-  coursesChecked,
-  coursesTotal,
+  manquantsCount,
   onChange,
 }: {
   section: 'recettes' | 'courses'
   recettesCount: number
-  coursesChecked: number
-  coursesTotal: number
+  manquantsCount: number
   onChange: (s: 'recettes' | 'courses') => void
 }) {
   return (
@@ -808,7 +1054,7 @@ function SectionTabs({
     }}>
       {([
         { id: 'recettes', label: 'Recettes', Icon: BookOpen, count: String(recettesCount) },
-        { id: 'courses', label: 'Liste de courses', Icon: ShoppingBasket, count: `${coursesChecked}/${coursesTotal}` },
+        { id: 'courses',  label: 'Mes stocks',  Icon: ShoppingBasket, count: manquantsCount > 0 ? `${manquantsCount} manquant${manquantsCount > 1 ? 's' : ''}` : '✓ complet' },
       ] as const).map(({ id, label, Icon, count }) => {
         const active = section === id
         return (
@@ -856,6 +1102,7 @@ function SectionTabs({
 
 function RecettesView({
   recettes,
+  canMakeSet,
   onOpen,
   onToggleFavorite,
   onSetImage,
@@ -863,6 +1110,7 @@ function RecettesView({
   onNewRecette,
 }: {
   recettes: Recette[]
+  canMakeSet: Set<string>
   onOpen: (id: string) => void
   onToggleFavorite: (id: string) => void
   onSetImage: (id: string, src: string) => void
@@ -883,7 +1131,6 @@ function RecettesView({
 
   return (
     <div className="cuisine-section-anim" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
-      {/* Editorial header */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
         <span style={{
           fontFamily: 'var(--font-mono)',
@@ -915,7 +1162,6 @@ function RecettesView({
         </p>
       </div>
 
-      {/* New recipe button */}
       <button
         onClick={onNewRecette}
         style={{
@@ -1021,6 +1267,7 @@ function RecettesView({
               key={r.id}
               recette={r}
               index={i}
+              canMake={canMakeSet.has(r.id)}
               onOpen={() => onOpen(r.id)}
               onToggleFavorite={() => onToggleFavorite(r.id)}
               onSetImage={(src) => onSetImage(r.id, src)}
@@ -1033,102 +1280,92 @@ function RecettesView({
   )
 }
 
-// ─── ShoppingItemRow ───────────────────────────────────────────────────────────
+// ─── IngredientStockRow ────────────────────────────────────────────────────────
 
-function ShoppingItemRow({
-  item,
+function IngredientStockRow({
+  ingredient,
+  linkedRecettes,
   onToggle,
-  onRemove,
 }: {
-  item: CourseItem
+  ingredient: Ingredient
+  linkedRecettes: Recette[]
   onToggle: () => void
-  onRemove: () => void
 }) {
-  const [hovered, setHovered] = useState(false)
-
   return (
     <div
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
+      onClick={onToggle}
       style={{
         display: 'flex',
         alignItems: 'center',
         gap: 12,
         padding: '10px 14px',
         borderRadius: 'var(--r-lg)',
-        background: item.checked ? 'transparent' : 'var(--paper-1)',
+        background: ingredient.disponible ? 'transparent' : 'var(--paper-1)',
         border: '1px solid',
-        borderColor: item.checked ? 'transparent' : 'var(--paper-2)',
-        transition: 'background var(--dur) var(--ease)',
-        opacity: item.checked ? 0.5 : 1,
+        borderColor: ingredient.disponible ? 'transparent' : 'var(--paper-2)',
+        opacity: ingredient.disponible ? 0.5 : 1,
+        transition: 'background var(--dur) var(--ease), opacity var(--dur) var(--ease)',
+        cursor: 'pointer',
       }}
     >
-      <CheckBox checked={item.checked} onClick={onToggle} />
+      <CheckBox checked={ingredient.disponible} onClick={onToggle} />
       <span style={{
         fontFamily: 'var(--font-sans)',
         fontSize: 14,
         color: 'var(--ink)',
         flex: 1,
-        textDecoration: item.checked ? 'line-through' : 'none',
+        textDecoration: ingredient.disponible ? 'line-through' : 'none',
         textDecorationColor: 'var(--ink-3)',
       }}>
-        {item.name}
+        {ingredient.nom}
       </span>
-      {item.qty && item.qty !== '—' && (
+      {ingredient.quantite && (
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--ink-3)' }}>
-          {item.qty}
+          {ingredient.quantite}
         </span>
       )}
-      {item.fromRecipe && (
-        <span style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 3,
-          fontFamily: 'var(--font-mono)',
-          fontSize: 10,
-          color: 'var(--ink-4)',
-          letterSpacing: '0.04em',
-        }}>
-          <Link size={9} />
-          {item.fromRecipe}
-        </span>
+      {linkedRecettes.length > 0 && (
+        <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexShrink: 0 }}>
+          {linkedRecettes.map((r) => (
+            <span key={r.id} style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 3,
+              fontFamily: 'var(--font-mono)',
+              fontSize: 10,
+              color: 'var(--ink-4)',
+              letterSpacing: '0.04em',
+              whiteSpace: 'nowrap',
+            }}>
+              <Utensils size={9} />
+              {r.nom}
+            </span>
+          ))}
+        </div>
       )}
-      <button
-        onClick={onRemove}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          display: 'flex',
-          color: 'var(--ink-4)',
-          padding: 2,
-          opacity: hovered ? 1 : 0,
-          transition: 'opacity var(--dur) var(--ease)',
-        }}
-      >
-        <X size={13} />
-      </button>
     </div>
   )
 }
 
-// ─── RayonGroup ────────────────────────────────────────────────────────────────
+// ─── StockRayonGroup ───────────────────────────────────────────────────────────
 
-function RayonGroup({
+function StockRayonGroup({
   rayon,
-  items,
+  ingredients,
+  recetteMap,
   onToggle,
-  onRemove,
 }: {
   rayon: string
-  items: CourseItem[]
+  ingredients: Ingredient[]
+  recetteMap: Map<string, Recette>
   onToggle: (id: string) => void
-  onRemove: (id: string) => void
 }) {
-  const sorted = [...items].sort((a, b) => {
-    if (a.checked === b.checked) return 0
-    return a.checked ? 1 : -1
+  const sorted = [...ingredients].sort((a, b) => {
+    if (a.disponible === b.disponible) return a.nom.localeCompare(b.nom, 'fr')
+    return a.disponible ? 1 : -1
   })
+
+  const manquants = ingredients.filter((i) => !i.disponible).length
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -1143,132 +1380,59 @@ function RayonGroup({
           {rayon}
         </h2>
         <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-4)' }}>
-          {items.length === 0 ? '—' : `${items.length}`}
+          {manquants > 0 ? `${manquants} manquant${manquants > 1 ? 's' : ''}` : '✓'}
         </span>
       </div>
 
-      {items.length === 0 ? (
-        <p style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-4)', fontStyle: 'italic', margin: 0 }}>
-          —
-        </p>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {sorted.map((item) => (
-            <ShoppingItemRow
-              key={item.id}
-              item={item}
-              onToggle={() => onToggle(item.id)}
-              onRemove={() => onRemove(item.id)}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {sorted.map((ing) => {
+          const linked = ing.recetteIds.map((id) => recetteMap.get(id)).filter(Boolean) as Recette[]
+          return (
+            <IngredientStockRow
+              key={ing.id}
+              ingredient={ing}
+              linkedRecettes={linked}
+              onToggle={() => onToggle(ing.id)}
             />
-          ))}
-        </div>
-      )}
+          )
+        })}
+      </div>
     </div>
-  )
-}
-
-// ─── QuickAddForm ──────────────────────────────────────────────────────────────
-
-function QuickAddForm({ onAdd }: { onAdd: (data: { name: string; qty: string; rayon: string }) => void }) {
-  const [name, setName] = useState('')
-  const [qty, setQty] = useState('')
-  const [rayon, setRayon] = useState<string>(RAYONS[0])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!name.trim()) return
-    onAdd({ name: name.trim(), qty, rayon })
-    setName('')
-    setQty('')
-  }
-
-  const inputStyle: React.CSSProperties = {
-    fontFamily: 'var(--font-sans)',
-    fontSize: 13,
-    padding: '8px 12px',
-    borderRadius: 'var(--r-lg)',
-    border: '1px solid var(--paper-2)',
-    background: 'var(--paper-1)',
-    color: 'var(--ink)',
-    outline: 'none',
-  }
-
-  return (
-    <form
-      onSubmit={handleSubmit}
-      style={{
-        display: 'flex',
-        gap: 8,
-        flexWrap: 'wrap',
-        padding: '16px 0',
-        borderTop: '1px solid var(--paper-2)',
-        marginTop: 8,
-      }}
-    >
-      <input
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        placeholder="Nom de l'article…"
-        style={{ ...inputStyle, flex: '2 1 160px' }}
-      />
-      <input
-        value={qty}
-        onChange={(e) => setQty(e.target.value)}
-        placeholder="Quantité"
-        style={{ ...inputStyle, flex: '1 1 80px' }}
-      />
-      <select
-        value={rayon}
-        onChange={(e) => setRayon(e.target.value)}
-        style={{ ...inputStyle, flex: '1 1 120px' }}
-      >
-        {RAYONS.map((r) => <option key={r} value={r}>{r}</option>)}
-      </select>
-      <button
-        type="submit"
-        disabled={!name.trim()}
-        style={{
-          fontFamily: 'var(--font-sans)',
-          fontSize: 13,
-          fontWeight: 500,
-          padding: '8px 16px',
-          borderRadius: 'var(--r-lg)',
-          background: 'var(--terra)',
-          color: 'var(--paper-1)',
-          border: 'none',
-          cursor: 'pointer',
-          opacity: name.trim() ? 1 : 0.4,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 6,
-        }}
-      >
-        <Plus size={14} />
-        Ajouter
-      </button>
-    </form>
   )
 }
 
 // ─── ListeDeCoursesView ────────────────────────────────────────────────────────
 
 function ListeDeCoursesView({
-  items,
-  onToggle,
-  onClearChecked,
-  onAdd,
-  onRemove,
+  recettes,
+  ingredients,
+  onToggleDisponible,
 }: {
-  items: CourseItem[]
-  onToggle: (id: string) => void
-  onClearChecked: () => void
-  onAdd: (data: { name: string; qty: string; rayon: string }) => void
-  onRemove: (id: string) => void
+  recettes: Recette[]
+  ingredients: Ingredient[]
+  onToggleDisponible: (id: string) => void
 }) {
-  const checkedCount = items.filter((i) => i.checked).length
-  const total = items.length
+  const recetteIngredientIdSet = new Set(recettes.flatMap((r) => r.ingredientIds))
+  const recetteIngredients = ingredients.filter((i) => recetteIngredientIdSet.has(i.id))
 
-  const byRayon = (rayon: string) => items.filter((i) => i.rayon === rayon)
+  const manquants = recetteIngredients.filter((i) => !i.disponible)
+  const realisables = recettes.filter(
+    (r) =>
+      r.ingredientIds.length > 0 &&
+      r.ingredientIds.every((id) => ingredients.find((i) => i.id === id)?.disponible === true),
+  )
+
+  // Group by rayon preserving order
+  const grouped = new Map<string, Ingredient[]>()
+  for (const rayon of RAYONS) grouped.set(rayon, [])
+
+  for (const ing of recetteIngredients) {
+    const rayon = getRayonForCategorie(ing.categorie)
+    const key = grouped.has(rayon) ? rayon : 'Autre'
+    grouped.get(key)!.push(ing)
+  }
+
+  const recetteMap = new Map(recettes.map((r) => [r.id, r]))
 
   return (
     <div className="cuisine-section-anim" style={{ display: 'flex', flexDirection: 'column', gap: 32 }}>
@@ -1281,7 +1445,7 @@ function ListeDeCoursesView({
           textTransform: 'uppercase',
           color: 'var(--ink-3)',
         }}>
-          liste de courses · {checkedCount}/{total} cochés
+          stocks · {manquants.length} manquant{manquants.length !== 1 ? 's' : ''}
         </span>
         <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <h1 style={{
@@ -1292,48 +1456,73 @@ function ListeDeCoursesView({
             margin: 0,
             lineHeight: 1.2,
           }}>
-            À rapporter.
+            Tes ingrédients.
           </h1>
-          {checkedCount > 0 && (
-            <button
-              onClick={onClearChecked}
-              style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                fontFamily: 'var(--font-sans)',
-                fontSize: 12,
-                padding: '6px 12px',
-                borderRadius: 'var(--r-lg)',
-                background: 'transparent',
-                color: 'var(--ink-3)',
-                border: '1px solid var(--ink-4)',
-                cursor: 'pointer',
-                marginLeft: 'auto',
-              }}
-            >
-              <Trash2 size={13} />
-              Vider les cochés
-            </button>
+          {realisables.length > 0 && (
+            <span style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 5,
+              background: '#E8F0E8',
+              color: '#3F5A3C',
+              padding: '4px 12px',
+              borderRadius: 'var(--r-full)',
+              fontFamily: 'var(--font-mono)',
+              fontSize: 11,
+              letterSpacing: '0.04em',
+              flexShrink: 0,
+            }}>
+              <Check size={11} strokeWidth={2.5} />
+              {realisables.length} réalisable{realisables.length !== 1 ? 's' : ''}
+            </span>
           )}
         </div>
+        <p style={{
+          fontFamily: 'var(--font-serif)',
+          fontSize: 15,
+          color: 'var(--ink-3)',
+          fontStyle: 'italic',
+          margin: 0,
+        }}>
+          Coche ce que tu as. La liste se met à jour automatiquement.
+        </p>
       </div>
 
-      {/* Rayon groups */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-        {RAYONS.map((rayon) => (
-          <RayonGroup
-            key={rayon}
-            rayon={rayon}
-            items={byRayon(rayon)}
-            onToggle={onToggle}
-            onRemove={onRemove}
-          />
-        ))}
-      </div>
+      {recetteIngredients.length === 0 ? (
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 12, padding: '60px 0', textAlign: 'center' }}>
+          <p style={{ fontFamily: 'var(--font-serif)', fontSize: 18, color: 'var(--ink-3)', fontStyle: 'italic', margin: 0 }}>
+            Ajoute des ingrédients à tes recettes pour les voir ici.
+          </p>
+        </div>
+      ) : (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+          {[...grouped.entries()].map(([rayon, ings]) => {
+            if (ings.length === 0) return null
+            return (
+              <StockRayonGroup
+                key={rayon}
+                rayon={rayon}
+                ingredients={ings}
+                recetteMap={recetteMap}
+                onToggle={onToggleDisponible}
+              />
+            )
+          })}
+        </div>
+      )}
 
-      {/* Quick add */}
-      <QuickAddForm onAdd={onAdd} />
+      {/* Manual add hint */}
+      {recetteIngredients.length > 0 && (
+        <p style={{
+          fontFamily: 'var(--font-sans)',
+          fontSize: 12,
+          color: 'var(--ink-4)',
+          margin: 0,
+          fontStyle: 'italic',
+        }}>
+          Pour ajouter des ingrédients, ouvre une recette et complète sa liste.
+        </p>
+      )}
     </div>
   )
 }
@@ -1410,7 +1599,6 @@ function NewRecipeModal({
           animation: 'cuisine-section-in 220ms var(--ease)',
         }}
       >
-        {/* Header */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h2 style={{
             fontFamily: 'var(--font-serif)',
@@ -1436,7 +1624,6 @@ function NewRecipeModal({
           </button>
         </div>
 
-        {/* Nom */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
             Nom *
@@ -1450,7 +1637,6 @@ function NewRecipeModal({
           />
         </div>
 
-        {/* Categorie + Temps */}
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
             <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
@@ -1482,7 +1668,16 @@ function NewRecipeModal({
           </div>
         </div>
 
-        {/* Actions */}
+        <p style={{
+          fontFamily: 'var(--font-sans)',
+          fontSize: 12,
+          color: 'var(--ink-4)',
+          margin: 0,
+          fontStyle: 'italic',
+        }}>
+          Tu pourras ajouter une image et des ingrédients après la création.
+        </p>
+
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 4 }}>
           <button
             type="button"
@@ -1561,22 +1756,41 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
 // ─── CuisinePage ───────────────────────────────────────────────────────────────
 
 export function CuisinePage() {
-  const recettes = useCuisineStore((s) => s.recettes)
-  const ingredients = useCuisineStore((s) => s.ingredients)
-  const updateRecette = useCuisineStore((s) => s.updateRecette)
+  const recettes              = useCuisineStore((s) => s.recettes)
+  const ingredients           = useCuisineStore((s) => s.ingredients)
+  const customCategories      = useCuisineStore((s) => s.customIngredientCategories)
+  const updateRecette         = useCuisineStore((s) => s.updateRecette)
+  const toggleDisponible      = useCuisineStore((s) => s.toggleDisponible)
 
-  const [section, setSection] = useState<'recettes' | 'courses'>('recettes')
+  const [section, setSection]           = useState<'recettes' | 'courses'>('recettes')
   const [openRecetteId, setOpenRecetteId] = useState<string | null>(null)
-  const [toast, setToast] = useState<string | null>(null)
-  const [showNewModal, setShowNewModal] = useState(false)
-  const [courses, setCourses] = useState<CourseItem[]>(() => loadCourses())
-
-  // Persist courses to localStorage
-  useEffect(() => {
-    try { localStorage.setItem(COURSES_LS_KEY, JSON.stringify(courses)) } catch {}
-  }, [courses])
+  const [toast, setToast]               = useState<string | null>(null)
+  const [showNewModal, setShowNewModal]  = useState(false)
 
   const openRecette = recettes.find((r) => r.id === openRecetteId) ?? null
+
+  // All categories: defaults + custom
+  const allCategories = [
+    ...DEFAULT_INGREDIENT_CATEGORIES,
+    ...customCategories.map((name) => ({ value: name, label: name })),
+  ]
+
+  // Compute which recipes are "réalisable"
+  const canMakeSet = new Set<string>(
+    recettes
+      .filter(
+        (r) =>
+          r.ingredientIds.length > 0 &&
+          r.ingredientIds.every((id) => ingredients.find((i) => i.id === id)?.disponible === true),
+      )
+      .map((r) => r.id),
+  )
+
+  // Count missing ingredients (linked to at least one recipe)
+  const recetteIngredientIdSet = new Set(recettes.flatMap((r) => r.ingredientIds))
+  const manquantsCount = ingredients.filter(
+    (i) => recetteIngredientIdSet.has(i.id) && !i.disponible,
+  ).length
 
   const toggleFavorite = useCallback(
     (id: string) => updateRecette(id, { favori: !recettes.find((r) => r.id === id)?.favori }),
@@ -1593,60 +1807,13 @@ export function CuisinePage() {
     [updateRecette],
   )
 
-  const addToCourses = useCallback(
-    (_recetteNom: string, newItems: CourseItem[]) => {
-      const existingNames = new Set(courses.map((i) => i.name.trim().toLowerCase()))
-      const fresh = newItems.filter((i) => !existingNames.has(i.name.trim().toLowerCase()))
-      if (fresh.length === 0) {
-        setToast('Tout est déjà dans la liste.')
-        return
-      }
-      setCourses((prev) => [...prev, ...fresh])
-      setToast(`${fresh.length} ingrédient${fresh.length > 1 ? 's' : ''} ajouté${fresh.length > 1 ? 's' : ''} à la liste.`)
-    },
-    [courses],
-  )
-
-  const toggleCourse = useCallback(
-    (id: string) => setCourses((prev) => prev.map((i) => i.id === id ? { ...i, checked: !i.checked } : i)),
-    [],
-  )
-
-  const clearChecked = useCallback(
-    () => setCourses((prev) => prev.filter((i) => !i.checked)),
-    [],
-  )
-
-  const addCourse = useCallback(
-    (data: { name: string; qty: string; rayon: string }) => {
-      const item: CourseItem = {
-        id: crypto.randomUUID(),
-        name: data.name,
-        qty: data.qty || '—',
-        rayon: data.rayon || 'Autre',
-        checked: false,
-        fromRecipe: null,
-      }
-      setCourses((prev) => [...prev, item])
-    },
-    [],
-  )
-
-  const removeCourse = useCallback(
-    (id: string) => setCourses((prev) => prev.filter((i) => i.id !== id)),
-    [],
-  )
-
-  const checkedCount = courses.filter((i) => i.checked).length
-
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
       {/* Section tabs */}
       <SectionTabs
         section={section}
         recettesCount={recettes.length}
-        coursesChecked={checkedCount}
-        coursesTotal={courses.length}
+        manquantsCount={manquantsCount}
         onChange={setSection}
       />
 
@@ -1655,6 +1822,7 @@ export function CuisinePage() {
         {section === 'recettes' ? (
           <RecettesView
             recettes={recettes}
+            canMakeSet={canMakeSet}
             onOpen={setOpenRecetteId}
             onToggleFavorite={toggleFavorite}
             onSetImage={handleSetImage}
@@ -1663,11 +1831,9 @@ export function CuisinePage() {
           />
         ) : (
           <ListeDeCoursesView
-            items={courses}
-            onToggle={toggleCourse}
-            onClearChecked={clearChecked}
-            onAdd={addCourse}
-            onRemove={removeCourse}
+            recettes={recettes}
+            ingredients={ingredients}
+            onToggleDisponible={toggleDisponible}
           />
         )}
       </div>
@@ -1677,10 +1843,12 @@ export function CuisinePage() {
         <RecipeDetailPanel
           recette={openRecette}
           allIngredients={ingredients}
-          courses={courses}
+          allCategories={allCategories}
           onClose={() => setOpenRecetteId(null)}
           onToggleFavorite={() => toggleFavorite(openRecette.id)}
-          onAddToCourses={addToCourses}
+          onSetImage={(src) => handleSetImage(openRecette.id, src)}
+          onRemoveImage={() => handleRemoveImage(openRecette.id)}
+          onToggleDisponible={toggleDisponible}
         />
       )}
 

@@ -16,10 +16,7 @@ export interface Recette {
 
 // ─── Ingredient ───────────────────────────────────────────────────────────────
 
-export type IngredientCategorie =
-  | 'legume'       | 'fruit'    | 'viande'        | 'poisson'  | 'produit_laitier'
-  | 'cereale'      | 'legumineuse' | 'oeuf'        | 'herbe'    | 'epice'
-  | 'huile'        | 'condiment' | 'conserve'      | 'boisson'  | 'autre'
+export type IngredientCategorie = string  // predefined or custom
 
 export interface Ingredient {
   id:         string
