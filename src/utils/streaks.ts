@@ -23,8 +23,9 @@ function shiftDay(iso: string, delta: number): string {
  * Un jour est actif si :
  *  - au moins une tâche a été marquée comme `done` ce jour-là (basé sur updatedAt)
  *  - OU au moins une session de focus a été enregistrée ce jour-là
+ *  - OU une activité d'un autre store (workout, session d'écriture, etc.) a eu lieu ce jour
  */
-function collectActiveDays(tasks: Task[], sessions: TimeSession[]): Set<string> {
+function collectActiveDays(tasks: Task[], sessions: TimeSession[], extraDates: string[]): Set<string> {
   const days = new Set<string>()
   for (const t of tasks) {
     if (t.status === 'done' && t.updatedAt) {
@@ -34,13 +35,20 @@ function collectActiveDays(tasks: Task[], sessions: TimeSession[]): Set<string> 
   for (const s of sessions) {
     if (s.date) days.add(s.date)
   }
+  for (const d of extraDates) {
+    if (d) days.add(d.split('T')[0])
+  }
   return days
 }
 
 // ─── Computation principale ──────────────────────────────────────────────────
 
-export function computeDailyStreak(tasks: Task[], sessions: TimeSession[]): DailyStreak {
-  const activeDays = collectActiveDays(tasks, sessions)
+export function computeDailyStreak(
+  tasks: Task[],
+  sessions: TimeSession[],
+  extraDates: string[] = [],
+): DailyStreak {
+  const activeDays = collectActiveDays(tasks, sessions, extraDates)
   if (activeDays.size === 0) return { current: 0, best: 0, activeToday: false }
 
   const today = todayIso()

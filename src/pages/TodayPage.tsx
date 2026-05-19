@@ -223,8 +223,14 @@ interface ExternalEntry {
 function StreakLine({ streak }: { streak: DailyStreak }) {
   const { current, best, activeToday } = streak
 
-  // Pas d'historique → on n'affiche rien (évite le bruit visuel au lancement)
-  if (best === 0) return null
+  const eyebrow = (text: string) => (
+    <div style={{
+      fontFamily: 'var(--font-mono)', fontSize: 10.5,
+      letterSpacing: '0.06em', color: 'var(--ink-3)',
+    }}>
+      {text}
+    </div>
+  )
 
   // Streak en cours
   if (current > 0) {
@@ -244,33 +250,34 @@ function StreakLine({ streak }: { streak: DailyStreak }) {
             jour{current > 1 ? 's' : ''} d'affilée
           </span>
         </div>
-        <div style={{
-          fontFamily: 'var(--font-mono)', fontSize: 10.5,
-          letterSpacing: '0.06em', color: 'var(--ink-3)',
-        }}>
-          {activeToday
+        {eyebrow(
+          activeToday
             ? (best > current ? `record · ${best} j` : 'record en cours')
-            : `à maintenir · record ${best} j`}
-        </div>
+            : `à maintenir · record ${best} j`,
+        )}
       </div>
     )
   }
 
-  // current === 0 mais il y a un historique → ton doux qui invite à reprendre
+  // Pas de streak en cours mais historique → ton doux
+  if (best > 0) {
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
+        <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--ink-3)' }}>
+          une autre fois.
+        </span>
+        {eyebrow(`record · ${best} j`)}
+      </div>
+    )
+  }
+
+  // Aucun historique → invite à démarrer la série
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 2 }}>
-      <span style={{
-        fontFamily: 'var(--font-serif)', fontStyle: 'italic',
-        fontSize: 15, color: 'var(--ink-3)',
-      }}>
-        une autre fois.
+      <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15, color: 'var(--ink-3)' }}>
+        première séance.
       </span>
-      <span style={{
-        fontFamily: 'var(--font-mono)', fontSize: 10.5,
-        letterSpacing: '0.06em', color: 'var(--ink-3)',
-      }}>
-        record · {best} j
-      </span>
+      {eyebrow('coche une tâche pour commencer')}
     </div>
   )
 }
@@ -287,15 +294,27 @@ export function TodayPage() {
   const updateTask   = useStore((s) => s.updateTask)
   const addTaskAction = useStore((s) => s.addTask)
 
-  // Streak quotidien — recalculé à chaque rendu (peu coûteux)
-  const streak = useMemo(() => computeDailyStreak(tasks, timeSessions), [tasks, timeSessions])
-
   const droitTaches    = useDroitStore((s) => s.taches)
   const writingStories = useWritingStore((s) => s.stories)
   const sportHistorique = useSportStore((s) => s.historique)
   const careerMissions = useCareerStore((s) => s.missions)
 
   const today = todayIso()
+
+  // Streak quotidien — agrège l'activité de tous les stores qui ont des dates ISO exploitables
+  const extraActivityDates = useMemo(() => {
+    const dates: string[] = []
+    for (const w of sportHistorique) if (w.date) dates.push(w.date)
+    for (const story of writingStories) {
+      for (const session of story.sessions) if (session.date) dates.push(session.date)
+    }
+    return dates
+  }, [sportHistorique, writingStories])
+
+  const streak = useMemo(
+    () => computeDailyStreak(tasks, timeSessions, extraActivityDates),
+    [tasks, timeSessions, extraActivityDates],
+  )
 
   // Tasks du store principal planifiées pour aujourd'hui
   const plannedTasks = useMemo(
