@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useStore } from '../store'
 import { getDomainColors } from '../utils/domainColors'
-import type { Objective } from '../types'
+import type { Domain, Objective } from '../types'
+
+const STATIC_DOMAINS: Domain[] = [
+  { id: 'musique',  name: 'Musique',       color: 'purple', icon: '🎵', description: '' },
+  { id: 'cuisine',  name: 'Cuisine',       color: 'orange', icon: '🍳', description: '' },
+  { id: 'achats',   name: 'Achats',        color: 'teal',   icon: '🛍️', description: '' },
+  { id: 'films',    name: 'Films & Séries',color: 'red',    icon: '🎬', description: '' },
+  { id: 'livres',   name: 'Livres',        color: 'blue',   icon: '📚', description: '' },
+  { id: 'cabinet',  name: 'Cabinet',       color: 'gray',   icon: '🗂️', description: '' },
+  { id: 'ecriture', name: 'Écriture',      color: 'indigo', icon: '✍️', description: '' },
+  { id: 'droit',    name: 'Droit',         color: 'indigo', icon: '⚖️', description: '' },
+  { id: 'sport',    name: 'Sport',         color: 'green',  icon: '🏋️', description: '' },
+]
 
 interface Props {
   domainId?: string
@@ -13,7 +25,9 @@ const progressColor = (p: number) =>
   p >= 80 ? 'bg-green-500' : p >= 50 ? 'bg-teal-500' : p >= 25 ? 'bg-blue-500' : 'bg-zinc-500'
 
 export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose }: Props) {
-  const domains         = useStore((s) => s.domains)
+  const storeDomains    = useStore((s) => s.domains)
+  const storeIds        = new Set(storeDomains.map((d) => d.id))
+  const domains         = [...storeDomains, ...STATIC_DOMAINS.filter((d) => !storeIds.has(d.id))]
   const tasks           = useStore((s) => s.tasks)
   const addObjective    = useStore((s) => s.addObjective)
   const updateObjective = useStore((s) => s.updateObjective)
