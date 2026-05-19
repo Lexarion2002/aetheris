@@ -225,7 +225,8 @@ export const useStore = createPersistedStore<AetherisState>(
             (d) => d.name.trim().toLowerCase() === domain.name.trim().toLowerCase()
           )
           if (exists) return s
-          return { domains: [...s.domains, { id: nanoid(), ...domain }] }
+          const id = (domain as Domain & { id?: string }).id ?? nanoid()
+          return { domains: [...s.domains, { id, ...domain }] }
         }),
 
       updateDomain: (id, updates) =>

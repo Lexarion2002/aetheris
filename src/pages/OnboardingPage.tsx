@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
 import { DEFAULT_DOMAINS } from '../store/defaults'
 import { getDomainColors, getDomainIcon } from '../utils/domainColors'
+import type { Domain } from '../types'
 
 export function OnboardingPage() {
   const navigate              = useNavigate()
@@ -22,7 +23,7 @@ export function OnboardingPage() {
   const handleStart = () => {
     DEFAULT_DOMAINS
       .filter((d) => selected.has(d.id))
-      .forEach(({ id: _id, ...rest }) => addDomain(rest))
+      .forEach((d) => (addDomain as (domain: Domain) => void)(d))
     completeOnboarding()
     navigate('/dashboard')
   }

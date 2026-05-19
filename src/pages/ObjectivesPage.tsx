@@ -566,9 +566,26 @@ export function ObjectivesPage() {
         })
         byDomainId.delete(d.id)
       }
-      // Fallback : objectifs dont le domaine n'est plus dans le store
+      // Fallback : essayer de matcher par nom normalisé (ex: domainId 'droit' → domaine "Droit")
+      // Nécessaire quand des objectifs anciens ont l'ID DEFAULT_DOMAINS ('droit', 'sport'...)
+      // alors que l'onboarding a recréé les domaines avec des UUID.
+      const normalize = (s: string) =>
+        s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim()
+      const domainByNorm = new Map(domains.map(d => [normalize(d.name), d]))
+
       for (const [domainId, items] of byDomainId) {
-        result.push({ key: domainId, label: 'Domaine inconnu', icon: null, items })
+        const matched = domainByNorm.get(normalize(domainId))
+        if (matched) {
+          const I = getDomainIcon(matched.name)
+          result.push({
+            key: matched.id,
+            label: matched.name,
+            icon: I ? <I size={15} style={{ color: 'var(--ink-3)' }} /> : <span>{matched.icon}</span>,
+            items,
+          })
+        } else {
+          result.push({ key: domainId, label: domainId, icon: null, items })
+        }
       }
       return result
     }
