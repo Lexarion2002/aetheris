@@ -1,6 +1,8 @@
 import { useState, useMemo, useRef, useEffect, useCallback, useLayoutEffect } from 'react'
+import ReactCrop, { type Crop, centerCrop, makeAspectCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
 import { saveImage as dbSaveImage, loadImage as dbLoadImage, deleteImage as dbDeleteImage } from '../lib/imageDb'
-import { Plus, ArrowRight, X, Check, ImagePlus, Link2 } from 'lucide-react'
+import { Plus, ArrowRight, X, Check, ImagePlus, Link2, Crop as CropIcon } from 'lucide-react'
 import { useShoppingStore } from '../store/shoppingStore'
 import { useStore } from '../store'
 import { computeMonthBalance } from '../utils/financeUtils'
@@ -172,6 +174,115 @@ function IconBtn({
   )
 }
 
+// ─── CropModal ────────────────────────────────────────────────────────────────
+
+function CropModal({ src, onConfirm, onClose }: {
+  src: string
+  onConfirm: (blob: Blob) => void
+  onClose: () => void
+}) {
+  const [crop, setCrop] = useState<Crop>()
+  const [completedCrop, setCompletedCrop] = useState<Crop>()
+  const imgRef = useRef<HTMLImageElement>(null)
+
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget
+    setCrop(centerCrop(makeAspectCrop({ unit: '%', width: 80 }, width / height, width, height), width, height))
+  }
+
+  const handleConfirm = () => {
+    const img = imgRef.current
+    if (!img || !completedCrop?.width || !completedCrop?.height) return
+
+    const scaleX = img.naturalWidth  / img.width
+    const scaleY = img.naturalHeight / img.height
+    const canvas = document.createElement('canvas')
+    canvas.width  = completedCrop.width  * scaleX
+    canvas.height = completedCrop.height * scaleY
+    const ctx = canvas.getContext('2d')!
+    ctx.drawImage(
+      img,
+      completedCrop.x * scaleX, completedCrop.y * scaleY,
+      completedCrop.width * scaleX, completedCrop.height * scaleY,
+      0, 0, canvas.width, canvas.height,
+    )
+    canvas.toBlob((blob) => { if (blob) onConfirm(blob) }, 'image/jpeg', 0.9)
+  }
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(30,24,18,0.7)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: 24,
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--paper-1)',
+          borderRadius: 'var(--r-lg)',
+          padding: 20,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 16,
+          maxWidth: '90vw',
+          maxHeight: '90vh',
+          boxShadow: 'var(--shadow-2)',
+        }}
+      >
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 16, color: 'var(--ink)' }}>
+          Recadrer l'image
+        </div>
+        <div style={{ overflow: 'auto', maxHeight: 'calc(90vh - 120px)' }}>
+          <ReactCrop
+            crop={crop}
+            onChange={(c) => setCrop(c)}
+            onComplete={(c) => setCompletedCrop(c)}
+            style={{ maxWidth: '100%' }}
+          >
+            <img
+              ref={imgRef}
+              src={src}
+              onLoad={onImageLoad}
+              style={{ maxWidth: '70vw', maxHeight: '70vh', display: 'block' }}
+              alt=""
+            />
+          </ReactCrop>
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              border: '1px solid var(--paper-2)', background: 'transparent',
+              borderRadius: 'var(--r-md)', padding: '6px 14px',
+              fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)',
+              cursor: 'pointer',
+            }}
+          >
+            Annuler
+          </button>
+          <button
+            type="button"
+            onClick={handleConfirm}
+            style={{
+              border: 'none', background: 'var(--terra)',
+              borderRadius: 'var(--r-md)', padding: '6px 14px',
+              fontFamily: 'var(--font-sans)', fontSize: 13, color: '#fff',
+              cursor: 'pointer',
+            }}
+          >
+            Appliquer
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── CardImage ────────────────────────────────────────────────────────────────
 
 function CardImage({ itemId }: { itemId: string }) {
@@ -180,6 +291,7 @@ function CardImage({ itemId }: { itemId: string }) {
   const [showUrl, setShowUrl] = useState(false)
   const [url, setUrl] = useState('')
   const [dragActive, setDragActive] = useState(false)
+  const [cropOpen, setCropOpen] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const objectUrlRef = useRef<string | null>(null)
 
@@ -286,6 +398,9 @@ function CardImage({ itemId }: { itemId: string }) {
           <IconBtn onClick={removeImage} title="Supprimer l'image">
             <X size={13} />
           </IconBtn>
+          <IconBtn onClick={(e) => { e.stopPropagation(); setCropOpen(true) }} title="Recadrer">
+            <CropIcon size={13} />
+          </IconBtn>
           <IconBtn onClick={(e) => { e.stopPropagation(); fileRef.current?.click() }} title="Changer d'image">
             <ImagePlus size={13} />
           </IconBtn>
@@ -297,6 +412,17 @@ function CardImage({ itemId }: { itemId: string }) {
           className="hidden"
           onChange={(e) => e.target.files?.[0] && handleFile(e.target.files[0])}
         />
+        {cropOpen && (
+          <CropModal
+            src={src}
+            onConfirm={(blob) => {
+              const previewUrl = URL.createObjectURL(blob)
+              persistAndShow(blob, previewUrl)
+              setCropOpen(false)
+            }}
+            onClose={() => setCropOpen(false)}
+          />
+        )}
       </div>
     )
   }
