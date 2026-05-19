@@ -30,33 +30,45 @@ function scopedKey(name: string): string {
 
 // ─── supabaseStorage — Zustand persist adapter (clé/valeur) ──────────────────
 
+// ─── localStorage quota check ─────────────────────────────────────────────────
+// Returns true if localStorage is currently full (can't write new data).
+function isLocalStorageFull(): boolean {
+  try {
+    const testKey = '__aetheris_quota_test__'
+    localStorage.setItem(testKey, '1')
+    localStorage.removeItem(testKey)
+    return false
+  } catch {
+    return true
+  }
+}
+
 export const supabaseStorage: StateStorage = {
   getItem: async (name: string): Promise<string | null> => {
     // Attend que l'auth soit résolue pour calculer la clé scopée correcte.
-    // Sans ce await, localStorage serait lu avec la clé brute si getItem
-    // est appelé avant setCurrentUserId() → fallback Supabase avec mauvaise clé.
     await waitForUserId()
     const key = scopedKey(name)
 
-    // localStorage est toujours synchrone et à jour → source principale
     const local = localStorage.getItem(key)
-    console.log(`[Debug] getItem("${key}") — localStorage: ${local ? `✅ ${Math.round(local.length / 1024)}kb` : '❌ absent'}`)
+
     if (local) {
-      try {
-        JSON.parse(local)
-      } catch (parseErr) {
-        console.error(`[Debug] getItem("${key}") — JSON.parse échoué sur la valeur localStorage :`, parseErr)
+      // If localStorage is full, the stale key may be outdated (recent writes failed).
+      // Remove it and fall back to Supabase which has the authoritative data.
+      if (isLocalStorageFull()) {
+        console.warn(`[Supabase] ⚠️ getItem("${key}") — localStorage plein, clé stale supprimée → lecture Supabase`)
+        try { localStorage.removeItem(key) } catch {}
+        // fall through to Supabase fetch below
+      } else {
+        console.log(`[Debug] getItem("${key}") — localStorage ✅ ${Math.round(local.length / 1024)}kb`)
+        return local
       }
-      return local
     }
 
-    // localStorage vide → premier chargement sur un nouvel appareil, on lit Supabase
+    // localStorage vide (ou vidé ci-dessus) → on lit Supabase
     if (!supabase) return null
 
-    console.log(`[Supabase] 📥 getItem("${key}") — localStorage vide, lecture cloud`)
+    console.log(`[Supabase] 📥 getItem("${key}") — lecture cloud`)
     try {
-      // .limit(1) + order au lieu de .single() pour éviter l'erreur 406
-      // quand des lignes dupliquées existent (e.g. après un bug de re-render)
       const { data, error } = await supabase
         .from('stores')
         .select('value')
@@ -71,8 +83,9 @@ export const supabaseStorage: StateStorage = {
 
       const value = Array.isArray(data) ? data[0]?.value : (data as { value?: string } | null)?.value
       if (value) {
-        console.log(`[Supabase] ✅ getItem("${key}") — données récupérées du cloud`)
-        localStorage.setItem(key, value)
+        console.log(`[Supabase] ✅ getItem("${key}") — données récupérées (${Math.round(value.length / 1024)}kb)`)
+        // Try to cache locally, but don't fail if quota is still full
+        try { localStorage.setItem(key, value) } catch {}
         return value
       }
 
@@ -85,7 +98,15 @@ export const supabaseStorage: StateStorage = {
 
   setItem: async (name: string, value: string): Promise<void> => {
     const key = scopedKey(name)
-    try { localStorage.setItem(key, value) } catch { /* quota exceeded — fall through to Supabase */ }
+    try {
+      localStorage.setItem(key, value)
+    } catch {
+      // Quota exceeded: remove the stale entry so the next getItem falls back to Supabase
+      // (which will receive the fresh data below). Without this, stale localStorage
+      // would shadow the authoritative Supabase data on the next page load.
+      console.warn(`[Supabase] ⚠️ setItem("${key}") — quota localStorage dépassé, clé stale supprimée`)
+      try { localStorage.removeItem(key) } catch {}
+    }
 
     if (!supabase) {
       console.warn(`[Supabase] setItem(${name}) — client null, localStorage only`)
