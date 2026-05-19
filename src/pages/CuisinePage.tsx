@@ -13,6 +13,35 @@ import {
   getRayonForCategorie,
 } from '../lib/cuisineConstants'
 
+// ─── Image helpers ─────────────────────────────────────────────────────────────
+
+const IMG_PREFIX = 'aetheris-recipe-img-'
+
+// Reads from store (new) AND legacy separate localStorage key (pre-refactor)
+function getRecipeImage(recette: Recette): string | null {
+  if (recette.image) return recette.image
+  try { return localStorage.getItem(IMG_PREFIX + recette.id) || null } catch { return null }
+}
+
+// Compress a base64 data URL to ~60-80KB (800px max, JPEG 0.72)
+function compressImage(dataUrl: string): Promise<string> {
+  return new Promise((resolve) => {
+    const img = new Image()
+    img.onload = () => {
+      const MAX = 800
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+      const w = Math.round(img.width * scale)
+      const h = Math.round(img.height * scale)
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      canvas.getContext('2d')!.drawImage(img, 0, 0, w, h)
+      resolve(canvas.toDataURL('image/jpeg', 0.72))
+    }
+    img.src = dataUrl
+  })
+}
+
 // ─── Quantity helpers ──────────────────────────────────────────────────────────
 
 function combineQuantites(q1?: string, q2?: string): string | undefined {
@@ -85,9 +114,12 @@ function ImageImport({
   const handleFile = (file: File) => {
     if (!file.type.startsWith('image/')) return
     const reader = new FileReader()
-    reader.onload = (e) => {
+    reader.onload = async (e) => {
       const result = e.target?.result
-      if (typeof result === 'string') onPick(result)
+      if (typeof result === 'string') {
+        const compressed = await compressImage(result)
+        onPick(compressed)
+      }
     }
     reader.readAsDataURL(file)
   }
@@ -264,8 +296,8 @@ function RecipeCard({
   const [showImgImport, setShowImgImport] = useState(false)
   const [hovered, setHovered] = useState(false)
 
-  // Image stored directly in the store via recette.image
-  const imgSrc = recette.image || null
+  // Read from store (new) or legacy localStorage key (pre-refactor)
+  const imgSrc = getRecipeImage(recette)
   const tint = PLACEHOLDER_TINTS[index % PLACEHOLDER_TINTS.length]
 
   return (
@@ -631,8 +663,8 @@ function RecipeDetailPanel({
   const [showImgImport, setShowImgImport] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  // Image lives in the store directly
-  const imgSrc = recette.image || null
+  // Read from store (new) or legacy localStorage key (pre-refactor)
+  const imgSrc = getRecipeImage(recette)
 
   const recetteIngredients = allIngredients.filter((i) => recette.ingredientIds.includes(i.id))
 
