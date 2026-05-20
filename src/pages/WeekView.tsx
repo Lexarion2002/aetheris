@@ -26,6 +26,7 @@ function getEffectiveDueDate(
   milestones: Milestone[],
   objectives: Objective[],
 ): string | null {
+  if (task.plannedDate) return task.plannedDate
   if (task.dueDate) return task.dueDate
   if (task.milestoneId) {
     const m = milestones.find(m => m.id === task.milestoneId)
