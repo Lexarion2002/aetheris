@@ -58,7 +58,7 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
   const [counterTarget,  setCounterTarget]  = useState<number>(objective?.target ?? 52)
   const [counterCurrent, setCounterCurrent] = useState<number>(objective?.current ?? 0)
   const [counterCadence, setCounterCadence] = useState<ObjectiveCadence>(objective?.cadence ?? 'weekly')
-  const [dailyTarget,    setDailyTarget]    = useState<number>(objective?.dailyTarget ?? 1)
+  const [dailyTarget,    setDailyTarget]    = useState<number>(objective?.dailyTarget ?? 0)
 
   const [linkedTaskIds, setLinkedTaskIds] = useState<Set<string>>(() =>
     new Set(objective ? tasks.filter((t) => t.objectiveId === objective.id).map((t) => t.id) : [])
@@ -109,7 +109,7 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
         target:  counterTarget,
         current: counterCurrent,
         cadence: counterCadence,
-        ...(counterCadence === 'daily' && dailyTarget > 0 ? { dailyTarget } : {}),
+        ...(dailyTarget > 0 ? { dailyTarget } : { dailyTarget: undefined }),
       } : {}),
     }
     if (isEdit) {
@@ -376,23 +376,25 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
                   })}
                 </div>
               </div>
-              {counterCadence === 'daily' && (
-                <div>
-                  <label style={labelStyle}>Objectif quotidien (habitude)</label>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
-                    <input
-                      type="number"
-                      min={1}
-                      value={dailyTarget}
-                      onChange={(e) => setDailyTarget(Math.max(1, parseInt(e.target.value || '1', 10)))}
-                      style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', flex: 1 }}
-                    />
-                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
-                      par jour (ex: 1000 mots, 30 min, 1 séance)
-                    </span>
-                  </div>
+              <div>
+                <label style={labelStyle}>Pratique quotidienne (optionnel)</label>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                  <input
+                    type="number"
+                    min={0}
+                    value={dailyTarget === 0 ? '' : dailyTarget}
+                    placeholder="0"
+                    onChange={(e) => setDailyTarget(Math.max(0, parseInt(e.target.value || '0', 10)))}
+                    style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', flex: 1 }}
+                  />
+                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                    par jour (ex: 1000 mots, 30 min, 1 séance)
+                  </span>
                 </div>
-              )}
+                <span style={{ fontFamily: 'var(--font-sans)', fontSize: 11, color: 'var(--ink-3)', marginTop: 4, display: 'block' }}>
+                  Indépendant de la cadence — pratique à faire chaque jour pour atteindre l'objectif.
+                </span>
+              </div>
               <div>
                 <label style={labelStyle}>Échéance globale (optionnel)</label>
                 <input

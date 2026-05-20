@@ -448,7 +448,7 @@ function CounterMeta({ obj }: { obj: Objective }) {
   const current = obj.current ?? 0
   const isComplete = current >= target
 
-  const isHabit = obj.cadence === 'daily' && !!obj.dailyTarget
+  const isHabit = !!obj.dailyTarget
   const cadenceLabel = obj.cadence === 'daily' ? '/ jour'
     : obj.cadence === 'weekly' ? '/ semaine'
     : obj.cadence === 'monthly' ? '/ mois'
@@ -668,7 +668,7 @@ function ObjectiveCard({
 
             {/* Droite : sparkline ou heatmap (habitude) + anneau */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, paddingTop: 2 }}>
-              {obj.kind === 'counter' && obj.cadence === 'daily' && obj.dailyTarget
+              {obj.kind === 'counter' && obj.dailyTarget
                 ? <HabitHeatmap obj={obj} />
                 : <Sparkline values={sparkValues} />}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
