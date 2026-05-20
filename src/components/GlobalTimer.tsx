@@ -1,7 +1,8 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo, type CSSProperties } from 'react'
 import { useStore } from '../store'
 import { usePomodoroStore, selectLiveRemaining } from '../store/pomodoroStore'
-import { getDomainColors } from '../utils/domainColors'
+import { getDomainIcon } from '../utils/domainColors'
+import { getDomainColor } from '../utils/analyticsUtils'
 import type { PomodoroPhase } from '../store/pomodoroStore'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -30,20 +31,25 @@ function playDing() {
   } catch { /* AudioContext unavailable */ }
 }
 
+// ─── Tokens locaux ───────────────────────────────────────────────────────────
+
+const labelStyle: CSSProperties = {
+  fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em',
+  textTransform: 'uppercase', color: 'var(--ink-3)',
+}
+
 // ─── Phase config ─────────────────────────────────────────────────────────────
 
 interface PhaseConfig {
-  label:   string
-  color:   string   // hex for SVG stroke
-  header:  string   // bg class for header
-  ring:    string   // text-color class
-  ping:    string   // bg class for ping dot
+  label:    string
+  color:    string   // var(--…) for stroke / accents
+  bgSoft:   string   // header tint
 }
 
 const PHASE_CFG: Record<PomodoroPhase, PhaseConfig> = {
-  focus:       { label: 'Focus',        color: '#14b8a6', header: 'bg-teal-950/20',   ring: 'text-teal-400',   ping: 'bg-teal-400'   },
-  short_break: { label: 'Pause courte', color: '#3b82f6', header: 'bg-blue-950/20',   ring: 'text-blue-400',   ping: 'bg-blue-400'   },
-  long_break:  { label: 'Pause longue', color: '#a855f7', header: 'bg-purple-950/20', ring: 'text-purple-400', ping: 'bg-purple-400' },
+  focus:       { label: 'Focus',        color: 'var(--terra)',     bgSoft: 'var(--terra-soft)' },
+  short_break: { label: 'Pause courte', color: 'var(--sage)',      bgSoft: 'var(--sage-soft)'  },
+  long_break:  { label: 'Pause longue', color: 'var(--sage-deep)', bgSoft: 'var(--sage-soft)'  },
 }
 
 // ─── SVG Ring ─────────────────────────────────────────────────────────────────
@@ -59,9 +65,7 @@ function Ring({ remaining, total, phase }: { remaining: number; total: number; p
 
   return (
     <svg width="128" height="128" viewBox="0 0 128 128" style={{ transform: 'rotate(-90deg)' }}>
-      {/* Track */}
-      <circle cx={CX} cy={CX} r={R} fill="none" stroke="#27272a" strokeWidth="6" />
-      {/* Progress */}
+      <circle cx={CX} cy={CX} r={R} fill="none" stroke="var(--paper-2)" strokeWidth="6" />
       <circle
         cx={CX} cy={CX} r={R}
         fill="none"
@@ -102,33 +106,65 @@ function TaskPicker({ onSelect, onClose }: {
     .filter((g) => g.tasks.length > 0)
 
   return (
-    <div className="flex flex-col" style={{ maxHeight: '360px' }}>
-      <div className="border-b border-zinc-800 px-3 py-2.5 flex items-center justify-between gap-2">
+    <div style={{ display: 'flex', flexDirection: 'column', maxHeight: 360 }}>
+      <div style={{
+        borderBottom: '1px solid var(--paper-2)',
+        padding: '10px 14px',
+        display: 'flex', alignItems: 'center', gap: 8,
+      }}>
         <input
           ref={inputRef}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Rechercher une tâche…"
-          className="flex-1 bg-transparent text-sm text-zinc-200 placeholder-zinc-600 outline-none"
+          style={{
+            flex: 1, background: 'transparent', border: 'none', outline: 'none',
+            fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
+          }}
         />
-        <button onClick={onClose} className="text-zinc-600 hover:text-zinc-400 text-lg leading-none transition-colors">×</button>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'transparent', border: 'none', cursor: 'pointer',
+            color: 'var(--ink-3)', fontSize: 18, lineHeight: 1, padding: 0,
+          }}
+        >×</button>
       </div>
-      <div className="flex-1 overflow-y-auto py-1">
+      <div style={{ flex: 1, overflowY: 'auto', padding: '4px 0' }}>
         {grouped.length === 0 ? (
-          <p className="px-4 py-6 text-center text-xs text-zinc-600">Aucune tâche active</p>
+          <p style={{
+            padding: '24px 16px', textAlign: 'center',
+            fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+            fontSize: 13, color: 'var(--ink-3)', margin: 0,
+          }}>
+            Aucune tâche active
+          </p>
         ) : (
           grouped.map(({ domain, tasks: domTasks }) => {
-            const colors = getDomainColors(domain.color)
+            const color = getDomainColor(domain.color)
+            const DomainIcon = getDomainIcon(domain.name)
             return (
               <div key={domain.id}>
-                <p className={['px-3 py-1.5 text-[10px] font-medium uppercase tracking-wider', colors.text].join(' ')}>
-                  {domain.icon} {domain.name}
+                <p style={{
+                  ...labelStyle, color,
+                  padding: '8px 14px 4px',
+                  display: 'flex', alignItems: 'center', gap: 6, margin: 0,
+                }}>
+                  {DomainIcon ? <DomainIcon size={11} /> : <span style={{ fontSize: 11 }}>{domain.icon}</span>}
+                  {domain.name}
                 </p>
                 {domTasks.map((t) => (
                   <button
                     key={t.id}
                     onClick={() => onSelect(t.id)}
-                    className="w-full px-4 py-2 text-left text-sm text-zinc-300 hover:bg-zinc-800 transition-colors"
+                    onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)' }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                    style={{
+                      width: '100%', padding: '8px 16px', textAlign: 'left',
+                      fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)',
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      transition: 'background var(--dur) var(--ease)',
+                    }}
                   >
                     {t.title}
                   </button>
@@ -171,7 +207,7 @@ export function GlobalTimer() {
 
     if (Notification.permission === 'granted') {
       new Notification(
-        s.phase === 'focus' ? `${cfg.label} terminé ! 🎉` : `${cfg.label} terminée !`,
+        s.phase === 'focus' ? `${cfg.label} terminé !` : `${cfg.label} terminée !`,
         { body: s.phase === 'focus' ? 'Bien joué, prends une pause.' : "C'est reparti !" },
       )
     }
@@ -273,7 +309,8 @@ export function GlobalTimer() {
   const cfg           = PHASE_CFG[phase]
   const task          = tasks.find((t) => t.id === taskId)
   const domain        = task ? domains.find((d) => d.id === task.domainId) : null
-  const colors        = domain ? getDomainColors(domain.color) : null
+  const domainColor   = domain ? getDomainColor(domain.color) : 'var(--ink-3)'
+  const DomainIcon    = domain ? getDomainIcon(domain.name) : null
   const isRunning     = status === 'running'
 
   const today          = todayStr()
@@ -286,17 +323,30 @@ export function GlobalTimer() {
 
   if (status === 'idle') {
     return (
-      <div className="fixed bottom-5 right-5 z-40">
+      <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 40 }}>
         <button
           onClick={() => setShowPicker(true)}
-          className="group flex items-center gap-2 rounded-full border border-zinc-700/60 bg-zinc-900 px-4 py-2.5 text-sm font-medium text-zinc-400 shadow-lg shadow-black/40 hover:border-teal-500/40 hover:text-teal-400 transition-all hover:shadow-teal-500/10"
+          onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--terra-deep)' }}
+          onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--terra)' }}
+          style={{
+            display: 'inline-flex', alignItems: 'center', gap: 8,
+            padding: '10px 18px', borderRadius: 999, border: 'none',
+            background: 'var(--terra)', color: '#FBF6EA',
+            fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 600,
+            boxShadow: 'var(--shadow-2)', cursor: 'pointer',
+            transition: 'background var(--dur) var(--ease), transform var(--dur) var(--ease)',
+          }}
         >
-          <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+          <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
           Focus
         </button>
 
         {showPicker && (
-          <div className="absolute bottom-full mb-2 right-0 w-72 rounded-2xl border border-zinc-700/60 bg-zinc-900 shadow-2xl shadow-black/50 overflow-hidden">
+          <div style={{
+            position: 'absolute', bottom: '100%', marginBottom: 8, right: 0, width: 288,
+            background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+            borderRadius: 16, boxShadow: 'var(--shadow-3)', overflow: 'hidden',
+          }}>
             <TaskPicker
               onSelect={handleSelectTask}
               onClose={() => setShowPicker(false)}
@@ -310,8 +360,11 @@ export function GlobalTimer() {
   // ── Active Pomodoro widget ────────────────────────────────────────────────────
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 w-72">
-      <div className="rounded-2xl border border-zinc-700/60 bg-zinc-900 shadow-2xl shadow-black/50 overflow-hidden">
+    <div style={{ position: 'fixed', bottom: 20, right: 20, zIndex: 40, width: 288 }}>
+      <div style={{
+        background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+        borderRadius: 16, boxShadow: 'var(--shadow-3)', overflow: 'hidden',
+      }}>
 
         {/* Task picker overlay */}
         {showPicker ? (
@@ -322,28 +375,53 @@ export function GlobalTimer() {
         ) : (
           <>
             {/* ── Header ─────────────────────────────────────────────────────── */}
-            <div className={['flex items-center justify-between px-4 py-3 border-b border-zinc-800/60', cfg.header].join(' ')}>
-              <div className="flex items-center gap-2">
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px',
+              borderBottom: '1px solid var(--paper-2)',
+              background: cfg.bgSoft,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 {isRunning && (
-                  <span className="relative flex h-2 w-2 shrink-0">
-                    <span className={['absolute inline-flex h-full w-full animate-ping rounded-full opacity-75', cfg.ping].join(' ')} />
-                    <span className={['relative inline-flex h-2 w-2 rounded-full', cfg.ping].join(' ')} />
+                  <span style={{ position: 'relative', display: 'inline-flex', width: 8, height: 8, flexShrink: 0 }}>
+                    <span style={{
+                      position: 'absolute', inset: 0, borderRadius: 999,
+                      background: cfg.color, opacity: 0.4,
+                      animation: 'focus-ping 1.4s var(--ease) infinite',
+                    }} />
+                    <span style={{
+                      position: 'relative', width: 8, height: 8, borderRadius: 999,
+                      background: cfg.color,
+                    }} />
                   </span>
                 )}
-                <span className={['text-sm font-semibold', cfg.ring].join(' ')}>{cfg.label}</span>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em',
+                  textTransform: 'uppercase', color: cfg.color, fontWeight: 600,
+                }}>
+                  {cfg.label}
+                </span>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-zinc-500 tabular-nums">
-                  Session {sessionNum}/{settings.sessionsBeforeLongBreak}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <span style={{
+                  fontFamily: 'var(--font-mono)', fontSize: 11,
+                  color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums',
+                }}>
+                  {sessionNum}/{settings.sessionsBeforeLongBreak}
                 </span>
-                {/* Change task */}
                 <button
                   onClick={() => setShowPicker(true)}
                   title="Changer de tâche"
-                  className="rounded-md p-1 text-zinc-600 hover:bg-zinc-800 hover:text-zinc-300 transition-colors"
+                  onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)'; e.currentTarget.style.color = 'var(--ink)' }}
+                  onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--ink-3)' }}
+                  style={{
+                    background: 'transparent', border: 'none', cursor: 'pointer',
+                    color: 'var(--ink-3)', padding: 4, borderRadius: 6, display: 'flex',
+                    transition: 'color var(--dur) var(--ease), background var(--dur) var(--ease)',
+                  }}
                 >
-                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h7" />
                   </svg>
                 </button>
@@ -351,11 +429,22 @@ export function GlobalTimer() {
             </div>
 
             {/* ── Ring + countdown ───────────────────────────────────────────── */}
-            <div className="flex flex-col items-center pt-5 pb-3">
-              <div className="relative flex items-center justify-center">
+            <div style={{
+              display: 'flex', flexDirection: 'column', alignItems: 'center',
+              paddingTop: 20, paddingBottom: 12,
+            }}>
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Ring remaining={liveRemaining} total={phaseDuration} phase={phase} />
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="font-mono text-3xl font-semibold tabular-nums text-zinc-100 leading-none">
+                <div style={{
+                  position: 'absolute', inset: 0,
+                  display: 'flex', flexDirection: 'column',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  <span style={{
+                    fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 30,
+                    color: 'var(--ink)', letterSpacing: '-0.02em', lineHeight: 1,
+                    fontVariantNumeric: 'tabular-nums',
+                  }}>
                     {fmtCountdown(liveRemaining)}
                   </span>
                 </div>
@@ -363,54 +452,107 @@ export function GlobalTimer() {
 
               {/* Task info */}
               {task ? (
-                <div className="mt-2 text-center px-4">
-                  <p className="text-sm font-medium text-zinc-200 leading-tight line-clamp-1">{task.title}</p>
-                  {domain && colors && (
-                    <p className={['text-xs mt-0.5', colors.text].join(' ')}>{domain.icon} {domain.name}</p>
+                <div style={{ marginTop: 10, textAlign: 'center', padding: '0 16px' }}>
+                  <p style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                    color: 'var(--ink)', lineHeight: 1.3, margin: 0,
+                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                  }}>
+                    {task.title}
+                  </p>
+                  {domain && (
+                    <p style={{
+                      fontFamily: 'var(--font-sans)', fontSize: 11.5,
+                      color: domainColor, marginTop: 2,
+                      display: 'inline-flex', alignItems: 'center', gap: 4,
+                    }}>
+                      {DomainIcon ? <DomainIcon size={11} /> : <span>{domain.icon}</span>}
+                      {domain.name}
+                    </p>
                   )}
                 </div>
               ) : (
-                <p className="mt-2 text-xs text-zinc-600">Aucune tâche</p>
+                <p style={{
+                  marginTop: 10, fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+                  fontSize: 12.5, color: 'var(--ink-3)',
+                }}>
+                  Aucune tâche
+                </p>
               )}
             </div>
 
             {/* ── Live stats ─────────────────────────────────────────────────── */}
-            <div className="flex items-center justify-center gap-3 px-4 pb-3 text-[10px] text-zinc-600">
-              <span>Sessions : <span className="text-zinc-400 tabular-nums">{todayCount}</span></span>
-              <span className="text-zinc-700">·</span>
-              <span>Focus : <span className="text-zinc-400 tabular-nums">{Math.floor(todayMinutes / 60)}h{String(todayMinutes % 60).padStart(2, '0')}m</span></span>
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '0 16px 12px',
+              fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-3)',
+              letterSpacing: '0.04em',
+            }}>
+              <span>
+                Sessions <span style={{ color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{todayCount}</span>
+              </span>
+              <span style={{ color: 'var(--ink-4)' }}>·</span>
+              <span>
+                Focus <span style={{ color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
+                  {Math.floor(todayMinutes / 60)}h{String(todayMinutes % 60).padStart(2, '0')}
+                </span>
+              </span>
               {phase === 'focus' && settings.sessionsBeforeLongBreak - sessionNum > 0 && (
                 <>
-                  <span className="text-zinc-700">·</span>
-                  <span>Longue : <span className="text-zinc-400 tabular-nums">dans {settings.sessionsBeforeLongBreak - sessionNum}</span></span>
+                  <span style={{ color: 'var(--ink-4)' }}>·</span>
+                  <span>
+                    Longue dans <span style={{ color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
+                      {settings.sessionsBeforeLongBreak - sessionNum}
+                    </span>
+                  </span>
                 </>
               )}
             </div>
 
             {/* ── Controls ───────────────────────────────────────────────────── */}
-            <div className="flex items-center gap-2 border-t border-zinc-800/60 px-3 py-3">
-              {/* Skip */}
+            <div style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              padding: '12px',
+              borderTop: '1px solid var(--paper-2)',
+            }}>
               <button
                 onClick={handleSkip}
                 title="Passer à l'étape suivante"
-                className="rounded-lg border border-zinc-700 px-2.5 py-1.5 text-xs text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-colors whitespace-nowrap"
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--paper-2)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                style={{
+                  padding: '6px 10px', borderRadius: 8,
+                  border: '1px solid var(--paper-2)',
+                  background: 'transparent', color: 'var(--ink-2)',
+                  fontFamily: 'var(--font-sans)', fontSize: 12, cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                  transition: 'background var(--dur) var(--ease), color var(--dur) var(--ease)',
+                }}
               >
-                Passer ⏭
+                Passer
               </button>
 
-              {/* Start / Pause / Resume */}
               <button
                 onClick={isRunning ? pauseTimer : startTimer}
-                className={[
-                  'flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-sm font-medium transition-colors',
-                  isRunning
-                    ? 'bg-zinc-700 text-zinc-200 hover:bg-zinc-600'
-                    : 'border border-teal-500/30 bg-teal-500/15 text-teal-300 hover:bg-teal-500/25',
-                ].join(' ')}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = isRunning ? 'var(--paper-3)' : 'var(--terra-deep)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = isRunning ? 'var(--paper-2)' : 'var(--terra)'
+                }}
+                style={{
+                  flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  gap: 6, padding: '8px 12px', borderRadius: 8,
+                  border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', fontSize: 13.5, fontWeight: 600,
+                  background: isRunning ? 'var(--paper-2)' : 'var(--terra)',
+                  color: isRunning ? 'var(--ink)' : '#FBF6EA',
+                  transition: 'background var(--dur) var(--ease)',
+                }}
               >
                 {isRunning ? (
                   <>
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor">
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor">
                       <rect x="6" y="5" width="4" height="14" rx="1" />
                       <rect x="14" y="5" width="4" height="14" rx="1" />
                     </svg>
@@ -418,29 +560,44 @@ export function GlobalTimer() {
                   </>
                 ) : (
                   <>
-                    <svg className="h-4 w-4" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z" /></svg>
                     {status === 'ready' ? 'Démarrer' : 'Reprendre'}
                   </>
                 )}
               </button>
 
-              {/* Terminate */}
               <button
                 onClick={handleTerminate}
                 title="Terminer et enregistrer"
-                className="rounded-lg border border-teal-500/20 bg-teal-500/10 p-2 text-teal-400 hover:bg-teal-500/20 transition-colors"
+                onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sage-soft)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
+                style={{
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  padding: 8, borderRadius: 8,
+                  border: '1px solid var(--paper-2)',
+                  background: 'transparent', color: 'var(--sage-deep)',
+                  cursor: 'pointer',
+                  transition: 'background var(--dur) var(--ease)',
+                }}
               >
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                <svg width={15} height={15} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </button>
             </div>
 
             {/* Abandon */}
-            <div className="flex justify-center pb-2.5">
+            <div style={{ display: 'flex', justifyContent: 'center', paddingBottom: 10 }}>
               <button
                 onClick={() => abandon(settings.focusDuration * 60)}
-                className="text-[10px] text-zinc-700 hover:text-red-400 transition-colors"
+                onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--danger)' }}
+                onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--ink-3)' }}
+                style={{
+                  background: 'transparent', border: 'none', cursor: 'pointer',
+                  fontFamily: 'var(--font-sans)', fontSize: 11,
+                  color: 'var(--ink-3)',
+                  transition: 'color var(--dur) var(--ease)',
+                }}
               >
                 Abandonner
               </button>
