@@ -570,7 +570,7 @@ function HabitHeatmap({ obj }: { obj: Objective }) {
 
 // ─── ObjectiveCard ─────────────────────────────────────────────────────────────
 
-function ObjectiveCard({
+export function ObjectiveCard({
   obj, expanded, onExpand, onEdit, onArchive, onDelete,
 }: {
   obj: Objective

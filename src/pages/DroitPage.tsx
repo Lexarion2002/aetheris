@@ -3,6 +3,7 @@ import { ChevronRight, Plus, X, Trash2, BookOpen, Sparkles } from 'lucide-react'
 import { useDroitStore } from '../store/droitStore'
 import { FlashcardCreateModal } from '../components/FlashcardCreateModal'
 import { FlashcardReviewModal } from '../components/FlashcardReviewModal'
+import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { Tache, SousTache, Flashcard } from '../store/droitStore'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -1013,6 +1014,12 @@ export function DroitPage() {
           )}
         </div>
       </section>
+
+      {/* Objectifs du domaine — branchés sur le store global */}
+      <DomainObjectivesSection
+        domainId="droit"
+        subtitle="« Bâtir l'année, semaine après semaine. »"
+      />
 
       {/* Révisions (flashcards spaced repetition) */}
       <RevisionsSection />
