@@ -1335,7 +1335,7 @@ function WeekNav({
 
       {onGeneratePlan && (
         <button
-          onClick={onGeneratePlan}
+          onClick={() => onGeneratePlan()}
           disabled={hasNoDomains || kitLoading}
           style={{
             fontFamily: 'var(--font-sans)', fontSize: 13,
