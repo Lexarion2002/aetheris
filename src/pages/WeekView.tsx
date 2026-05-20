@@ -9,7 +9,7 @@ import { TaskFormModal } from '../components/TaskFormModal'
 import { ObjectivesPage } from './ObjectivesPage'
 import { generateWeekPlan, type WeekPlanItem } from '../lib/aiService'
 import { expandDomains } from '../utils/standaloneDomains'
-import type { Domain, Task, TimeSession } from '../types'
+import type { Domain, Task, TimeSession, Milestone, Objective } from '../types'
 import {
   getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
   minutesToHours, minutesToShort, DOMAIN_COLOR_TONES, type Day,
@@ -19,6 +19,28 @@ import {
 
 function todayIso(): string {
   return new Date().toISOString().split('T')[0]
+}
+
+function getEffectiveDueDate(
+  task: Task,
+  milestones: Milestone[],
+  objectives: Objective[],
+): string | null {
+  if (task.dueDate) return task.dueDate
+  if (task.milestoneId) {
+    const m = milestones.find(m => m.id === task.milestoneId)
+    if (m?.targetDate) return m.targetDate
+  }
+  if (task.objectiveId) {
+    const o = objectives.find(o => o.id === task.objectiveId)
+    if (o?.targetDate) return o.targetDate
+  }
+  return null
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso + 'T00:00:00')
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 }
 
 function getDomainTone(domain: Domain | undefined) {
@@ -69,13 +91,14 @@ function Checkbox({ checked, onClick }: { checked: boolean; onClick: () => void 
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 function WeekTaskCard({
-  task, domain, dimmed, onToggle, variant,
+  task, domain, dimmed, onToggle, variant, effectiveDueDate: edd,
 }: {
   task: Task
   domain: Domain | undefined
   dimmed?: boolean
   onToggle: (id: string) => void
   variant?: 'backlog'
+  effectiveDueDate?: string | null
 }) {
   const [hover, setHover] = useState(false)
   const timerStore = useTimerStore()
@@ -83,12 +106,15 @@ function WeekTaskCard({
   const prio     = prioLevel(task.priority)
   const isDone   = task.status === 'done'
   const today    = todayIso()
-  const isOverdue = !isDone && !!task.dueDate && task.dueDate < today
-  const overdueDays = isOverdue && task.dueDate
-    ? Math.round((new Date(today + 'T00:00:00').getTime() - new Date(task.dueDate + 'T00:00:00').getTime()) / 86400000)
+  const effectiveDate = edd ?? task.dueDate
+  const isOverdue = !isDone && !!effectiveDate && effectiveDate < today
+  const overdueDays = isOverdue && effectiveDate
+    ? Math.round((new Date(today + 'T00:00:00').getTime() - new Date(effectiveDate + 'T00:00:00').getTime()) / 86400000)
     : 0
   const isBacklog  = variant === 'backlog'
   const isRunning  = timerStore.taskId === task.id && timerStore.running
+  // Deadline héritée d'un objectif/jalon (sans dueDate propre)
+  const inheritedDeadline = isBacklog && !task.dueDate && effectiveDate ? effectiveDate : null
 
   const startFocus = (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -193,6 +219,19 @@ function WeekTaskCard({
           </>
         )}
 
+        {!isOverdue && inheritedDeadline && (
+          <>
+            <span style={{ color: 'var(--ink-4)' }}>·</span>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontSize: 10,
+              letterSpacing: '0.08em', textTransform: 'uppercase',
+              color: 'var(--ink-3)',
+            }}>
+              {formatShortDate(inheritedDeadline)}
+            </span>
+          </>
+        )}
+
         {!isDone && (
           <button
             onClick={startFocus}
@@ -220,17 +259,19 @@ function WeekTaskCard({
 // ─── Overdue Row ──────────────────────────────────────────────────────────────
 
 function OverdueRow({
-  task, domain, onToggle,
+  task, domain, onToggle, effectiveDueDate: edd,
 }: {
   task: Task
   domain: Domain | undefined
   onToggle: (id: string) => void
+  effectiveDueDate?: string | null
 }) {
   const [hover, setHover] = useState(false)
   const tone = getDomainTone(domain)
   const today = todayIso()
-  const overdueDays = task.dueDate
-    ? Math.round((new Date(today + 'T00:00:00').getTime() - new Date(task.dueDate + 'T00:00:00').getTime()) / 86400000)
+  const effectiveDate = edd ?? task.dueDate
+  const overdueDays = effectiveDate
+    ? Math.round((new Date(today + 'T00:00:00').getTime() - new Date(effectiveDate + 'T00:00:00').getTime()) / 86400000)
     : 0
 
   return (
@@ -277,15 +318,21 @@ function OverdueRow({
 // ─── Overdue Banner ───────────────────────────────────────────────────────────
 
 function OverdueBanner({
-  tasks, domains, expanded, onExpand, onToggle,
+  tasks, domains, expanded, onExpand, onToggle, milestones, objectives,
 }: {
   tasks: Task[]
   domains: Domain[]
   expanded: boolean
   onExpand: () => void
   onToggle: (id: string) => void
+  milestones: Milestone[]
+  objectives: Objective[]
 }) {
-  const sorted   = [...tasks].sort((a, b) => (a.dueDate ?? '').localeCompare(b.dueDate ?? ''))
+  const sorted = [...tasks].sort((a, b) => {
+    const da = getEffectiveDueDate(a, milestones, objectives) ?? ''
+    const db = getEffectiveDueDate(b, milestones, objectives) ?? ''
+    return da.localeCompare(db)
+  })
   const shown    = expanded ? sorted : sorted.slice(0, 5)
   const rest     = sorted.length - shown.length
   const total    = tasks.length
@@ -341,6 +388,7 @@ function OverdueBanner({
             task={t}
             domain={domains.find(d => d.id === t.domainId)}
             onToggle={onToggle}
+            effectiveDueDate={getEffectiveDueDate(t, milestones, objectives)}
           />
         ))}
       </div>
@@ -533,12 +581,17 @@ function WeekDayColumn({
 // ─── Backlog ──────────────────────────────────────────────────────────────────
 
 function Backlog({
-  tasks, domains, onToggle,
+  tasks, domains, onToggle, milestones, objectives,
 }: {
   tasks: Task[]
   domains: Domain[]
   onToggle: (id: string) => void
+  milestones: Milestone[]
+  objectives: Objective[]
 }) {
+  const trueBacklog = tasks.filter(t => !getEffectiveDueDate(t, milestones, objectives))
+  const withDeadline = tasks.filter(t => !!getEffectiveDueDate(t, milestones, objectives))
+
   return (
     <section style={{ marginTop: 40 }}>
       <div style={{
@@ -567,7 +620,9 @@ function Backlog({
           }}>
             {tasks.length === 0
               ? 'Aucune tâche sans deadline.'
-              : 'Sans deadline — pioche quand tu veux.'}
+              : withDeadline.length > 0 && trueBacklog.length === 0
+                ? 'À planifier — échéances en attente.'
+                : 'Sans deadline — pioche quand tu veux.'}
           </span>
           {tasks.length > 0 && (
             <span style={{
@@ -593,6 +648,7 @@ function Backlog({
               domain={domains.find(d => d.id === t.domainId)}
               variant="backlog"
               onToggle={onToggle}
+              effectiveDueDate={getEffectiveDueDate(t, milestones, objectives)}
             />
           ))}
         </div>
@@ -833,29 +889,34 @@ export function WeekView() {
   const weekYear = days[0].iso.slice(0, 4)
   const weekLabel = useMemo(() => formatWeekLabel(days), [days])
 
-  // ── Tâches planifiées cette semaine ─────────────────────────────────────────
+  // ── Tâches planifiées cette semaine (deadline propre ou héritée d'un objectif/jalon) ─────
   const weekTasks = useMemo(
-    () => tasks.filter(t => t.dueDate && t.dueDate >= bounds.start && t.dueDate <= bounds.end),
-    [tasks, bounds],
+    () => tasks.filter(t => {
+      const edd = getEffectiveDueDate(t, milestones, objectives)
+      return edd && edd >= bounds.start && edd <= bounds.end
+    }),
+    [tasks, bounds, milestones, objectives],
   )
 
   // ── Tâches en retard (avant weekStart) ──────────────────────────────────────
   const overdueTasks = useMemo(
-    () => tasks.filter(t =>
-      t.dueDate && t.dueDate < bounds.start &&
-      t.status !== 'done' && t.status !== 'cancelled'
-    ),
-    [tasks, bounds],
+    () => tasks.filter(t => {
+      const edd = getEffectiveDueDate(t, milestones, objectives)
+      return edd && edd < bounds.start &&
+        t.status !== 'done' && t.status !== 'cancelled'
+    }),
+    [tasks, bounds, milestones, objectives],
   )
 
-  // ── Backlog (sans dueDate, pas terminées) ────────────────────────────────────
+  // ── Backlog : sans deadline effective OU deadline dans le futur hors semaine courante ─────
   const backlogTasks = useMemo(
-    () => tasks.filter(t =>
-      !t.dueDate &&
-      t.status !== 'done' &&
-      t.status !== 'cancelled'
-    ).slice(0, 20),
-    [tasks],
+    () => tasks.filter(t => {
+      if (t.status === 'done' || t.status === 'cancelled') return false
+      const edd = getEffectiveDueDate(t, milestones, objectives)
+      if (!edd) return true
+      return edd > bounds.end
+    }).slice(0, 20),
+    [tasks, milestones, objectives, bounds],
   )
 
   // ── Métriques ───────────────────────────────────────────────────────────────
@@ -872,7 +933,7 @@ export function WeekView() {
   // ── Données par jour pour les colonnes ─────────────────────────────────────
   const dayData = useMemo(() => {
     return days.map(day => {
-      const dayTasks = weekTasks.filter(t => t.dueDate === day.iso)
+      const dayTasks = weekTasks.filter(t => getEffectiveDueDate(t, milestones, objectives) === day.iso)
       const daySessions: TimeSession[] = timeSessions.filter(s => s.date === day.iso)
 
       // Barre focus : sessions réelles si dispo, sinon estimations
@@ -905,7 +966,7 @@ export function WeekView() {
 
       return { day, dayTasks, focusSegments, focusTotal }
     })
-  }, [days, weekTasks, timeSessions, tasks, domains])
+  }, [days, weekTasks, timeSessions, tasks, domains, milestones, objectives])
 
   // ── Handlers ────────────────────────────────────────────────────────────────
   const handleToggle = (id: string) => {
@@ -1092,6 +1153,8 @@ export function WeekView() {
           expanded={showAllOverdue}
           onExpand={() => setShowAllOverdue(v => !v)}
           onToggle={handleToggle}
+          milestones={milestones}
+          objectives={objectives}
         />
       )}
 
@@ -1129,7 +1192,7 @@ export function WeekView() {
       </div>
 
       {/* ── Backlog ───────────────────────────────────────────────────────── */}
-      <Backlog tasks={backlogTasks} domains={domains} onToggle={handleToggle} />
+      <Backlog tasks={backlogTasks} domains={domains} onToggle={handleToggle} milestones={milestones} objectives={objectives} />
 
       {/* ── Objectifs ─────────────────────────────────────────────────────── */}
       <ObjectivesPage />
