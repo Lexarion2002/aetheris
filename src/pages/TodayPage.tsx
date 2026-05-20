@@ -405,6 +405,37 @@ export function TodayPage() {
 
   const AUTOPLAN_KEY = `aetheris-kit-autoplan-${today}`
 
+  // Détecter si un Plan Kit semaine couvre la semaine en cours.
+  // Si oui, l'auto-plan today s'efface : le plan semaine est la source unique.
+  const weekStartIso = useMemo(() => {
+    const d = new Date(today + 'T00:00:00')
+    const daysSinceMonday = (d.getDay() + 6) % 7
+    d.setDate(d.getDate() - daysSinceMonday)
+    return d.toISOString().split('T')[0]
+  }, [today])
+  const WEEKPLAN_KEY = `aetheris-kit-weekplan-${weekStartIso}`
+
+  interface WeekPlanRecord {
+    ranAt:     string
+    weekStart: string
+    taskIds:   string[]
+  }
+
+  const [weekPlanRecord] = useState<WeekPlanRecord | null>(() => {
+    if (typeof window === 'undefined') return null
+    const raw = window.localStorage.getItem(WEEKPLAN_KEY)
+    if (!raw) return null
+    try { return JSON.parse(raw) as WeekPlanRecord } catch { return null }
+  })
+
+  // Le plan semaine est considéré actif s'il existe ET qu'au moins une de ses
+  // tâches survit encore parmi les plannedTasks d'aujourd'hui (sinon l'user a
+  // tout supprimé → on revient à l'auto-plan today).
+  const weekPlanActive = useMemo(() => {
+    if (!weekPlanRecord) return false
+    return weekPlanRecord.taskIds.some((id) => tasks.some((t) => t.id === id && t.plannedDate === today))
+  }, [weekPlanRecord, tasks, today])
+
   interface AutoplanRecord {
     ranAt:   string    // ISO timestamp
     taskIds: string[]  // IDs des tâches créées par Kit
@@ -466,11 +497,12 @@ export function TodayPage() {
   // Auto-déclenchement au premier ouverture du jour
   useEffect(() => {
     if (!kitEnabled || activeObjectives.length === 0) return
+    if (weekPlanActive) return            // le plan semaine fait le travail
     if (autoplan) return                  // déjà tourné aujourd'hui
     if (plannedTasks.length >= 3) return  // utilisateur déjà bien planifié
     void runAutoplan(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [today, kitEnabled, activeObjectives.length])
+  }, [today, kitEnabled, activeObjectives.length, weekPlanActive])
 
   // Compte de tâches Kit encore présentes (pour l'affichage du bandeau)
   const kitTasksRemaining = useMemo(() => {
@@ -511,7 +543,8 @@ export function TodayPage() {
       {/* ── Bandeau Kit (auto-plan) — toujours visible quand Kit est activé ── */}
       {kitEnabled && (() => {
         const state =
-          autoplanLoading                       ? 'loading'
+          weekPlanActive                        ? 'weekplan'
+          : autoplanLoading                     ? 'loading'
           : autoplanError                       ? 'error'
           : autoplan                            ? 'ran'
           : activeObjectives.length === 0       ? 'no-objectives'
@@ -533,6 +566,16 @@ export function TodayPage() {
               <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--terra)' }}>
                 ✦ kit
               </span>
+              {state === 'weekplan' && weekPlanRecord && (
+                <>
+                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--ink-2)' }}>
+                    issu du plan de semaine généré le{' '}
+                    <span style={{ fontFamily: 'var(--font-mono)', color: 'var(--ink)' }}>
+                      {new Date(weekPlanRecord.ranAt).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                    </span>
+                  </span>
+                </>
+              )}
               {state === 'loading' && (
                 <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontStyle: 'italic', color: 'var(--ink-2)' }}>
                   organise ta journée…
@@ -576,6 +619,19 @@ export function TodayPage() {
               )}
             </div>
             <div style={{ display: 'flex', gap: 8 }}>
+              {state === 'weekplan' && (
+                <a
+                  href="/week"
+                  style={{
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
+                    background: 'transparent', border: '1px solid var(--paper-2)',
+                    borderRadius: 6, padding: '4px 10px',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Voir Semaine →
+                </a>
+              )}
               {(state === 'ran' || state === 'error') && (
                 <button
                   onClick={() => void runAutoplan(true)}

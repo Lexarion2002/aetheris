@@ -780,7 +780,8 @@ export function WeekView() {
   const milestones   = useStore(s => s.milestones)
   const scheduleBlocks = useStore(s => s.scheduleBlocks)
   const setTaskStatus = useStore(s => s.setTaskStatus)
-  const addTaskAction = useStore(s => s.addTask)
+  const addTaskAction    = useStore(s => s.addTask)
+  const deleteTaskAction = useStore(s => s.deleteTask)
   const kitEnabled   = useStore(s => !!s.anthropicApiKey)
 
   const [weekOffset, setWeekOffset]       = useState(0)
@@ -910,8 +911,36 @@ export function WeekView() {
   }
 
   const acceptPlan = (selected: WeekPlanItem[]) => {
+    // 1) Nettoyer un éventuel plan semaine précédent + l'auto-plan today
+    //    s'il tombe dans cette même semaine, pour éviter le doublon.
+    const weekKey = `aetheris-kit-weekplan-${bounds.start}`
+    const previousPlanRaw = window.localStorage.getItem(weekKey)
+    if (previousPlanRaw) {
+      try {
+        const prev = JSON.parse(previousPlanRaw) as { taskIds: string[] }
+        for (const id of prev.taskIds) deleteTaskAction(id)
+      } catch { /* ignore */ }
+    }
+    // Si l'auto-plan today a tourné aujourd'hui et que today est dans cette
+    // semaine, supprimer ses tâches pour laisser la place au plan semaine.
+    const today = new Date().toISOString().split('T')[0]
+    const todayInWeek = today >= bounds.start && today <= bounds.end
+    if (todayInWeek) {
+      const todayKey = `aetheris-kit-autoplan-${today}`
+      const todayPlanRaw = window.localStorage.getItem(todayKey)
+      if (todayPlanRaw) {
+        try {
+          const tp = JSON.parse(todayPlanRaw) as { taskIds: string[] }
+          for (const id of tp.taskIds) deleteTaskAction(id)
+          window.localStorage.removeItem(todayKey)
+        } catch { /* ignore */ }
+      }
+    }
+
+    // 2) Créer les nouvelles tâches du plan semaine
+    const createdIds: string[] = []
     selected.forEach(item => {
-      addTaskAction({
+      const created = addTaskAction({
         domainId:     item.domainId,
         title:        item.title,
         status:       'todo',
@@ -922,7 +951,17 @@ export function WeekView() {
         objectiveId:  item.objectiveId,
         milestoneId:  item.milestoneId,
       })
+      createdIds.push(created.id)
     })
+
+    // 3) Persister le record pour que TodayPage sache qu'un plan semaine
+    //    est actif.
+    window.localStorage.setItem(weekKey, JSON.stringify({
+      ranAt:     new Date().toISOString(),
+      weekStart: bounds.start,
+      taskIds:   createdIds,
+    }))
+
     setKitPlanItems(null)
   }
 
