@@ -4,6 +4,7 @@ import {
   AtSign, Mail, Check, Trash2, Pencil,
 } from 'lucide-react'
 import { useCabinetStore } from '../store/cabinetStore'
+import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type {
   CabinetDossier, CabinetTache, CabinetNote, CabinetContact,
   DossierType, DossierStatut, TachePriorite, TacheStatut, NoteType, ContactRole,
@@ -818,6 +819,12 @@ export function CabinetPage() {
       <TachesSection   onAdd={() => setShowAddTache(true)} />
       <NotesSection    onAdd={() => setShowAddNote(true)} />
       <ContactsSection onAdd={() => setShowAddContact(true)} />
+
+      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
+      <DomainObjectivesSection
+        domainId="cabinet"
+        subtitle="« Ce qui structure le cabinet, dossier par dossier. »"
+      />
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {isCaseModalOpen && <CaseModal mode={caseModalMode} dossier={selectedCase} onClose={closeCaseModal} />}

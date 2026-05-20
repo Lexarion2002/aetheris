@@ -6,6 +6,7 @@ import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
 import { suggestTodayTasks } from '../lib/aiService'
 import { expandDomains } from '../utils/standaloneDomains'
+import { BoussoleCompact } from '../components/BoussoleCompact'
 import { computeDailyStreak, type DailyStreak } from '../utils/streaks'
 import type { Task } from '../types'
 import type { Tache, SousTache } from '../store/droitStore'
@@ -825,6 +826,12 @@ export function TodayPage() {
           </div>
         )}
       </section>
+
+      {/* ── Boussole : objectifs actifs par domaine ─────────────────────────── */}
+      <BoussoleCompact
+        subtitle="« Ce que tu fais aujourd'hui sert ce que tu construis. »"
+        maxPerDomain={3}
+      />
 
     </div>
   )

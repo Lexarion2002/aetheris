@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Plus, Heart, X, Check, BookOpen, ShoppingBasket, ImageUp, Replace, Link, Utensils, Trash2 } from 'lucide-react'
 import { useCuisineStore } from '../store/cuisineStore'
+import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { Recette, Ingredient, RecetteCategorie } from '../types/cuisine'
 import {
   RECIPE_TYPES,
@@ -1735,6 +1736,12 @@ export function CuisinePage() {
           />
         )}
       </div>
+
+      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
+      <DomainObjectivesSection
+        domainId="cuisine"
+        subtitle="« Apprendre un répertoire, pas suivre des modes. »"
+      />
 
       {openRecette && (
         <RecipeDetailPanel

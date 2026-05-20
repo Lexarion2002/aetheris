@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Plus, Dumbbell, Footprints, X, Check, ChevronRight } from 'lucide-react'
+import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { MuscuSession, Run, SportGoal, Exercise, Split } from '../types/sport'
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
@@ -2372,6 +2373,12 @@ export function SportView() {
           onClose={() => setDetailId(null)}
         />
       )}
+
+      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
+      <DomainObjectivesSection
+        domainId="sport"
+        subtitle="« Bâtir un corps qui dure, pas une silhouette qui plaît. »"
+      />
 
       {/* ── Modals ────────────────────────────────────────────────────────── */}
       {showNewModal &&

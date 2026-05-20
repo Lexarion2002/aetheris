@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { useStore } from '../store'
 import { computeReport } from '../utils/financeUtils'
+import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { Transaction, SavingsGoal, FinanceCategory } from '../types'
 
 // ─── Design-system palettes for donut segments ────────────────────────────────
@@ -452,6 +453,12 @@ export function FinancePage() {
           </>
         )}
       </section>
+
+      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
+      <DomainObjectivesSection
+        domainId="finance"
+        subtitle="« Construire la liberté financière, mois après mois. »"
+      />
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {showTxModal && <TransactionModal tx={editTx} onClose={() => { setShowTxModal(false); setEditTx(undefined) }} />}

@@ -2,6 +2,7 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import { Plus, Trash2, X, GraduationCap, Briefcase, BookOpen, Circle, Repeat } from 'lucide-react'
 import { useStore } from '../store'
 import { expandDomains } from '../utils/standaloneDomains'
+import { BoussoleCompact } from '../components/BoussoleCompact'
 import type { ScheduleBlock, ScheduleBlockKind, Routine, RoutineCadence } from '../types'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -865,6 +866,11 @@ export function SchedulePage() {
           </div>
         )}
       </div>
+
+      {/* Boussole : objectifs actifs par domaine */}
+      <BoussoleCompact
+        subtitle="« Le temps qui structure les objectifs, les objectifs qui structurent le temps. »"
+      />
 
       {/* Modal bloc */}
       {editing.open && (
