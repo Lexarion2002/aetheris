@@ -121,6 +121,7 @@ interface Ctx {
   recentTasks:    Task[]
   scheduleBlocks?: ScheduleBlock[]
   routines?:      Routine[]
+  userInstructions?: string
 }
 
 function buildContext(ctx: Ctx): string {
@@ -268,8 +269,13 @@ function buildContext(ctx: Ctx): string {
   }
   const scheduleText = scheduleLines.join('\n')
 
-  return `Date du jour : ${today}
+  const userInstructionsBlock = ctx.userInstructions && ctx.userInstructions.trim().length > 0
+    ? `\nINSTRUCTIONS PERSONNELLES de l'utilisateur (à respecter en priorité, elles priment sur les règles génériques ci-dessous) :
+${ctx.userInstructions.trim()}\n`
+    : ''
 
+  return `Date du jour : ${today}
+${userInstructionsBlock}
 DOMAINES ACTIFS de l'utilisateur :
 ${activeDomains || '(aucun)'}
 

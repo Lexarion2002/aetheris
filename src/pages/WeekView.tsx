@@ -806,15 +806,18 @@ function Backlog({
 // ─── KitWeekPlanModal — modale du plan de semaine généré ─────────────────────
 
 function KitWeekPlanModal({
-  items, weekStart, domains, onAccept, onClose,
+  items, weekStart, domains, onAccept, onClose, onRegenerate, regenerating,
 }: {
   items: WeekPlanItem[]
   weekStart: string
   domains: Domain[]
   onAccept: (selected: WeekPlanItem[]) => void
   onClose: () => void
+  onRegenerate?: (feedback: string) => void
+  regenerating?: boolean
 }) {
   const [skipped, setSkipped] = useState<Set<number>>(new Set())
+  const [feedback, setFeedback] = useState('')
 
   const toggle = (idx: number) => {
     setSkipped(prev => {
@@ -956,6 +959,45 @@ function KitWeekPlanModal({
           ))}
         </div>
 
+        {/* Zone de feedback pour régénérer */}
+        {onRegenerate && (
+          <div style={{ padding: '12px 24px', borderTop: '1px solid var(--paper-2)', background: 'var(--paper-2)' }}>
+            <label style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+              affiner ce plan
+            </label>
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              <textarea
+                value={feedback}
+                onChange={(e) => setFeedback(e.target.value)}
+                rows={2}
+                placeholder="Ex: « trop de droit le lundi », « décale l'écriture en soirée », « ajoute du sport mardi et jeudi »"
+                disabled={regenerating}
+                style={{
+                  flex: 1, padding: '8px 12px', borderRadius: 8,
+                  border: '1px solid var(--ink-4)', background: 'var(--paper-1)',
+                  fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)',
+                  outline: 'none', resize: 'vertical', minHeight: 38,
+                }}
+              />
+              <button
+                onClick={() => { if (!regenerating) onRegenerate(feedback) }}
+                disabled={regenerating}
+                style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+                  padding: '0 14px', alignSelf: 'stretch',
+                  background: 'transparent', color: 'var(--terra)',
+                  border: '1px solid var(--terra)', borderRadius: 8,
+                  cursor: regenerating ? 'wait' : 'pointer',
+                  opacity: regenerating ? 0.6 : 1,
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {regenerating ? '…' : 'Régénérer'}
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         <div style={{ padding: '14px 24px', borderTop: '1px solid var(--paper-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
@@ -1009,6 +1051,7 @@ export function WeekView() {
   const milestones   = useStore(s => s.milestones)
   const scheduleBlocks = useStore(s => s.scheduleBlocks)
   const routines       = useStore(s => s.routines ?? [])
+  const kitInstructions = useStore(s => s.kitInstructions ?? '')
   const setTaskStatus = useStore(s => s.setTaskStatus)
   const addTaskAction    = useStore(s => s.addTask)
   const deleteTaskAction = useStore(s => s.deleteTask)
@@ -1127,17 +1170,22 @@ export function WeekView() {
     setTaskModalOpen(true)
   }
 
-  const generatePlan = async () => {
+  const generatePlan = async (extraFeedback?: string) => {
     if (kitPlanLoading) return
     setKitPlanLoading(true); setKitPlanError(null)
     try {
       const active = objectives.filter(o => !o.archived && o.progress < 100)
+      const combinedInstructions = [kitInstructions, extraFeedback]
+        .map(s => (s ?? '').trim())
+        .filter(Boolean)
+        .join('\n\n')
       const items = await generateWeekPlan({
         domains: expandDomains(domains),
         objectives: active, milestones,
         recentTasks: tasks.slice(-30),
         scheduleBlocks,
         routines,
+        userInstructions: combinedInstructions,
       }, bounds.start, today)
       setKitPlanItems(items)
     } catch (err) {
@@ -1378,6 +1426,8 @@ export function WeekView() {
           domains={domains}
           onAccept={acceptPlan}
           onClose={() => setKitPlanItems(null)}
+          onRegenerate={(feedback) => { generatePlan(feedback) }}
+          regenerating={kitPlanLoading}
         />
       )}
     </div>

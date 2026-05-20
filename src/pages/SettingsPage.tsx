@@ -91,6 +91,12 @@ export function SettingsPage() {
   const [apiKey,      setApiKeyLocal] = useState(storedApiKey)
   const [apiKeySaved, setApiKeySaved] = useState(false)
 
+  // Kit — instructions permanentes
+  const storedKitInstructions = useStore((s) => s.kitInstructions ?? '')
+  const setKitInstructions    = useStore((s) => s.setKitInstructions)
+  const [kitInstructionsLocal, setKitInstructionsLocal] = useState(storedKitInstructions)
+  const [kitInstructionsSaved, setKitInstructionsSaved] = useState(false)
+
   // Import/export
   const [importStatus,    setImportStatus]         = useState<'idle' | 'success' | 'error'>('idle')
   const [importMsg,       setImportMsg]            = useState('')
@@ -549,6 +555,30 @@ export function SettingsPage() {
               Sans clé, les suggestions Kit sont désactivées — tout le reste d'Aetheris fonctionne normalement.
             </p>
           )}
+
+          {/* Instructions permanentes pour Kit */}
+          <div style={{ marginTop: 24, borderTop: '1px solid var(--paper-2)', paddingTop: 18 }}>
+            <p style={rowLabel}>Instructions permanentes</p>
+            <p style={rowSublabel}>
+              Règles que Kit doit suivre à chaque génération de plan (semaine ou jour). Exemples : « pas de droit le dimanche », « écriture toujours le matin », « jamais plus de 2h de focus avant midi ».
+            </p>
+            <textarea
+              value={kitInstructionsLocal}
+              onChange={(e) => { setKitInstructionsLocal(e.target.value); setKitInstructionsSaved(false) }}
+              rows={5}
+              placeholder="- Pas de tâches avant 9h&#10;- L'écriture doit se faire le matin&#10;- Garder le dimanche soir libre"
+              className={`${inputCls} w-full px-3 py-2 text-sm`}
+              style={{ resize: 'vertical', fontFamily: 'var(--font-sans)' }}
+            />
+            <div className="flex justify-end mt-2">
+              <button
+                onClick={() => { setKitInstructions(kitInstructionsLocal); setKitInstructionsSaved(true); setTimeout(() => setKitInstructionsSaved(false), 2000) }}
+                className={actionBtn}
+              >
+                {kitInstructionsSaved ? '✓ Enregistré' : 'Enregistrer'}
+              </button>
+            </div>
+          </div>
         </div>
       </Section>
 

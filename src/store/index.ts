@@ -142,6 +142,12 @@ interface AetherisState {
   anthropicApiKey:    string
   setAnthropicApiKey: (key: string) => void
 
+  // Kit — instructions persistantes données par l'utilisateur (ex: "pas de
+  // droit le dimanche", "écriture toujours le matin"). Injectées dans les
+  // prompts à chaque appel.
+  kitInstructions:    string
+  setKitInstructions: (text: string) => void
+
   // Migrations one-shot (booléens persistants pour éviter double-migration)
   _migratedSportObjectives?: boolean
   _migratedBookAnnualGoal?:  boolean
@@ -195,6 +201,7 @@ export const useStore = createPersistedStore<AetherisState>(
       anthropicApiKey: '',
       scheduleBlocks: [],
       routines:       [],
+      kitInstructions: '',
 
       // ── Seed / Onboarding ────────────────────────────────────────────────────
 
@@ -663,6 +670,8 @@ export const useStore = createPersistedStore<AetherisState>(
       // ── Kit (IA) ─────────────────────────────────────────────────────────────
 
       setAnthropicApiKey: (key) => set({ anthropicApiKey: key.trim() }),
+
+      setKitInstructions: (text) => set({ kitInstructions: text }),
 
       setMigrationFlag: (key, v) => set({ [key]: v } as Partial<AetherisState>),
 
