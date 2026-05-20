@@ -990,7 +990,7 @@ export function WeekView() {
         objectives: active, milestones,
         recentTasks: tasks.slice(-30),
         scheduleBlocks,
-      }, bounds.start)
+      }, bounds.start, today)
       setKitPlanItems(items)
     } catch (err) {
       setKitPlanError(err instanceof Error ? err.message : 'Erreur Kit')

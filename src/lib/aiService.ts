@@ -147,7 +147,11 @@ function buildContext(ctx: Ctx): string {
         else if (days <= 14) urgency = ` [PROCHE — ${days} j restants]`
         else if (days <= 30) urgency = ` [${days} j restants]`
       }
-      const kindTag = o.kind === 'counter' ? ` (compteur ${o.current ?? 0}/${o.target ?? '?'})` : ''
+      const kindTag = o.kind === 'counter'
+        ? ` (compteur ${o.current ?? 0}/${o.target ?? '?'}${o.cadence === 'daily' || o.dailyTarget ? ', HABITUDE QUOTIDIENNE' : ''})`
+        : o.cadence === 'daily' || o.dailyTarget
+          ? ' [HABITUDE QUOTIDIENNE — à faire chaque jour]'
+          : ''
       const msText = open.length > 0
         ? `\n    Jalons ouverts : ${open.slice(0, 5).map(m => m.title + (m.targetDate ? ` (${m.targetDate})` : '')).join(' / ')}`
         : ''
@@ -393,8 +397,32 @@ export interface WeekPlanItem {
   milestoneId?: string
 }
 
-export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<WeekPlanItem[]> {
+export async function generateWeekPlan(ctx: Ctx, weekStart: string, today?: string): Promise<WeekPlanItem[]> {
+  const todayIso = today ?? new Date().toISOString().split('T')[0]
   const userContext = buildContext(ctx)
+
+  // Calcul du dayOffset minimum : ne pas proposer de tâches sur des jours déjà passés
+  const weekStartMs = new Date(weekStart + 'T00:00:00').getTime()
+  const todayMs     = new Date(todayIso  + 'T00:00:00').getTime()
+  const minDayOffset = Math.max(0, Math.min(6, Math.round((todayMs - weekStartMs) / 86400000)))
+  const daysRemaining = 7 - minDayOffset  // nombre de jours restants (aujourd'hui inclus)
+
+  const dayNames = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
+  const startDayName = dayNames[minDayOffset] ?? 'aujourd\'hui'
+
+  // Objectifs quotidiens : 1 tâche par jour restant
+  const dailyObjectives = ctx.objectives.filter(o =>
+    !o.archived && o.progress < 100 && (o.cadence === 'daily' || o.dailyTarget != null)
+  )
+  const dailyTasksCount = dailyObjectives.length * daysRemaining
+
+  // Cible de tâches : au moins 2-3 par objectif urgent + habitudes quotidiennes
+  const urgentCount = ctx.objectives.filter(o => !o.archived && o.progress < 100 && o.targetDate && (() => {
+    const days = Math.round((new Date(o.targetDate + 'T12:00:00').getTime() - new Date(todayIso + 'T12:00:00').getTime()) / 86400000)
+    return days <= 14
+  })()).length
+  const targetMin = Math.max(dailyTasksCount + urgentCount * 2, daysRemaining * 2)
+  const targetMax = Math.max(targetMin + 4, 20)
 
   const tool: AnthropicTool = {
     name: 'generate_week_plan',
@@ -404,14 +432,14 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<Wee
       properties: {
         items: {
           type: 'array',
-          maxItems: 16,
+          maxItems: Math.min(targetMax + 5, 35),
           items: {
             type: 'object',
             properties: {
               domain_name:     { type: 'string' },
               title:           { type: 'string' },
               reason:          { type: 'string' },
-              day_offset:      { type: 'integer', minimum: 0, maximum: 6, description: '0=lundi, 6=dimanche' },
+              day_offset:      { type: 'integer', minimum: minDayOffset, maximum: 6, description: `${minDayOffset}=${startDayName} (aujourd'hui), 6=dimanche — NE PAS utiliser de valeur < ${minDayOffset}` },
               time_estimate:   { type: 'integer', minimum: 10, maximum: 240 },
               start_time:      { type: 'string', description: 'Heure de début au format HH:MM (24h), respectant les plages bloquées' },
               objective_title: { type: 'string' },
@@ -425,9 +453,14 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<Wee
     },
   }
 
+  const dailySection = dailyObjectives.length > 0
+    ? `\nHABITUDES QUOTIDIENNES (obligatoires — 1 tâche par jour restant pour chacune) :
+${dailyObjectives.map(o => `- "${o.title}" : génère exactement ${daysRemaining} tâche(s) — une pour chaque jour de ${startDayName} à dimanche`).join('\n')}`
+    : ''
+
   const response = await callAnthropic({
     model: MODEL,
-    max_tokens: 2500,
+    max_tokens: 4000,
     system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     tools: [tool],
     tool_choice: { type: 'tool', name: 'generate_week_plan' },
@@ -437,17 +470,20 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<Wee
         content: `${userContext}
 
 SEMAINE CIBLE : du ${weekStart} (lundi) au dimanche suivant.
+AUJOURD'HUI : ${todayIso} (${startDayName}) — dayOffset minimum = ${minDayOffset}.
+⚠️ NE génère AUCUNE tâche avec day_offset < ${minDayOffset} : ces jours sont déjà passés.
+Jours restants : ${daysRemaining} (de ${startDayName} à dimanche inclus).
 
-Génère un plan dense et utile — vise 10 à 12 tâches pour la semaine, plus si plusieurs objectifs ont des échéances proches.
+Génère un plan dense et utile — vise ${targetMin} à ${targetMax} tâches au total.${dailySection}
 
 PRIORITÉS strictes :
-- Objectifs marqués [EN RETARD] ou [URGENT] : au moins 2-3 tâches par objectif sur la semaine
+- Objectifs marqués [EN RETARD] ou [URGENT] : au moins 2-3 tâches par objectif sur les jours restants
 - Objectifs [PROCHE] (≤14j) : au moins 1-2 tâches
 - Objectifs [≤30j restants] : au moins 1 tâche
 - Objectifs counter : propose des sessions concrètes qui font avancer le compteur (ex: pour "Lire 52 livres", propose "Lire 30 pages de X")
 - Objectifs sans échéance : 1 tâche optionnelle si capacité reste
 
-RÉGLES de répartition :
+RÈGLES de répartition :
 - Mix les domaines mais charge davantage les jours où une échéance approche
 - Les tâches doivent être concrètes et actionnables (pas "réfléchir à X" mais "rédiger l'intro de X", "ficher l'arrêt Y")
 - Évite le dimanche pour le travail intense
@@ -490,7 +526,7 @@ CONTRAINTES D'EMPLOI DU TEMPS — créneaux précis :
       domainId:     domain?.id ?? ctx.domains[0]?.id ?? '',
       title:        item.title,
       reason:       item.reason,
-      dayOffset:    Math.max(0, Math.min(6, item.day_offset)),
+      dayOffset:    Math.max(minDayOffset, Math.min(6, item.day_offset)),
       timeEstimate: item.time_estimate,
       startTime:    item.start_time && /^\d{2}:\d{2}$/.test(item.start_time) ? item.start_time : undefined,
       objectiveId:  objective?.id,
