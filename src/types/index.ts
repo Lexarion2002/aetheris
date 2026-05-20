@@ -196,6 +196,30 @@ export interface ScheduleBlock {
   createdAt:   string
 }
 
+// ─── Routine ──────────────────────────────────────────────────────────────────
+
+/**
+ * Tâche personnelle récurrente sans lien à un objectif (ex: "Faire la lessive
+ * tous les dimanches", "Sortir les poubelles le mardi"). Différent d'un
+ * ScheduleBlock (plage horaire bloquée) : c'est une corvée à cocher.
+ * Kit la voit dans le plan de semaine et l'instancie aux jours/heures voulus.
+ */
+export type RoutineCadence = 'daily' | 'weekly' | 'monthly'
+
+export interface Routine {
+  id:            string
+  title:         string
+  cadence:       RoutineCadence
+  daysOfWeek?:   number[]            // pour weekly : 0=lundi … 6=dimanche
+  dayOfMonth?:   number              // pour monthly : 1–31
+  timeEstimate?: number              // minutes (optionnel — défaut: 30)
+  preferredTime?: string             // "HH:MM" optionnel
+  domainId?:     string              // optionnel : on peut rattacher à un domaine
+  notes?:        string
+  createdAt:     string
+  updatedAt:     string
+}
+
 // ─── TimeSession ──────────────────────────────────────────────────────────────
 
 export interface TimeSession {

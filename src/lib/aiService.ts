@@ -1,5 +1,5 @@
 import { useStore } from '../store'
-import type { Domain, Objective, Milestone, Task, ScheduleBlock } from '../types'
+import type { Domain, Objective, Milestone, Task, ScheduleBlock, Routine } from '../types'
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
@@ -120,6 +120,7 @@ interface Ctx {
   milestones:     Milestone[]
   recentTasks:    Task[]
   scheduleBlocks?: ScheduleBlock[]
+  routines?:      Routine[]
 }
 
 function buildContext(ctx: Ctx): string {
@@ -234,6 +235,24 @@ function buildContext(ctx: Ctx): string {
     return free
   }
 
+  // Routines personnelles — corvées récurrentes sans objectif
+  const routinesText = (ctx.routines && ctx.routines.length > 0)
+    ? ctx.routines.map(r => {
+        const when = r.cadence === 'daily'
+          ? 'tous les jours'
+          : r.cadence === 'weekly'
+            ? (r.daysOfWeek && r.daysOfWeek.length > 0
+                ? r.daysOfWeek.map(d => dayNames[d]).join(', ')
+                : '1×/semaine (jour libre)')
+            : r.cadence === 'monthly'
+              ? `le ${r.dayOfMonth ?? 1} du mois`
+              : ''
+        const time = r.preferredTime ? ` à ${r.preferredTime}` : ''
+        const dur = r.timeEstimate ? ` (${r.timeEstimate} min)` : ''
+        return `- "${r.title}" → ${when}${time}${dur}`
+      }).join('\n')
+    : ''
+
   const scheduleLines: string[] = []
   for (let d = 0; d < 7; d++) {
     const busy = busyByDay[d] ?? []
@@ -260,6 +279,9 @@ ${activeObjectives || '(aucun)'}
 EMPLOI DU TEMPS HEBDOMADAIRE (fenêtre travaillée : 08:00–22:00, soit 14h/jour) :
 Pour chaque jour, on liste les plages OCCUPÉES (cours, alternance, engagements — NE PAS planifier dessus) et les plages LIBRES (où tu dois caser les tâches) :
 ${scheduleText}
+
+ROUTINES PERSONNELLES (corvées récurrentes, à inclure dans le plan comme des tâches normales, sans objectif lié) :
+${routinesText || '(aucune)'}
 
 TÂCHES RÉCEMMENT TERMINÉES (pour comprendre le rythme) :
 ${recentDone || '(aucune)'}`
@@ -605,6 +627,7 @@ PRIORITÉS strictes :
 - Objectifs [≤30j restants] : au moins 1 tâche
 - Objectifs counter : propose des sessions concrètes qui font avancer le compteur (ex: pour "Lire 52 livres", propose "Lire 30 pages de X")
 - Objectifs sans échéance : 1 tâche optionnelle si capacité reste
+- ROUTINES PERSONNELLES : tu DOIS instancier chaque routine aux jours indiqués (ex: "Faire la lessive — dimanche" → 1 tâche le dimanche). Reprends le titre tel quel, sans objectif lié. Respecte l'heure préférée si fournie.
 
 RÈGLES de répartition :
 - Mix les domaines mais charge davantage les jours où une échéance approche

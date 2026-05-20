@@ -1008,6 +1008,7 @@ export function WeekView() {
   const objectives   = useStore(s => s.objectives)
   const milestones   = useStore(s => s.milestones)
   const scheduleBlocks = useStore(s => s.scheduleBlocks)
+  const routines       = useStore(s => s.routines ?? [])
   const setTaskStatus = useStore(s => s.setTaskStatus)
   const addTaskAction    = useStore(s => s.addTask)
   const deleteTaskAction = useStore(s => s.deleteTask)
@@ -1136,6 +1137,7 @@ export function WeekView() {
         objectives: active, milestones,
         recentTasks: tasks.slice(-30),
         scheduleBlocks,
+        routines,
       }, bounds.start, today)
       setKitPlanItems(items)
     } catch (err) {

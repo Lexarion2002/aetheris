@@ -477,11 +477,13 @@ export function TodayPage() {
       }
 
       const scheduleBlocks = useStore.getState().scheduleBlocks
+      const routines       = useStore.getState().routines ?? []
       const items = await suggestTodayTasks({
         domains: expandDomains(domains),
         objectives: activeObjectives, milestones,
         recentTasks: tasks.slice(-30),
         scheduleBlocks,
+        routines,
       }, 5)
 
       const newIds: string[] = []

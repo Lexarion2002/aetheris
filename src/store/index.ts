@@ -1,7 +1,7 @@
 import { nanoid } from '../utils/nanoid'
 import { DEFAULT_FINANCE_CATEGORIES } from './defaults'
 import { createPersistedStore } from '../lib/persistenceManager'
-import type { Domain, Task, SubTask, Objective, Milestone, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings, ScheduleBlock } from '../types'
+import type { Domain, Task, SubTask, Objective, Milestone, Expense, TimeSession, DomainBudget, TaskStatus, Priority, ExpenseCategory, ProgressEntry, Transaction, FinanceCategoryBudget, SavingsGoal, FinanceCategory, PomodoroSettings, ScheduleBlock, Routine } from '../types'
 
 // ─── State shape ──────────────────────────────────────────────────────────────
 
@@ -132,6 +132,12 @@ interface AetherisState {
   updateScheduleBlock: (id: string, updates: Partial<Omit<ScheduleBlock, 'id' | 'createdAt'>>) => void
   deleteScheduleBlock: (id: string) => void
 
+  // Routines personnelles (corvées récurrentes, sans objectif lié)
+  routines:        Routine[]
+  addRoutine:      (routine: Omit<Routine, 'id' | 'createdAt' | 'updatedAt'>) => Routine
+  updateRoutine:   (id: string, updates: Partial<Omit<Routine, 'id' | 'createdAt' | 'updatedAt'>>) => void
+  deleteRoutine:   (id: string) => void
+
   // Kit (IA) — clé Anthropic stockée dans le store sync Supabase
   anthropicApiKey:    string
   setAnthropicApiKey: (key: string) => void
@@ -188,6 +194,7 @@ export const useStore = createPersistedStore<AetherisState>(
       userContext: '',
       anthropicApiKey: '',
       scheduleBlocks: [],
+      routines:       [],
 
       // ── Seed / Onboarding ────────────────────────────────────────────────────
 
@@ -672,6 +679,21 @@ export const useStore = createPersistedStore<AetherisState>(
         })),
       deleteScheduleBlock: (id) =>
         set((s) => ({ scheduleBlocks: s.scheduleBlocks.filter((b) => b.id !== id) })),
+
+      // ── Routines personnelles ──────────────────────────────────────────────
+
+      addRoutine: (routine) => {
+        const t = now()
+        const newRoutine: Routine = { ...routine, id: nanoid(), createdAt: t, updatedAt: t }
+        set((s) => ({ routines: [...(s.routines ?? []), newRoutine] }))
+        return newRoutine
+      },
+      updateRoutine: (id, updates) =>
+        set((s) => ({
+          routines: (s.routines ?? []).map((r) => (r.id === id ? { ...r, ...updates, updatedAt: now() } : r)),
+        })),
+      deleteRoutine: (id) =>
+        set((s) => ({ routines: (s.routines ?? []).filter((r) => r.id !== id) })),
   }),
 )
 

@@ -1,8 +1,8 @@
 import { useMemo, useState, type CSSProperties } from 'react'
-import { Plus, Trash2, X, GraduationCap, Briefcase, BookOpen, Circle } from 'lucide-react'
+import { Plus, Trash2, X, GraduationCap, Briefcase, BookOpen, Circle, Repeat } from 'lucide-react'
 import { useStore } from '../store'
 import { expandDomains } from '../utils/standaloneDomains'
-import type { ScheduleBlock, ScheduleBlockKind } from '../types'
+import type { ScheduleBlock, ScheduleBlockKind, Routine, RoutineCadence } from '../types'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
 
@@ -307,11 +307,311 @@ function BlockEditorModal({
   )
 }
 
+// ─── Modale d'édition Routine ────────────────────────────────────────────────
+
+interface RoutineFormState {
+  title:         string
+  cadence:       RoutineCadence
+  daysOfWeek:    number[]
+  dayOfMonth:    number
+  preferredTime: string
+  timeEstimate:  number
+  domainId:      string
+  notes:         string
+}
+
+function emptyRoutineForm(): RoutineFormState {
+  return {
+    title: '', cadence: 'weekly', daysOfWeek: [], dayOfMonth: 1,
+    preferredTime: '', timeEstimate: 30, domainId: '', notes: '',
+  }
+}
+
+function RoutineEditorModal({
+  routine, onClose,
+}: {
+  routine: Routine | null
+  onClose: () => void
+}) {
+  const storeDomains = useStore((s) => s.domains)
+  const domains = useMemo(() => expandDomains(storeDomains), [storeDomains])
+  const addRoutine    = useStore((s) => s.addRoutine)
+  const updateRoutine = useStore((s) => s.updateRoutine)
+  const deleteRoutine = useStore((s) => s.deleteRoutine)
+
+  const [form, setForm] = useState<RoutineFormState>(() =>
+    routine ? {
+      title:         routine.title,
+      cadence:       routine.cadence,
+      daysOfWeek:    routine.daysOfWeek ? [...routine.daysOfWeek] : [],
+      dayOfMonth:    routine.dayOfMonth ?? 1,
+      preferredTime: routine.preferredTime ?? '',
+      timeEstimate:  routine.timeEstimate ?? 30,
+      domainId:      routine.domainId ?? '',
+      notes:         routine.notes ?? '',
+    } : emptyRoutineForm()
+  )
+
+  const toggleDay = (d: number) => {
+    setForm((s) => ({
+      ...s,
+      daysOfWeek: s.daysOfWeek.includes(d) ? s.daysOfWeek.filter((x) => x !== d) : [...s.daysOfWeek, d].sort(),
+    }))
+  }
+
+  const canSave =
+    form.title.trim().length > 0 &&
+    (form.cadence !== 'weekly' || form.daysOfWeek.length > 0) &&
+    (form.cadence !== 'monthly' || (form.dayOfMonth >= 1 && form.dayOfMonth <= 31))
+
+  const save = () => {
+    if (!canSave) return
+    const payload = {
+      title:         form.title.trim(),
+      cadence:       form.cadence,
+      daysOfWeek:    form.cadence === 'weekly' ? form.daysOfWeek : undefined,
+      dayOfMonth:    form.cadence === 'monthly' ? form.dayOfMonth : undefined,
+      preferredTime: form.preferredTime.trim() || undefined,
+      timeEstimate:  form.timeEstimate > 0 ? form.timeEstimate : undefined,
+      domainId:      form.domainId || undefined,
+      notes:         form.notes.trim() || undefined,
+    }
+    if (routine) updateRoutine(routine.id, payload)
+    else addRoutine(payload)
+    onClose()
+  }
+
+  const input: CSSProperties = {
+    width: '100%', boxSizing: 'border-box',
+    padding: '8px 12px', borderRadius: 8,
+    border: '1px solid var(--ink-4)', background: 'var(--paper-1)',
+    fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)', outline: 'none',
+  }
+
+  const CADENCE_OPTIONS: Array<{ value: RoutineCadence; label: string }> = [
+    { value: 'daily',   label: 'Tous les jours' },
+    { value: 'weekly',  label: 'Certains jours' },
+    { value: 'monthly', label: '1×/mois' },
+  ]
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, background: 'rgba(58,46,34,0.45)',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        zIndex: 50, padding: '40px 20px',
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: 'var(--paper-1)', border: '1px solid var(--ink-4)',
+          borderRadius: 14, maxWidth: 520, width: '100%',
+          boxShadow: 'var(--shadow-2)', overflow: 'hidden',
+        }}
+      >
+        <div style={{ padding: '18px 22px', borderBottom: '1px solid var(--paper-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 22, fontWeight: 500, color: 'var(--ink)', margin: 0 }}>
+            {routine ? 'Modifier la routine' : 'Nouvelle routine'}
+          </h2>
+          <button onClick={onClose} style={{ background: 'transparent', border: 0, cursor: 'pointer', color: 'var(--ink-3)', padding: 4 }}>
+            <X size={18} />
+          </button>
+        </div>
+
+        <div style={{ padding: '20px 22px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {/* Titre */}
+          <div>
+            <label style={labelStyle}>Intitulé</label>
+            <input
+              autoFocus
+              value={form.title}
+              onChange={(e) => setForm((s) => ({ ...s, title: e.target.value }))}
+              placeholder="Faire la lessive"
+              style={{ ...input, marginTop: 6 }}
+            />
+          </div>
+
+          {/* Cadence */}
+          <div>
+            <label style={labelStyle}>Rythme</label>
+            <div style={{ display: 'flex', gap: 6, marginTop: 6, flexWrap: 'wrap' }}>
+              {CADENCE_OPTIONS.map((opt) => {
+                const active = form.cadence === opt.value
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setForm((s) => ({ ...s, cadence: opt.value }))}
+                    style={{
+                      padding: '6px 12px', borderRadius: 999,
+                      border: '1px solid ' + (active ? 'var(--terra)' : 'var(--paper-2)'),
+                      background: active ? 'var(--terra)' : 'transparent',
+                      color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                      cursor: 'pointer',
+                      fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: active ? 500 : 400,
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* Jours (weekly) */}
+          {form.cadence === 'weekly' && (
+            <div>
+              <label style={labelStyle}>Jours</label>
+              <div style={{ display: 'flex', gap: 4, marginTop: 6 }}>
+                {DAYS_SHORT.map((d, i) => {
+                  const active = form.daysOfWeek.includes(i)
+                  return (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => toggleDay(i)}
+                      style={{
+                        flex: 1, padding: '8px 0', borderRadius: 8,
+                        border: '1px solid ' + (active ? 'var(--terra)' : 'var(--paper-2)'),
+                        background: active ? 'var(--terra)' : 'transparent',
+                        color: active ? 'var(--paper-1)' : 'var(--ink-2)',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: active ? 500 : 400,
+                      }}
+                    >
+                      {d}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Jour du mois (monthly) */}
+          {form.cadence === 'monthly' && (
+            <div>
+              <label style={labelStyle}>Jour du mois</label>
+              <input
+                type="number"
+                min={1}
+                max={31}
+                value={form.dayOfMonth}
+                onChange={(e) => setForm((s) => ({ ...s, dayOfMonth: Math.max(1, Math.min(31, parseInt(e.target.value || '1', 10))) }))}
+                style={{ ...input, marginTop: 6, fontFamily: 'var(--font-mono)', width: 100 }}
+              />
+            </div>
+          )}
+
+          {/* Heure préférée + durée */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+            <div>
+              <label style={labelStyle}>Heure préférée (optionnel)</label>
+              <input
+                type="time"
+                value={form.preferredTime}
+                onChange={(e) => setForm((s) => ({ ...s, preferredTime: e.target.value }))}
+                style={{ ...input, marginTop: 6, fontFamily: 'var(--font-mono)' }}
+              />
+            </div>
+            <div>
+              <label style={labelStyle}>Durée (min)</label>
+              <input
+                type="number"
+                min={5}
+                max={240}
+                step={5}
+                value={form.timeEstimate}
+                onChange={(e) => setForm((s) => ({ ...s, timeEstimate: Math.max(0, parseInt(e.target.value || '0', 10)) }))}
+                style={{ ...input, marginTop: 6, fontFamily: 'var(--font-mono)' }}
+              />
+            </div>
+          </div>
+
+          {/* Domaine optionnel */}
+          {domains.length > 0 && (
+            <div>
+              <label style={labelStyle}>Domaine (optionnel)</label>
+              <select
+                value={form.domainId}
+                onChange={(e) => setForm((s) => ({ ...s, domainId: e.target.value }))}
+                style={{ ...input, marginTop: 6 }}
+              >
+                <option value="">—</option>
+                {domains.map((d) => (
+                  <option key={d.id} value={d.id}>{d.name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label style={labelStyle}>Notes (optionnel)</label>
+            <textarea
+              value={form.notes}
+              onChange={(e) => setForm((s) => ({ ...s, notes: e.target.value }))}
+              rows={2}
+              placeholder="Détail, contraintes…"
+              style={{ ...input, marginTop: 6, resize: 'vertical' }}
+            />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: '14px 22px', borderTop: '1px solid var(--paper-2)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          {routine ? (
+            <button
+              onClick={() => { deleteRoutine(routine.id); onClose() }}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--danger)',
+                background: 'transparent', border: 0, cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', gap: 4,
+              }}
+            >
+              <Trash2 size={12} /> Supprimer
+            </button>
+          ) : <span />}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={onClose}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 13,
+                background: 'transparent', color: 'var(--ink-2)',
+                border: '1px solid var(--ink-4)', borderRadius: 8,
+                padding: '7px 14px', cursor: 'pointer',
+              }}
+            >
+              Annuler
+            </button>
+            <button
+              onClick={save}
+              disabled={!canSave}
+              style={{
+                fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+                background: 'var(--terra)', color: 'var(--paper-1)',
+                border: 0, borderRadius: 8, padding: '7px 16px',
+                cursor: canSave ? 'pointer' : 'not-allowed',
+                opacity: canSave ? 1 : 0.5,
+              }}
+            >
+              {routine ? 'Enregistrer' : 'Créer'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Page principale ─────────────────────────────────────────────────────────
 
 export function SchedulePage() {
   const blocks = useStore((s) => s.scheduleBlocks)
+  const routines = useStore((s) => s.routines ?? [])
   const [editing, setEditing] = useState<{ open: boolean; block: ScheduleBlock | null }>({ open: false, block: null })
+  const [editingRoutine, setEditingRoutine] = useState<{ open: boolean; routine: Routine | null }>({ open: false, routine: null })
 
   // Couvrir le rendu : on regroupe les blocks par jour
   const blocksByDay = useMemo(() => {
@@ -480,11 +780,105 @@ export function SchedulePage() {
         </div>
       )}
 
-      {/* Modal */}
+      {/* ─── Routines personnelles ─────────────────────────────────────────── */}
+      <div style={{ marginTop: 48 }}>
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24, marginBottom: 18, flexWrap: 'wrap' }}>
+          <div>
+            <span style={labelStyle}>routines · récurrentes</span>
+            <h2 style={{
+              fontFamily: 'var(--font-serif)', fontSize: 28, fontWeight: 500,
+              color: 'var(--ink)', letterSpacing: '-0.01em',
+              margin: '6px 0 8px', lineHeight: 1.15,
+            }}>
+              Tes corvées qui reviennent<span style={{ color: 'var(--terra)' }}>.</span>
+            </h2>
+            <p style={{
+              fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14.5,
+              color: 'var(--ink-2)', margin: 0, maxWidth: '62ch', lineHeight: 1.45,
+            }}>
+              « Lessive du dimanche, courses du samedi, sortir les poubelles le mardi… Kit les ajoute au plan de semaine au bon jour. »
+            </p>
+          </div>
+          <button
+            onClick={() => setEditingRoutine({ open: true, routine: null })}
+            style={{
+              fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
+              background: 'transparent', color: 'var(--terra)',
+              border: '1px solid var(--terra)', borderRadius: 8,
+              padding: '7px 14px', cursor: 'pointer',
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <Plus size={13} /> Nouvelle routine
+          </button>
+        </div>
+
+        {routines.length === 0 ? (
+          <div style={{
+            padding: '24px 20px', textAlign: 'center',
+            background: 'var(--paper-1)', border: '1px dashed var(--paper-2)', borderRadius: 12,
+          }}>
+            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--ink-3)', margin: 0 }}>
+              Aucune routine encore. Ajoute par exemple « Faire la lessive » tous les dimanches.
+            </p>
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gap: 10 }}>
+            {routines.map((r) => {
+              const when = r.cadence === 'daily'
+                ? 'Tous les jours'
+                : r.cadence === 'weekly'
+                  ? (r.daysOfWeek && r.daysOfWeek.length > 0 ? r.daysOfWeek.map((d) => DAYS[d]).join(' · ') : '1×/semaine')
+                  : `Le ${r.dayOfMonth ?? 1} du mois`
+              return (
+                <button
+                  key={r.id}
+                  onClick={() => setEditingRoutine({ open: true, routine: r })}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 14,
+                    padding: '12px 16px',
+                    background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+                    borderRadius: 10, cursor: 'pointer',
+                    textAlign: 'left',
+                  }}
+                >
+                  <div style={{
+                    width: 32, height: 32, borderRadius: 8,
+                    background: 'var(--paper-2)', color: 'var(--ink-2)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                  }}>
+                    <Repeat size={14} />
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500, color: 'var(--ink)' }}>
+                      {r.title}
+                    </div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+                      {when}
+                      {r.preferredTime ? ` · ${r.preferredTime}` : ''}
+                      {r.timeEstimate ? ` · ${r.timeEstimate} min` : ''}
+                    </div>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Modal bloc */}
       {editing.open && (
         <BlockEditorModal
           block={editing.block}
           onClose={() => setEditing({ open: false, block: null })}
+        />
+      )}
+
+      {/* Modal routine */}
+      {editingRoutine.open && (
+        <RoutineEditorModal
+          routine={editingRoutine.routine}
+          onClose={() => setEditingRoutine({ open: false, routine: null })}
         />
       )}
     </div>
