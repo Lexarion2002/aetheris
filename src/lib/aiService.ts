@@ -147,11 +147,16 @@ function buildContext(ctx: Ctx): string {
         else if (days <= 14) urgency = ` [PROCHE — ${days} j restants]`
         else if (days <= 30) urgency = ` [${days} j restants]`
       }
-      const kindTag = o.kind === 'counter'
-        ? ` (compteur ${o.current ?? 0}/${o.target ?? '?'}${o.cadence === 'daily' || o.dailyTarget ? ', HABITUDE QUOTIDIENNE' : ''})`
-        : o.cadence === 'daily' || o.dailyTarget
-          ? ' [HABITUDE QUOTIDIENNE — à faire chaque jour]'
-          : ''
+      const isDaily = o.cadence === 'daily' || (o.dailyTarget != null && o.dailyTarget > 0)
+      const dailyTag = isDaily
+        ? (o.dailyTarget && o.dailyTarget > 0
+            ? ` [HABITUDE QUOTIDIENNE — quota quotidien EXACT à respecter : ${o.dailyTarget} par jour (ne JAMAIS diviser ni réduire cette quantité dans les tâches générées)]`
+            : ' [HABITUDE QUOTIDIENNE — à faire chaque jour]')
+        : ''
+      const counterTag = o.kind === 'counter'
+        ? ` (compteur ${o.current ?? 0}/${o.target ?? '?'})`
+        : ''
+      const kindTag = counterTag + dailyTag
       const msText = open.length > 0
         ? `\n    Jalons ouverts : ${open.slice(0, 5).map(m => m.title + (m.targetDate ? ` (${m.targetDate})` : '')).join(' / ')}`
         : ''
@@ -273,6 +278,8 @@ PRIORITÉS strictes :
 - Diversifie les domaines, ne mets pas 5 tâches Droit le même jour si plusieurs objectifs autres sont aussi urgents
 
 Chaque tâche doit pouvoir être faite en une session de focus (10–120 min) et être concrète (pas "réfléchir à X").
+
+⚠️ HABITUDES QUOTIDIENNES avec quota exact : si un objectif indique un quota quotidien (ex: 1000), la tâche du jour DOIT reprendre cette quantité telle quelle dans son titre (ex: "Écrire 1000 mots"). Tu ne dois JAMAIS diviser ni réduire ce nombre.
 
 CONTRAINTES D'EMPLOI DU TEMPS — créneaux précis :
 - Pour chaque tâche, propose une heure de début (start_time HH:MM) qui s'insère dans le créneau libre du jour
@@ -455,7 +462,14 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string, today?: stri
 
   const dailySection = dailyObjectives.length > 0
     ? `\nHABITUDES QUOTIDIENNES (obligatoires — 1 tâche par jour restant pour chacune) :
-${dailyObjectives.map(o => `- "${o.title}" : génère exactement ${daysRemaining} tâche(s) — une pour chaque jour de ${startDayName} à dimanche`).join('\n')}`
+${dailyObjectives.map(o => {
+  const quotaPart = o.dailyTarget && o.dailyTarget > 0
+    ? ` — quota EXACT à inscrire dans chaque tâche : ${o.dailyTarget} (le titre de la tâche doit mentionner cette quantité telle quelle, sans la diviser, ex: "Écrire ${o.dailyTarget} mots")`
+    : ''
+  return `- "${o.title}"${quotaPart} : génère exactement ${daysRemaining} tâche(s) — une pour chaque jour de ${startDayName} à dimanche`
+}).join('\n')}
+
+⚠️ RÈGLE STRICTE sur les quotas quotidiens : si un objectif a un quota quotidien (ex: 1000), la tâche du jour DOIT reprendre cette quantité exacte. Tu ne dois JAMAIS diviser, réduire ou ajuster ce nombre (pas de "300 mots" si le quota est 1000).`
     : ''
 
   const response = await callAnthropic({
