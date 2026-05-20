@@ -1,6 +1,7 @@
 import { useMemo, useState, type CSSProperties } from 'react'
 import { Plus, Trash2, X, GraduationCap, Briefcase, BookOpen, Circle } from 'lucide-react'
 import { useStore } from '../store'
+import { expandDomains } from '../utils/standaloneDomains'
 import type { ScheduleBlock, ScheduleBlockKind } from '../types'
 
 // ─── Constantes ──────────────────────────────────────────────────────────────
@@ -63,7 +64,8 @@ function BlockEditorModal({
   block: ScheduleBlock | null  // null = création
   onClose: () => void
 }) {
-  const domains = useStore((s) => s.domains)
+  const storeDomains = useStore((s) => s.domains)
+  const domains = useMemo(() => expandDomains(storeDomains), [storeDomains])
   const addBlock    = useStore((s) => s.addScheduleBlock)
   const updateBlock = useStore((s) => s.updateScheduleBlock)
   const deleteBlock = useStore((s) => s.deleteScheduleBlock)
