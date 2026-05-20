@@ -173,21 +173,81 @@ function buildContext(ctx: Ctx): string {
     })
     .join('\n')
 
-  // Emploi du temps récurrent — groupé par jour
+  // Emploi du temps récurrent — créneaux occupés + créneaux libres par jour
   const dayNames = ['lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi', 'dimanche']
-  const blocksByDay: Record<number, string[]> = {}
+  const DAY_START_MIN = 8 * 60     // 08:00
+  const DAY_END_MIN   = 22 * 60    // 22:00
+  const DAY_WINDOW_MIN = DAY_END_MIN - DAY_START_MIN  // 14h
+
+  const toMin = (hhmm: string): number => {
+    const [h, m] = hhmm.split(':').map(n => parseInt(n, 10))
+    return (h || 0) * 60 + (m || 0)
+  }
+  const fmt = (mins: number): string => {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+  }
+  const fmtDuration = (mins: number): string => {
+    const h = Math.floor(mins / 60)
+    const m = mins % 60
+    return m === 0 ? `${h}h` : `${h}h${String(m).padStart(2, '0')}`
+  }
+
+  type Interval = { start: number; end: number; label?: string }
+  const busyByDay: Record<number, Interval[]> = {}
   for (const b of ctx.scheduleBlocks ?? []) {
+    const s = toMin(b.startTime)
+    const e = toMin(b.endTime)
+    if (e <= s) continue
     for (const d of b.daysOfWeek) {
-      if (!blocksByDay[d]) blocksByDay[d] = []
-      blocksByDay[d].push(`${b.startTime}-${b.endTime} ${b.title}`)
+      if (!busyByDay[d]) busyByDay[d] = []
+      busyByDay[d].push({ start: s, end: e, label: b.title })
     }
   }
-  const scheduleText = Object.keys(blocksByDay).length > 0
-    ? Object.entries(blocksByDay)
-        .sort(([a], [b]) => Number(a) - Number(b))
-        .map(([d, items]) => `${dayNames[Number(d)]} : ${items.join(' / ')}`)
-        .join('\n')
-    : '(aucune plage récurrente — l\'utilisateur n\'a pas saisi son emploi du temps)'
+
+  const mergeIntervals = (arr: Interval[]): Interval[] => {
+    if (arr.length === 0) return []
+    const sorted = [...arr].sort((a, b) => a.start - b.start)
+    const out: Interval[] = [{ ...sorted[0] }]
+    for (let i = 1; i < sorted.length; i++) {
+      const prev = out[out.length - 1]
+      const cur = sorted[i]
+      if (cur.start <= prev.end) prev.end = Math.max(prev.end, cur.end)
+      else out.push({ ...cur })
+    }
+    return out
+  }
+
+  const freeIntervalsForDay = (day: number): Interval[] => {
+    const busy = mergeIntervals(busyByDay[day] ?? [])
+    const free: Interval[] = []
+    let cursor = DAY_START_MIN
+    for (const b of busy) {
+      const bs = Math.max(b.start, DAY_START_MIN)
+      const be = Math.min(b.end,   DAY_END_MIN)
+      if (be <= cursor) continue
+      if (bs > cursor) free.push({ start: cursor, end: bs })
+      cursor = Math.max(cursor, be)
+    }
+    if (cursor < DAY_END_MIN) free.push({ start: cursor, end: DAY_END_MIN })
+    return free
+  }
+
+  const scheduleLines: string[] = []
+  for (let d = 0; d < 7; d++) {
+    const busy = busyByDay[d] ?? []
+    const free = freeIntervalsForDay(d)
+    const freeMin = free.reduce((acc, iv) => acc + (iv.end - iv.start), 0)
+    const busyTxt = busy.length > 0
+      ? busy.map(iv => `${fmt(iv.start)}-${fmt(iv.end)} ${iv.label ?? ''}`.trim()).join(' / ')
+      : '(rien)'
+    const freeTxt = free.length > 0
+      ? free.map(iv => `${fmt(iv.start)}-${fmt(iv.end)}`).join(', ')
+      : '(aucun)'
+    scheduleLines.push(`${dayNames[d]} — occupé : ${busyTxt} | libre (${fmtDuration(freeMin)} sur ${fmtDuration(DAY_WINDOW_MIN)}) : ${freeTxt}`)
+  }
+  const scheduleText = scheduleLines.join('\n')
 
   return `Date du jour : ${today}
 
@@ -197,7 +257,8 @@ ${activeDomains || '(aucun)'}
 OBJECTIFS EN COURS :
 ${activeObjectives || '(aucun)'}
 
-EMPLOI DU TEMPS RÉCURRENT (plages déjà occupées chaque semaine — NE PAS planifier de tâches dessus) :
+EMPLOI DU TEMPS HEBDOMADAIRE (fenêtre travaillée : 08:00–22:00, soit 14h/jour) :
+Pour chaque jour, on liste les plages OCCUPÉES (cours, alternance, engagements — NE PAS planifier dessus) et les plages LIBRES (où tu dois caser les tâches) :
 ${scheduleText}
 
 TÂCHES RÉCEMMENT TERMINÉES (pour comprendre le rythme) :
@@ -428,8 +489,54 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string, today?: stri
     const days = Math.round((new Date(o.targetDate + 'T12:00:00').getTime() - new Date(todayIso + 'T12:00:00').getTime()) / 86400000)
     return days <= 14
   })()).length
-  const targetMin = Math.max(dailyTasksCount + urgentCount * 2, daysRemaining * 2)
-  const targetMax = Math.max(targetMin + 4, 20)
+
+  // ── Capacité libre cette semaine (jours restants) ────────────────────────
+  // On somme les minutes libres entre 08:00 et 22:00 sur les jours encore à venir.
+  const DAY_START_MIN = 8 * 60
+  const DAY_END_MIN   = 22 * 60
+  const toMin = (hhmm: string): number => {
+    const [h, m] = hhmm.split(':').map(n => parseInt(n, 10))
+    return (h || 0) * 60 + (m || 0)
+  }
+  let capacityMin = 0
+  for (let d = minDayOffset; d <= 6; d++) {
+    const busy: Array<{ s: number; e: number }> = []
+    for (const b of ctx.scheduleBlocks ?? []) {
+      if (!b.daysOfWeek.includes(d)) continue
+      const s = toMin(b.startTime), e = toMin(b.endTime)
+      if (e > s) busy.push({ s, e })
+    }
+    busy.sort((a, b) => a.s - b.s)
+    const merged: Array<{ s: number; e: number }> = []
+    for (const iv of busy) {
+      const last = merged[merged.length - 1]
+      if (last && iv.s <= last.e) last.e = Math.max(last.e, iv.e)
+      else merged.push({ ...iv })
+    }
+    let cursor = DAY_START_MIN
+    let freeDay = 0
+    for (const iv of merged) {
+      const s = Math.max(iv.s, DAY_START_MIN)
+      const e = Math.min(iv.e, DAY_END_MIN)
+      if (e <= cursor) continue
+      if (s > cursor) freeDay += s - cursor
+      cursor = Math.max(cursor, e)
+    }
+    if (cursor < DAY_END_MIN) freeDay += DAY_END_MIN - cursor
+    capacityMin += freeDay
+  }
+  // Cible : remplir ~65% de la capacité libre avec du focus utile (le reste
+  // = pauses, transitions, marges). Si pas d'agenda saisi, on retombe sur
+  // une estimation conservative de 8h/jour libre.
+  const FILL_RATIO = 0.65
+  const effectiveCapacity = capacityMin > 0 ? capacityMin : daysRemaining * 8 * 60
+  const targetWorkMin = Math.round(effectiveCapacity * FILL_RATIO)
+  const targetWorkHours = Math.round(targetWorkMin / 60)
+  // Tâches moyennes : 60 min. Borne basse = tâches 75 min, borne haute = 45 min.
+  const computedTargetMin = Math.ceil(targetWorkMin / 75)
+  const computedTargetMax = Math.ceil(targetWorkMin / 45)
+  const targetMin = Math.max(dailyTasksCount + urgentCount * 2, daysRemaining * 2, computedTargetMin)
+  const targetMax = Math.max(targetMin + 5, computedTargetMax, 20)
 
   const tool: AnthropicTool = {
     name: 'generate_week_plan',
@@ -439,7 +546,7 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string, today?: stri
       properties: {
         items: {
           type: 'array',
-          maxItems: Math.min(targetMax + 5, 35),
+          maxItems: Math.min(targetMax + 5, 45),
           items: {
             type: 'object',
             properties: {
@@ -474,7 +581,7 @@ ${dailyObjectives.map(o => {
 
   const response = await callAnthropic({
     model: MODEL,
-    max_tokens: 4000,
+    max_tokens: 6000,
     system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
     tools: [tool],
     tool_choice: { type: 'tool', name: 'generate_week_plan' },
@@ -488,7 +595,9 @@ AUJOURD'HUI : ${todayIso} (${startDayName}) — dayOffset minimum = ${minDayOffs
 ⚠️ NE génère AUCUNE tâche avec day_offset < ${minDayOffset} : ces jours sont déjà passés.
 Jours restants : ${daysRemaining} (de ${startDayName} à dimanche inclus).
 
-Génère un plan dense et utile — vise ${targetMin} à ${targetMax} tâches au total.${dailySection}
+CAPACITÉ LIBRE de la semaine restante : ${Math.round(effectiveCapacity / 60)}h cumulées (entre 08:00 et 22:00, hors plages occupées).
+OBJECTIF DE REMPLISSAGE : ~${targetWorkHours}h de focus utile sur ces ${daysRemaining} jours (≈65% de la capacité libre, le reste = pauses, repas, marges).
+Génère un plan DENSE — vise ${targetMin} à ${targetMax} tâches au total. Une journée libre doit comporter 4–6 tâches (5–8h de focus cumulé), pas 1–2.${dailySection}
 
 PRIORITÉS strictes :
 - Objectifs marqués [EN RETARD] ou [URGENT] : au moins 2-3 tâches par objectif sur les jours restants
@@ -504,13 +613,15 @@ RÈGLES de répartition :
 - Un même objectif urgent peut avoir 2-3 tâches espacées dans la semaine
 
 CONTRAINTES D'EMPLOI DU TEMPS — créneaux précis :
-- Pour CHAQUE tâche, propose une heure de début (start_time HH:MM) qui s'insère dans le créneau libre du jour
-- Tiens compte des plages bloquées : ne pose JAMAIS une tâche pendant un cours / engagement
-- Sur un jour donné, espace les tâches : pas deux qui se chevauchent (respecte time_estimate)
+- Tu disposes pour chaque jour de la liste explicite des plages LIBRES (voir EMPLOI DU TEMPS HEBDOMADAIRE ci-dessus). Toutes les tâches DOIVENT être casées dans ces plages libres.
+- Pour CHAQUE tâche, propose une heure de début (start_time HH:MM) qui s'insère dans une plage libre
+- Ne pose JAMAIS une tâche pendant une plage occupée (cours / alternance / engagement)
+- Sur un jour donné, espace les tâches : pas deux qui se chevauchent (respecte time_estimate) et prévois ~15 min de transition entre deux tâches consécutives
 - Préfère matin (09:00-12:00) pour le travail intense, après-midi (14:00-18:00) pour le reste, soir (20:00-22:00) pour les routines légères
-- Respecte les plages récurrentes : si un jour est majoritairement occupé (>5h), 1-2 tâches max placées dans les pauses
-- Sur les jours libres, tu peux mettre 3-4 tâches
-- Le créneau utile = la portion du jour qui n'est PAS dans une plage bloquée`,
+- Sur un jour majoritairement occupé (<3h libres) : 1-2 tâches courtes (30-45 min) glissées dans les pauses
+- Sur un jour moyennement libre (3-6h libres) : 3-4 tâches qui remplissent ~65% du créneau libre
+- Sur un jour très libre (>6h libres) : 4-6 tâches étalées entre matin, après-midi et soir, totalisant ~5-7h de focus
+- Le créneau utile = la portion du jour qui n'est PAS dans une plage occupée`,
       },
     ],
   })
