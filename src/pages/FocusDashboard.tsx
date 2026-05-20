@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type CSSProperties } from 'react'
 import { useStore } from '../store'
-import { getDomainColors, getDomainIcon } from '../utils/domainColors'
+import { getDomainIcon } from '../utils/domainColors'
+import { getDomainColor } from '../utils/analyticsUtils'
 import { formatDuration, startOfCurrentWeek, startOfCurrentMonth } from '../utils/dateHelpers'
 import type { Domain, Task } from '../types'
 
@@ -16,6 +17,17 @@ interface DomainStats {
   tasks:        Set<string>
 }
 
+// ─── Tokens locaux ───────────────────────────────────────────────────────────
+
+const labelStyle: CSSProperties = {
+  fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em',
+  textTransform: 'uppercase', color: 'var(--ink-3)',
+}
+
+const numStyle: CSSProperties = {
+  fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 const fmtDate = (iso: string) =>
@@ -25,10 +37,59 @@ const focusLabel = (f: number) =>
   f >= 90 ? 'Excellent' : f >= 75 ? 'Bon' : f >= 60 ? 'Correct' : 'Distrait'
 
 const focusColor = (f: number) =>
-  f >= 90 ? 'text-green-400' : f >= 75 ? 'text-teal-400' : f >= 60 ? 'text-blue-400' : 'text-zinc-500'
+  f >= 90 ? 'var(--sage-deep)'
+  : f >= 75 ? 'var(--sage)'
+  : f >= 60 ? 'var(--terra)'
+  : 'var(--ink-3)'
 
-const focusBg = (f: number) =>
-  f >= 90 ? 'bg-green-500' : f >= 75 ? 'bg-teal-500' : f >= 60 ? 'bg-blue-500' : 'bg-zinc-600'
+// ─── Primitives ───────────────────────────────────────────────────────────────
+
+function Card({ children, style }: { children: React.ReactNode; style?: CSSProperties }) {
+  return (
+    <div style={{
+      background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
+      borderRadius: 12, ...style,
+    }}>
+      {children}
+    </div>
+  )
+}
+
+function NoData({ children = "Aucune session enregistrée." }: { children?: React.ReactNode }) {
+  return (
+    <div style={{
+      padding: '24px 8px', textAlign: 'center',
+      fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14,
+      color: 'var(--ink-3)',
+    }}>
+      {children}
+    </div>
+  )
+}
+
+interface KpiProps {
+  label:  string
+  value:  string
+  suffix?: string
+  accent?: string
+}
+
+function Kpi({ label, value, suffix, accent }: KpiProps) {
+  return (
+    <Card style={{ padding: '16px 18px 14px', display: 'flex', flexDirection: 'column', gap: 6, minHeight: 96 }}>
+      <span style={labelStyle}>{label}</span>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 6, marginTop: 4 }}>
+        <span style={{
+          fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 32,
+          color: accent ?? 'var(--ink)', letterSpacing: '-0.015em', lineHeight: 1,
+        }}>{value}</span>
+        {suffix && (
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: 13, color: 'var(--ink-3)' }}>{suffix}</span>
+        )}
+      </div>
+    </Card>
+  )
+}
 
 // ─── FocusDashboard ───────────────────────────────────────────────────────────
 
@@ -76,8 +137,8 @@ export function FocusDashboard() {
       })
     }
 
-    let focusSums: Record<string, number>  = {}
-    let focusCnts: Record<string, number>  = {}
+    const focusSums: Record<string, number> = {}
+    const focusCnts: Record<string, number> = {}
 
     for (const session of filteredSessions) {
       const task = taskById.get(session.taskId)
@@ -155,85 +216,123 @@ export function FocusDashboard() {
   ]
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
 
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-4">
+      {/* ── Header ───────────────────────────────────────────────────────── */}
+      <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 24 }}>
         <div>
-          <h2 className="text-base font-semibold text-zinc-100">Suivi du focus</h2>
-          <p className="mt-0.5 text-sm text-zinc-500">Analyse de tes sessions de concentration</p>
+          <span style={labelStyle}>focus</span>
+          <h2 style={{
+            fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 'clamp(28px, 3vw, 36px)',
+            lineHeight: 1.1, letterSpacing: '-0.015em', color: 'var(--ink)', marginTop: 6,
+          }}>
+            Suivi du focus
+          </h2>
+          <p style={{
+            fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15,
+            color: 'var(--ink-3)', marginTop: 6,
+          }}>
+            Analyse de tes sessions de concentration.
+          </p>
         </div>
+
         {/* Period selector */}
-        <div className="flex rounded-lg border border-zinc-800 bg-zinc-900/60 p-0.5">
-          {PERIODS.map((p) => (
-            <button
-              key={p.key}
-              onClick={() => setPeriod(p.key)}
-              className={[
-                'rounded-md px-3 py-1.5 text-xs font-medium transition-colors',
-                period === p.key
-                  ? 'bg-zinc-700 text-zinc-100 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-300',
-              ].join(' ')}
-            >
-              {p.label}
-            </button>
-          ))}
+        <div style={{
+          display: 'inline-flex', background: 'var(--paper-1)',
+          border: '1px solid var(--paper-2)', borderRadius: 999, padding: 3,
+        }}>
+          {PERIODS.map((p) => {
+            const active = period === p.key
+            return (
+              <button
+                key={p.key}
+                onClick={() => setPeriod(p.key)}
+                style={{
+                  fontFamily: 'var(--font-sans)', fontSize: 12.5,
+                  padding: '6px 14px', borderRadius: 999, border: 'none',
+                  cursor: 'pointer',
+                  background: active ? 'var(--paper-3)' : 'transparent',
+                  color: active ? 'var(--ink)' : 'var(--ink-2)',
+                  fontWeight: active ? 600 : 400,
+                  transition: 'background var(--dur) var(--ease), color var(--dur) var(--ease)',
+                }}
+              >
+                {p.label}
+              </button>
+            )
+          })}
         </div>
+      </header>
+
+      {/* ── Global stats ─────────────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14 }}>
+        <Kpi
+          label="temps · total"
+          value={totalMinutes > 0 ? formatDuration(totalMinutes) : '—'}
+        />
+        <Kpi
+          label="sessions"
+          value={totalSessions > 0 ? String(totalSessions) : '—'}
+        />
+        <Kpi
+          label="focus moyen"
+          value={globalAvgFocus > 0 ? String(globalAvgFocus) : '—'}
+          suffix={globalAvgFocus > 0 ? '%' : undefined}
+          accent={globalAvgFocus > 0 ? focusColor(globalAvgFocus) : undefined}
+        />
+        <Kpi
+          label="domaines actifs"
+          value={domainStats.length > 0 ? String(domainStats.length) : '—'}
+        />
       </div>
 
-      {/* ── Global stats ───────────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {[
-          { label: 'Temps total',     value: formatDuration(totalMinutes),    accent: 'text-teal-400' },
-          { label: 'Sessions',        value: String(totalSessions),           accent: 'text-blue-400' },
-          { label: 'Focus moyen',     value: globalAvgFocus > 0 ? `${globalAvgFocus}%` : '—', accent: focusColor(globalAvgFocus) },
-          { label: 'Domaines actifs', value: String(domainStats.length),      accent: 'text-indigo-400' },
-        ].map((s) => (
-          <div key={s.label} className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 px-4 py-3">
-            <p className={['text-2xl font-bold tabular-nums leading-none', s.accent].join(' ')}>{s.value}</p>
-            <p className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600">{s.label}</p>
-          </div>
-        ))}
-      </div>
-
-      {/* ── Layout : graphe journalier + répartition par domaine ───────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* ── Layout : graphe journalier + répartition par domaine ─────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
 
         {/* Daily bar chart */}
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 p-4">
-          <h3 className="mb-4 text-sm font-semibold text-zinc-200">Activité journalière</h3>
+        <Card style={{ padding: '22px 24px' }}>
+          <span style={labelStyle}>activité · jour par jour</span>
+          <h3 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500,
+            color: 'var(--ink)', marginTop: 4,
+          }}>
+            Le rythme de ta semaine.
+          </h3>
+
           {totalMinutes === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-600">Aucune session enregistrée</p>
+            <NoData />
           ) : (
-            <div className="flex items-end gap-1.5 h-32">
+            <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 128, marginTop: 18 }}>
               {dailyData.map((day) => {
-                const height = day.minutes > 0 ? Math.max(4, Math.round((day.minutes / maxDayMinutes) * 100)) : 0
+                const height = day.minutes > 0
+                  ? Math.max(4, Math.round((day.minutes / maxDayMinutes) * 100))
+                  : 0
                 const isToday = day.date === new Date().toISOString().split('T')[0]
                 return (
-                  <div key={day.date} className="group relative flex flex-1 flex-col items-center gap-1">
-                    {/* Tooltip */}
-                    {day.minutes > 0 && (
-                      <div className="absolute bottom-full mb-1 hidden group-hover:block z-10">
-                        <div className="rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-200 whitespace-nowrap shadow-lg">
-                          {formatDuration(day.minutes)}
-                        </div>
-                      </div>
-                    )}
-                    {/* Bar */}
-                    <div className="flex w-full items-end justify-center" style={{ height: '100%' }}>
-                      <div
-                        className={[
-                          'w-full rounded-t transition-all',
-                          day.minutes > 0
-                            ? isToday ? 'bg-teal-500' : 'bg-zinc-600 group-hover:bg-zinc-500'
-                            : 'bg-zinc-800/40',
-                        ].join(' ')}
-                        style={{ height: day.minutes > 0 ? `${height}%` : '4px' }}
-                      />
+                  <div key={day.date} style={{
+                    position: 'relative', flex: 1,
+                    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+                  }}
+                  className="focus-day"
+                  title={day.minutes > 0 ? formatDuration(day.minutes) : ''}
+                  >
+                    <div style={{ flex: 1, width: '100%', display: 'flex', alignItems: 'flex-end' }}>
+                      <div style={{
+                        width: '100%',
+                        borderRadius: '4px 4px 0 0',
+                        height: day.minutes > 0 ? `${height}%` : 4,
+                        background: day.minutes > 0
+                          ? isToday ? 'var(--terra)' : 'var(--ink-4)'
+                          : 'var(--paper-2)',
+                        transition: 'background var(--dur) var(--ease)',
+                      }} />
                     </div>
-                    {/* Label */}
-                    <span className={['text-[10px]', isToday ? 'text-teal-400 font-medium' : 'text-zinc-600'].join(' ')}>
+                    <span style={{
+                      fontFamily: 'var(--font-mono)', fontSize: 10.5,
+                      letterSpacing: '0.04em',
+                      color: isToday ? 'var(--terra)' : 'var(--ink-3)',
+                      fontWeight: isToday ? 600 : 400,
+                    }}>
                       {day.label}
                     </span>
                   </div>
@@ -241,105 +340,143 @@ export function FocusDashboard() {
               })}
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Domain distribution */}
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 p-4">
-          <h3 className="mb-4 text-sm font-semibold text-zinc-200">Répartition par domaine</h3>
+        <Card style={{ padding: '22px 24px' }}>
+          <span style={labelStyle}>répartition · par domaine</span>
+          <h3 style={{
+            fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500,
+            color: 'var(--ink)', marginTop: 4,
+          }}>
+            Où s'est posée ton attention.
+          </h3>
+
           {domainStats.length === 0 ? (
-            <p className="py-8 text-center text-sm text-zinc-600">Aucune session enregistrée</p>
+            <NoData />
           ) : (
-            <div className="space-y-3">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 18 }}>
               {domainStats.map(({ domain, totalMinutes: mins, sessionCount, avgFocus }) => {
-                const colors = getDomainColors(domain.color)
+                const color = getDomainColor(domain.color)
                 const DomainIcon = getDomainIcon(domain.name)
-                const pct    = Math.round((mins / maxMinutes) * 100)
+                const pct = Math.round((mins / maxMinutes) * 100)
                 return (
                   <div key={domain.id}>
-                    <div className="mb-1 flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="text-sm flex items-center">
-                          {DomainIcon ? <DomainIcon size={14} /> : domain.icon}
-                        </span>
-                        <span className="text-xs font-medium text-zinc-300 truncate">{domain.name}</span>
+                    <div style={{
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                      gap: 8, marginBottom: 5,
+                    }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 }}>
+                        {DomainIcon
+                          ? <DomainIcon size={13} style={{ color }} />
+                          : <span style={{ fontSize: 12 }}>{domain.icon}</span>}
+                        <span style={{
+                          fontFamily: 'var(--font-sans)', fontSize: 13,
+                          color: 'var(--ink)', fontWeight: 500,
+                          overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                        }}>{domain.name}</span>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0 text-xs">
-                        <span className={[colors.text, 'font-semibold tabular-nums'].join(' ')}>
-                          {formatDuration(mins)}
-                        </span>
-                        <span className="text-zinc-600 tabular-nums">·</span>
-                        <span className="text-zinc-500 tabular-nums">{sessionCount} sess.</span>
+                      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexShrink: 0, fontSize: 12 }}>
+                        <span style={{ ...numStyle, color, fontWeight: 600 }}>{formatDuration(mins)}</span>
+                        <span style={{ color: 'var(--ink-4)' }}>·</span>
+                        <span style={{ ...numStyle, color: 'var(--ink-3)' }}>{sessionCount} sess.</span>
                         {avgFocus > 0 && (
                           <>
-                            <span className="text-zinc-600">·</span>
-                            <span className={[focusColor(avgFocus), 'tabular-nums'].join(' ')}>{avgFocus}%</span>
+                            <span style={{ color: 'var(--ink-4)' }}>·</span>
+                            <span style={{ ...numStyle, color: focusColor(avgFocus) }}>{avgFocus}%</span>
                           </>
                         )}
                       </div>
                     </div>
-                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-                      <div
-                        className={['h-full rounded-full transition-all duration-500', colors.dot].join(' ')}
-                        style={{ width: `${pct}%` }}
-                      />
+                    <div style={{
+                      height: 6, width: '100%', borderRadius: 999,
+                      background: 'var(--paper-2)', overflow: 'hidden',
+                    }}>
+                      <div style={{
+                        height: '100%', width: `${pct}%`, background: color,
+                        borderRadius: 999, transition: 'width 500ms var(--ease)',
+                      }} />
                     </div>
                   </div>
                 )
               })}
             </div>
           )}
-        </div>
+        </Card>
       </div>
 
-      {/* ── Domain stats table ──────────────────────────────────────────────── */}
+      {/* ── Domain stats table ──────────────────────────────────────────── */}
       {domainStats.length > 0 && (
-        <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 overflow-hidden">
-          <div className="border-b border-zinc-800/60 px-4 py-3">
-            <h3 className="text-sm font-semibold text-zinc-200">Statistiques par domaine</h3>
+        <Card style={{ overflow: 'hidden' }}>
+          <div style={{
+            borderBottom: '1px solid var(--paper-2)',
+            padding: '16px 22px',
+          }}>
+            <span style={labelStyle}>statistiques · par domaine</span>
+            <h3 style={{
+              fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500,
+              color: 'var(--ink)', marginTop: 4,
+            }}>
+              Le détail, ligne à ligne.
+            </h3>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
-                <tr className="border-b border-zinc-800/60">
+                <tr style={{ borderBottom: '1px solid var(--paper-2)' }}>
                   {['Domaine', 'Temps', 'Sessions', 'Tâches', 'Focus moyen', 'Niveau'].map((h) => (
-                    <th key={h} className="px-4 py-2.5 text-left text-[10px] font-medium uppercase tracking-wider text-zinc-600">{h}</th>
+                    <th key={h} style={{
+                      ...labelStyle, padding: '10px 18px', textAlign: 'left', fontWeight: 400,
+                    }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {domainStats.map(({ domain, totalMinutes: mins, sessionCount, tasks: taskSet, avgFocus }) => {
-                  const colors = getDomainColors(domain.color)
+                  const color = getDomainColor(domain.color)
                   const DomainIcon = getDomainIcon(domain.name)
                   return (
-                    <tr key={domain.id} className="border-b border-zinc-800/30 hover:bg-zinc-800/20 transition-colors">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2">
-                          <span className="flex items-center">
-                            {DomainIcon ? <DomainIcon size={16} /> : domain.icon}
-                          </span>
-                          <span className={['font-medium', colors.text].join(' ')}>{domain.name}</span>
+                    <tr key={domain.id} style={{ borderBottom: '1px solid var(--paper-2)' }}>
+                      <td style={{ padding: '12px 18px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          {DomainIcon
+                            ? <DomainIcon size={15} style={{ color }} />
+                            : <span style={{ fontSize: 14 }}>{domain.icon}</span>}
+                          <span style={{ fontWeight: 500, color }}>{domain.name}</span>
                         </div>
                       </td>
-                      <td className="px-4 py-3 tabular-nums text-zinc-200 font-medium">{formatDuration(mins)}</td>
-                      <td className="px-4 py-3 tabular-nums text-zinc-400">{sessionCount}</td>
-                      <td className="px-4 py-3 tabular-nums text-zinc-400">{taskSet.size}</td>
-                      <td className="px-4 py-3">
+                      <td style={{ padding: '12px 18px', ...numStyle, color: 'var(--ink)', fontWeight: 500 }}>
+                        {formatDuration(mins)}
+                      </td>
+                      <td style={{ padding: '12px 18px', ...numStyle, color: 'var(--ink-2)' }}>{sessionCount}</td>
+                      <td style={{ padding: '12px 18px', ...numStyle, color: 'var(--ink-2)' }}>{taskSet.size}</td>
+                      <td style={{ padding: '12px 18px' }}>
                         {avgFocus > 0 ? (
-                          <div className="flex items-center gap-2">
-                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-zinc-800">
-                              <div
-                                className={['h-full rounded-full', focusBg(avgFocus)].join(' ')}
-                                style={{ width: `${avgFocus}%` }}
-                              />
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <div style={{
+                              height: 6, width: 72, borderRadius: 999,
+                              background: 'var(--paper-2)', overflow: 'hidden',
+                            }}>
+                              <div style={{
+                                height: '100%', width: `${avgFocus}%`,
+                                background: focusColor(avgFocus), borderRadius: 999,
+                              }} />
                             </div>
-                            <span className={['tabular-nums text-xs', focusColor(avgFocus)].join(' ')}>{avgFocus}%</span>
+                            <span style={{ ...numStyle, fontSize: 12, color: focusColor(avgFocus) }}>
+                              {avgFocus}%
+                            </span>
                           </div>
                         ) : (
-                          <span className="text-zinc-600">—</span>
+                          <span style={{ color: 'var(--ink-3)' }}>—</span>
                         )}
                       </td>
-                      <td className="px-4 py-3">
-                        <span className={['text-xs', focusColor(avgFocus)].join(' ')}>{avgFocus > 0 ? focusLabel(avgFocus) : '—'}</span>
+                      <td style={{ padding: '12px 18px' }}>
+                        <span style={{
+                          fontFamily: 'var(--font-serif)', fontStyle: 'italic',
+                          fontSize: 13, color: focusColor(avgFocus),
+                        }}>
+                          {avgFocus > 0 ? focusLabel(avgFocus) : '—'}
+                        </span>
                       </td>
                     </tr>
                   )
@@ -347,66 +484,111 @@ export function FocusDashboard() {
               </tbody>
             </table>
           </div>
-        </div>
+        </Card>
       )}
 
-      {/* ── Recent sessions ─────────────────────────────────────────────────── */}
-      <div className="rounded-xl border border-zinc-800/60 bg-zinc-900/40 overflow-hidden">
-        <div className="border-b border-zinc-800/60 px-4 py-3 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-200">Dernières sessions</h3>
+      {/* ── Recent sessions ─────────────────────────────────────────────── */}
+      <Card style={{ overflow: 'hidden' }}>
+        <div style={{
+          borderBottom: '1px solid var(--paper-2)',
+          padding: '16px 22px',
+          display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16,
+        }}>
+          <div>
+            <span style={labelStyle}>dernières sessions</span>
+            <h3 style={{
+              fontFamily: 'var(--font-serif)', fontSize: 19, fontWeight: 500,
+              color: 'var(--ink)', marginTop: 4,
+            }}>
+              Ce que tu viens de poser.
+            </h3>
+          </div>
           {recentSessions.length > 0 && (
-            <span className="text-xs text-zinc-600 tabular-nums">{recentSessions.length} affiché{recentSessions.length > 1 ? 's' : ''}</span>
+            <span style={{
+              ...numStyle, fontSize: 11, color: 'var(--ink-3)',
+              letterSpacing: '0.04em',
+            }}>
+              {recentSessions.length} affichée{recentSessions.length > 1 ? 's' : ''}
+            </span>
           )}
         </div>
 
         {recentSessions.length === 0 ? (
-          <div className="px-4 py-10 text-center">
-            <p className="text-sm text-zinc-600">Aucune session enregistrée pour cette période.</p>
-            <p className="mt-1 text-xs text-zinc-700">Lance le timer Focus pour commencer à tracker ton temps.</p>
+          <div style={{ padding: '40px 24px', textAlign: 'center' }}>
+            <p style={{
+              fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15,
+              color: 'var(--ink-3)', margin: 0,
+            }}>
+              Aucune session enregistrée pour cette période.
+            </p>
+            <p style={{
+              fontFamily: 'var(--font-sans)', fontSize: 12.5,
+              color: 'var(--ink-3)', marginTop: 6,
+            }}>
+              Lance le timer Focus pour commencer à tracker ton temps.
+            </p>
           </div>
         ) : (
-          <div className="divide-y divide-zinc-800/40">
-            {recentSessions.map(({ session, task, domain }) => {
-              const colors = domain ? getDomainColors(domain.color) : null
-                const DomainIcon = domain ? getDomainIcon(domain.name) : null
+          <div>
+            {recentSessions.map(({ session, task, domain }, idx) => {
+              const color = domain ? getDomainColor(domain.color) : 'var(--ink-3)'
+              const DomainIcon = domain ? getDomainIcon(domain.name) : null
               return (
-                <div key={session.id} className="flex items-center gap-3 px-4 py-3 hover:bg-zinc-800/20 transition-colors">
+                <div key={session.id} style={{
+                  display: 'flex', alignItems: 'center', gap: 14,
+                  padding: '14px 22px',
+                  borderTop: idx === 0 ? 'none' : '1px solid var(--paper-2)',
+                }}>
                   {/* Domain icon */}
-                  <div className={[
-                    'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg text-base',
-                    colors?.bg ?? 'bg-zinc-800',
-                  ].join(' ')}>
-                      {DomainIcon ? <DomainIcon size={16} /> : (domain?.icon ?? '⋯')}
+                  <div style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: 34, height: 34, borderRadius: 8,
+                    background: 'var(--paper-2)', flexShrink: 0,
+                  }}>
+                    {DomainIcon
+                      ? <DomainIcon size={16} style={{ color }} />
+                      : <span style={{ fontSize: 15 }}>{domain?.icon ?? '·'}</span>}
                   </div>
 
                   {/* Info */}
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-zinc-200 leading-tight truncate">
-                      {task?.title ?? <span className="italic text-zinc-500">Tâche supprimée</span>}
-                    </p>
-                    <div className="mt-0.5 flex items-center gap-2">
-                      {domain && colors && (
-                        <span className={['text-xs', colors.text].join(' ')}>{domain.name}</span>
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <p style={{
+                      fontFamily: 'var(--font-sans)', fontSize: 14, fontWeight: 500,
+                      color: 'var(--ink)', lineHeight: 1.3, margin: 0,
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                    }}>
+                      {task?.title ?? (
+                        <span style={{ fontStyle: 'italic', color: 'var(--ink-3)' }}>Tâche supprimée</span>
                       )}
-                      <span className="text-xs text-zinc-600">·</span>
-                      <span className="text-xs text-zinc-500">{fmtDate(session.date)}</span>
+                    </p>
+                    <div style={{ marginTop: 3, display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                      {domain && (
+                        <span style={{ color }}>{domain.name}</span>
+                      )}
+                      {domain && <span style={{ color: 'var(--ink-4)' }}>·</span>}
+                      <span style={{ color: 'var(--ink-3)' }}>{fmtDate(session.date)}</span>
                     </div>
                   </div>
 
-                  {/* Duration */}
-                  <div className="flex-shrink-0 text-right">
-                    <p className="text-sm font-semibold tabular-nums text-teal-400">
+                  {/* Duration + focus */}
+                  <div style={{ flexShrink: 0, textAlign: 'right' }}>
+                    <p style={{
+                      fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 500,
+                      color: 'var(--ink)', margin: 0, letterSpacing: '-0.01em',
+                    }}>
                       {formatDuration(session.duration)}
                     </p>
-                    {/* Focus bar */}
-                    <div className="mt-1 flex items-center gap-1.5 justify-end">
-                      <div className="h-1 w-12 overflow-hidden rounded-full bg-zinc-800">
-                        <div
-                          className={['h-full rounded-full', focusBg(session.focus)].join(' ')}
-                          style={{ width: `${session.focus}%` }}
-                        />
+                    <div style={{ marginTop: 4, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                      <div style={{
+                        height: 4, width: 52, borderRadius: 999,
+                        background: 'var(--paper-2)', overflow: 'hidden',
+                      }}>
+                        <div style={{
+                          height: '100%', width: `${session.focus}%`,
+                          background: focusColor(session.focus), borderRadius: 999,
+                        }} />
                       </div>
-                      <span className={['text-[10px] tabular-nums', focusColor(session.focus)].join(' ')}>
+                      <span style={{ ...numStyle, fontSize: 10.5, color: focusColor(session.focus) }}>
                         {session.focus}%
                       </span>
                     </div>
@@ -416,7 +598,7 @@ export function FocusDashboard() {
             })}
           </div>
         )}
-      </div>
+      </Card>
     </div>
   )
 }
