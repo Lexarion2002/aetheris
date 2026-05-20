@@ -2,13 +2,15 @@
 // Design éditorial : palette papier/encre, grille 7 colonnes, backlog, retards
 
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Target, ClockAlert, Plus, Sparkles, X } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { ChevronLeft, ChevronRight, Target, ClockAlert, Plus, Sparkles, X, ArrowRight } from 'lucide-react'
 import { useStore } from '../store'
 import { useTimerStore } from '../store/timerStore'
 import { TaskFormModal } from '../components/TaskFormModal'
-import { ObjectivesPage } from './ObjectivesPage'
 import { generateWeekPlan, type WeekPlanItem } from '../lib/aiService'
 import { expandDomains } from '../utils/standaloneDomains'
+import { getDomainIcon } from '../utils/domainColors'
+import { urgencyBucket, relativeDate, daysUntil } from '../utils/objectiveUtils'
 import type { Domain, Task, TimeSession, Milestone, Objective } from '../types'
 import {
   getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
@@ -575,6 +577,150 @@ function WeekDayColumn({
         )}
       </div>
     </div>
+  )
+}
+
+// ─── BoussoleSemaine ─────────────────────────────────────────────────────────
+
+function CompactObjectiveRow({ obj }: { obj: Objective }) {
+  const bucket    = urgencyBucket(obj.targetDate)
+  const isOverdue = bucket === 'overdue'
+  const days      = obj.targetDate ? daysUntil(obj.targetDate) : null
+  const isCounter = obj.kind === 'counter'
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: 14,
+      background: 'var(--paper-1)',
+      border: `1px solid ${isOverdue ? '#DEB89C' : 'var(--paper-2)'}`,
+      borderRadius: 10, padding: '9px 16px',
+    }}>
+      {/* Progress ring mini */}
+      <div style={{ position: 'relative', width: 28, height: 28, flexShrink: 0 }}>
+        <svg width={28} height={28} style={{ display: 'block' }}>
+          <circle cx={14} cy={14} r={11} fill="none" stroke="var(--paper-2)" strokeWidth={2.5} />
+          <circle cx={14} cy={14} r={11} fill="none"
+            stroke={isOverdue ? 'var(--terra)' : 'var(--sage)'}
+            strokeWidth={2.5}
+            strokeDasharray={`${(2 * Math.PI * 11 * Math.min(100, obj.progress) / 100).toFixed(2)} ${(2 * Math.PI * 11).toFixed(2)}`}
+            strokeLinecap="round"
+            transform="rotate(-90 14 14)"
+            style={{ transition: 'stroke-dasharray 0.4s ease' }}
+          />
+        </svg>
+        <span style={{
+          position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontFamily: 'var(--font-mono)', fontSize: 8, color: 'var(--ink-3)',
+        }}>
+          {obj.progress}
+        </span>
+      </div>
+
+      {/* Titre */}
+      <span style={{
+        flex: 1, fontFamily: 'var(--font-serif)', fontSize: 14, color: 'var(--ink)',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }}>
+        {obj.title}
+      </span>
+
+      {/* Compteur */}
+      {isCounter && obj.target != null && (
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', flexShrink: 0 }}>
+          {obj.current ?? 0}&nbsp;/&nbsp;{obj.target}
+        </span>
+      )}
+
+      {/* Date relative */}
+      {obj.targetDate && days !== null && (
+        <span style={{
+          fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', flexShrink: 0,
+          color: isOverdue ? 'var(--terra)' : days <= 7 ? '#B06000' : 'var(--ink-3)',
+        }}>
+          {relativeDate(obj.targetDate)}
+        </span>
+      )}
+    </div>
+  )
+}
+
+function BoussoleSemaine() {
+  const navigate   = useNavigate()
+  const domains    = useStore(s => s.domains)
+  const objectives = useStore(s => s.objectives)
+  const allDomains = useMemo(() => expandDomains(domains), [domains])
+
+  const groups = useMemo(() => {
+    const active = objectives.filter(o => !o.archived && o.progress < 100)
+    const map = new Map<string, Objective[]>()
+    active.forEach(o => {
+      if (!map.has(o.domainId)) map.set(o.domainId, [])
+      map.get(o.domainId)!.push(o)
+    })
+    return allDomains
+      .map(d => ({ domain: d, objs: (map.get(d.id) ?? []).sort((a, b) => (urgencyBucket(a.targetDate) === 'overdue' ? -1 : 1) - (urgencyBucket(b.targetDate) === 'overdue' ? -1 : 1)) }))
+      .filter(g => g.objs.length > 0)
+  }, [objectives, allDomains])
+
+  if (groups.length === 0) return null
+
+  return (
+    <section style={{ marginTop: 56, maxWidth: 1100 }}>
+
+      {/* Header */}
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ fontFamily: 'var(--font-mono)', fontSize: 12, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 4 }}>
+          boussole
+        </div>
+        <h2 style={{ fontFamily: 'var(--font-serif)', fontSize: 26, fontWeight: 500, color: 'var(--ink)', letterSpacing: '-0.005em', margin: '2px 0 4px', lineHeight: 1.2 }}>
+          Objectifs<span style={{ color: 'var(--terra)' }}>.</span>
+        </h2>
+        <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--ink-2)' }}>
+          Gère et construis tes objectifs depuis chaque domaine.
+        </span>
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+        {groups.map(({ domain, objs }) => {
+          const Icon = getDomainIcon(domain.name)
+          return (
+            <section key={domain.id}>
+              {/* En-tête domaine */}
+              <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, marginBottom: 10 }}>
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  {Icon && <Icon size={16} style={{ color: 'var(--ink-3)' }} />}
+                  <h3 style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 500, color: 'var(--ink)', margin: 0, lineHeight: 1.2 }}>
+                    {domain.name}
+                  </h3>
+                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+                    {String(objs.length).padStart(2, '0')}
+                  </span>
+                </div>
+                <span style={{ flex: 1, height: 1, background: 'var(--paper-2)', alignSelf: 'center' }} />
+                <button
+                  onClick={() => navigate(`/domain/${domain.id}`)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 5,
+                    fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)',
+                    background: 'transparent', border: 0, cursor: 'pointer', padding: 0,
+                    transition: 'color 0.15s',
+                  }}
+                  onMouseEnter={e => (e.currentTarget.style.color = 'var(--ink)')}
+                  onMouseLeave={e => (e.currentTarget.style.color = 'var(--ink-3)')}
+                >
+                  Gérer dans le domaine <ArrowRight size={12} />
+                </button>
+              </div>
+
+              {/* Objectifs */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {objs.map(o => <CompactObjectiveRow key={o.id} obj={o} />)}
+              </div>
+            </section>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
@@ -1194,8 +1340,8 @@ export function WeekView() {
       {/* ── Backlog ───────────────────────────────────────────────────────── */}
       <Backlog tasks={backlogTasks} domains={domains} onToggle={handleToggle} milestones={milestones} objectives={objectives} />
 
-      {/* ── Objectifs ─────────────────────────────────────────────────────── */}
-      <ObjectivesPage />
+      {/* ── Objectifs (boussole) ──────────────────────────────────────────── */}
+      <BoussoleSemaine />
 
       {/* ── TaskFormModal ─────────────────────────────────────────────────── */}
       {taskModalOpen && firstDomainId && (

@@ -10,7 +10,8 @@ import { LawPage }            from './LawPage'
 import { CareerView }        from './CareerView'
 import { SportView }         from './SportView'
 import { MusicPage }         from './MusicPage'
-import type { Task, SubTask, Objective, Priority, TaskStatus, TimeSession } from '../types'
+import { suggestMilestoneRecovery } from '../lib/aiService'
+import type { Task, SubTask, Objective, Milestone, Priority, TaskStatus, TimeSession } from '../types'
 import type { PomodoroPhase } from '../store/pomodoroStore'
 
 // ─── Priority / Status config ─────────────────────────────────────────────────
@@ -517,37 +518,124 @@ function TaskCard({ task, onEdit, sessions, subTasks }: {
   )
 }
 
+// ─── HabitHeatmap (DomainView) ───────────────────────────────────────────────
+
+function HabitHeatmap({ obj }: { obj: Objective }) {
+  if (!obj.dailyTarget) return null
+  const dailyTarget = obj.dailyTarget
+  const logMap = new Map((obj.dailyLog ?? []).map((e) => [e.date, e.value]))
+  const days: Array<{ date: string; intensity: number }> = []
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i)
+    const iso = d.toISOString().split('T')[0]
+    const v = logMap.get(iso) ?? 0
+    const intensity = v >= dailyTarget ? 4 : v > dailyTarget * 0.66 ? 3 : v > dailyTarget * 0.33 ? 2 : v > 0 ? 1 : 0
+    days.push({ date: iso, intensity })
+  }
+  return (
+    <div className="flex gap-0.5 flex-nowrap">
+      {days.map((d) => (
+        <div
+          key={d.date}
+          title={d.date}
+          className="w-2.5 h-2.5 rounded-sm flex-shrink-0"
+          style={{
+            background: d.intensity === 0 ? 'rgb(39 39 42)' : '#4ade80',
+            opacity: d.intensity === 0 ? 1 : 0.2 + d.intensity * 0.2,
+          }}
+        />
+      ))}
+    </div>
+  )
+}
+
 // ─── ObjectiveCard ────────────────────────────────────────────────────────────
 
 function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective) => void }) {
-  const deleteObjective    = useStore((s) => s.deleteObjective)
+  const domains              = useStore((s) => s.domains)
+  const deleteObjective      = useStore((s) => s.deleteObjective)
   const setObjectiveProgress = useStore((s) => s.setObjectiveProgress)
+  const incrementCounter     = useStore((s) => s.incrementCounter)
+  const decrementCounter     = useStore((s) => s.decrementCounter)
+  const logDailyValue        = useStore((s) => s.logDailyValue)
+  const allMilestones        = useStore((s) => s.milestones)
+  const addMilestone         = useStore((s) => s.addMilestone)
+  const toggleMilestone      = useStore((s) => s.toggleMilestone)
+  const deleteMilestone      = useStore((s) => s.deleteMilestone)
+  const addTask              = useStore((s) => s.addTask)
+  const kitEnabled           = useStore((s) => !!s.anthropicApiKey)
 
-  const [showSlider, setShowSlider] = useState(false)
-  const [localProg,  setLocalProg]  = useState(obj.progress)
-  const [confirmDel, setConfirmDel] = useState(false)
+  const milestones = useMemo(
+    () => allMilestones.filter(m => m.objectiveId === obj.id).sort((a, b) => a.position - b.position),
+    [allMilestones, obj.id],
+  )
 
-  const done   = obj.progress >= 100
-  const days   = obj.targetDate ? daysUntil(obj.targetDate) : null
-  const pColor = progressColor(obj.progress)
+  const [showSlider,  setShowSlider]  = useState(false)
+  const [localProg,   setLocalProg]   = useState(obj.progress)
+  const [confirmDel,  setConfirmDel]  = useState(false)
+  const [expanded,    setExpanded]    = useState(false)
+  const [addingMs,    setAddingMs]    = useState(false)
+  const [newMsTitle,  setNewMsTitle]  = useState('')
+  const [newMsDate,   setNewMsDate]   = useState('')
+  const [kitLoading,  setKitLoading]  = useState(false)
+  const [kitSug,      setKitSug]      = useState<{ nextAction: string; reason: string; timeEstimate: number } | null>(null)
+  const [kitAccepted, setKitAccepted] = useState(false)
+  const msInputRef = useRef<HTMLInputElement>(null)
 
-  const saveProgress = () => {
-    setObjectiveProgress(obj.id, localProg)
-    setShowSlider(false)
+  const done        = obj.progress >= 100
+  const days        = obj.targetDate ? daysUntil(obj.targetDate) : null
+  const isOverdue   = days !== null && days < 0 && !done
+  const pColor      = progressColor(obj.progress)
+  const isCounter   = obj.kind === 'counter'
+  const isHabit     = isCounter && !!obj.dailyTarget
+  const today       = new Date().toISOString().split('T')[0]
+  const todayVal    = obj.dailyLog?.find(e => e.date === today)?.value ?? 0
+  const dailyTarget = obj.dailyTarget ?? 1
+  const isDoneToday = isHabit && todayVal >= dailyTarget
+  const doneMs      = milestones.filter(m => m.done).length
+
+  const saveProgress = () => { setObjectiveProgress(obj.id, localProg); setShowSlider(false) }
+
+  const submitMs = () => {
+    if (!newMsTitle.trim()) return
+    const pos = milestones.length > 0 ? Math.max(...milestones.map(m => m.position)) + 1 : 0
+    addMilestone({ objectiveId: obj.id, title: newMsTitle.trim(), targetDate: newMsDate || null, done: false, position: pos })
+    setNewMsTitle(''); setNewMsDate(''); setAddingMs(false)
+  }
+
+  const fetchKit = async () => {
+    setKitLoading(true)
+    try {
+      const domain = domains.find(d => d.id === obj.domainId)
+      const result = await suggestMilestoneRecovery(obj, milestones, domain)
+      setKitSug(result)
+    } catch { /* ignore */ } finally { setKitLoading(false) }
+  }
+
+  const acceptKit = () => {
+    if (!kitSug) return
+    addTask({ domainId: obj.domainId, title: kitSug.nextAction, status: 'todo', priority: 'high', timeEstimate: kitSug.timeEstimate, dueDate: null, plannedDate: today, objectiveId: obj.id })
+    setKitAccepted(true)
   }
 
   return (
     <div className={[
       'group rounded-xl border transition-colors',
-      done
-        ? 'border-green-900/30 bg-green-950/10 opacity-70'
-        : 'border-zinc-800/60 bg-zinc-900/40 hover:border-zinc-700/60',
+      done      ? 'border-green-900/30 bg-green-950/10 opacity-70'
+      : isOverdue ? 'border-orange-800/40 bg-zinc-900/40'
+      : 'border-zinc-800/60 bg-zinc-900/40 hover:border-zinc-700/60',
     ].join(' ')}>
       <div className="px-4 py-3">
-        {/* Header row */}
+
+        {/* Header */}
         <div className="flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2 flex-wrap">
+              {isOverdue && (
+                <span className="rounded-full bg-orange-500/15 border border-orange-500/25 px-2 py-0.5 text-xs text-orange-400">
+                  en retard
+                </span>
+              )}
               <span className={['text-sm font-medium', done ? 'text-zinc-500 line-through' : 'text-zinc-200'].join(' ')}>
                 {obj.title}
               </span>
@@ -561,16 +649,13 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
               <p className="mt-0.5 text-xs text-zinc-500 leading-relaxed line-clamp-2">{obj.description}</p>
             )}
           </div>
-          {/* Actions */}
           <div className="flex flex-shrink-0 items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
             <button onClick={() => onEdit(obj)} className="rounded-lg p-1.5 text-zinc-500 hover:bg-zinc-800 hover:text-zinc-300 transition-colors">
               <EditIcon className="h-3.5 w-3.5" />
             </button>
             {confirmDel ? (
               <div className="flex items-center gap-1">
-                <button onClick={() => deleteObjective(obj.id)} className="rounded-lg px-2 py-1 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">
-                  Confirmer
-                </button>
+                <button onClick={() => deleteObjective(obj.id)} className="rounded-lg px-2 py-1 text-xs bg-red-500/20 text-red-400 hover:bg-red-500/30 transition-colors">Confirmer</button>
                 <button onClick={() => setConfirmDel(false)} className="text-zinc-500 hover:text-zinc-300 px-1 transition-colors">×</button>
               </div>
             ) : (
@@ -581,70 +666,164 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
           </div>
         </div>
 
-        {/* Meta */}
+        {/* Date */}
         {obj.targetDate && (
           <div className="mt-2 flex items-center gap-1.5">
             <CalendarIcon className="h-3 w-3 text-zinc-600" />
-            <span className={[
-              'text-xs',
-              days !== null && days < 0  ? 'text-red-400' :
-              days !== null && days <= 7 ? 'text-orange-400' : 'text-zinc-500',
-            ].join(' ')}>
-              {days !== null && days < 0
-                ? `Dépassé de ${Math.abs(days)}j`
-                : days !== null && days === 0
-                ? "Aujourd'hui"
-                : fmtDateLong(obj.targetDate)}
-              {days !== null && days > 0 && (
-                <span className="ml-1.5 text-zinc-600">({days}j restants)</span>
-              )}
+            <span className={['text-xs', days !== null && days < 0 ? 'text-orange-400' : days !== null && days <= 7 ? 'text-orange-400' : 'text-zinc-500'].join(' ')}>
+              {days !== null && days < 0 ? `Dépassé de ${Math.abs(days)}j` : days !== null && days === 0 ? "Aujourd'hui" : fmtDateLong(obj.targetDate)}
+              {days !== null && days > 0 && <span className="ml-1.5 text-zinc-600">({days}j restants)</span>}
             </span>
           </div>
         )}
 
-        {/* Progress bar */}
-        <div className="mt-3">
-          <div className="mb-1.5 flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-wider text-zinc-600">Progression</span>
-            <button
-              onClick={() => { setLocalProg(obj.progress); setShowSlider(!showSlider) }}
-              className="text-xs font-semibold tabular-nums text-zinc-400 hover:text-zinc-200 transition-colors"
-            >
-              {obj.progress}%
-            </button>
+        {/* Counter / Habitude */}
+        {isCounter && !done && (
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            {isHabit ? (
+              <>
+                <button
+                  onClick={() => logDailyValue(obj.id, todayVal + dailyTarget)}
+                  className={['rounded-lg px-3 py-1.5 text-xs font-medium transition-colors border',
+                    isDoneToday ? 'border-green-500/30 bg-green-500/10 text-green-400' : 'border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700',
+                  ].join(' ')}
+                >
+                  {isDoneToday ? `✓ ${todayVal} aujourd'hui` : `+ ${dailyTarget} aujourd'hui`}
+                </button>
+                <HabitHeatmap obj={obj} />
+              </>
+            ) : (
+              <>
+                <button onClick={() => decrementCounter(obj.id)} disabled={(obj.current ?? 0) === 0}
+                  className="rounded-lg w-7 h-7 border border-zinc-700 text-zinc-400 hover:text-zinc-200 hover:border-zinc-600 disabled:opacity-30 transition-colors flex items-center justify-center text-base">
+                  −
+                </button>
+                <span className="text-sm text-zinc-300 tabular-nums font-medium">{obj.current ?? 0} / {obj.target ?? 0}</span>
+                <button onClick={() => incrementCounter(obj.id)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium border border-zinc-700 bg-zinc-800 text-zinc-300 hover:bg-zinc-700 transition-colors">
+                  + Ajouter
+                </button>
+              </>
+            )}
           </div>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
-            <div
-              className={['h-full rounded-full transition-all duration-500', pColor].join(' ')}
-              style={{ width: `${obj.progress}%` }}
-            />
-          </div>
+        )}
 
-          {/* Inline progress slider */}
-          {showSlider && (
-            <div className="mt-3 space-y-2">
-              <div className="flex items-center gap-2">
-                <input
-                  type="range"
-                  min="0" max="100" step="5"
-                  value={localProg}
-                  onChange={(e) => setLocalProg(Number(e.target.value))}
-                  className="flex-1 accent-teal-500"
-                />
-                <span className="w-9 text-right text-xs font-medium tabular-nums text-zinc-300">{localProg}%</span>
+        {/* Barre de progression (objectifs simples) */}
+        {!isCounter && (
+          <div className="mt-3">
+            <div className="mb-1.5 flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-zinc-600">Progression</span>
+              <button onClick={() => { setLocalProg(obj.progress); setShowSlider(!showSlider) }}
+                className="text-xs font-semibold tabular-nums text-zinc-400 hover:text-zinc-200 transition-colors">
+                {obj.progress}%
+              </button>
+            </div>
+            <div className="h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div className={['h-full rounded-full transition-all duration-500', pColor].join(' ')} style={{ width: `${obj.progress}%` }} />
+            </div>
+            {showSlider && (
+              <div className="mt-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <input type="range" min="0" max="100" step="5" value={localProg}
+                    onChange={(e) => setLocalProg(Number(e.target.value))} className="flex-1 accent-teal-500" />
+                  <span className="w-9 text-right text-xs font-medium tabular-nums text-zinc-300">{localProg}%</span>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={saveProgress} className="rounded px-2.5 py-1 text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors">Mettre à jour</button>
+                  <button onClick={() => setShowSlider(false)} className="rounded px-2.5 py-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">Annuler</button>
+                </div>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* Barre compteur */}
+        {isCounter && obj.target != null && (
+          <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-zinc-800">
+            <div className={['h-full rounded-full transition-all duration-500', pColor].join(' ')} style={{ width: `${obj.progress}%` }} />
+          </div>
+        )}
+
+        {/* Footer : jalons + Kit */}
+        <div className="mt-3 flex items-center gap-3">
+          <button onClick={() => setExpanded(!expanded)}
+            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
+            <ChevronDownIcon className={['h-3.5 w-3.5 transition-transform', expanded ? 'rotate-180' : ''].join(' ')} />
+            Jalons
+            {milestones.length > 0 && <span className="ml-0.5 text-zinc-600">({doneMs}/{milestones.length})</span>}
+          </button>
+          {isOverdue && kitEnabled && !kitAccepted && (
+            <button onClick={() => void fetchKit()} disabled={kitLoading}
+              className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs border border-orange-800/40 text-orange-400 hover:bg-orange-500/10 transition-colors">
+              <SparklesIcon className="h-3 w-3" />
+              {kitLoading ? 'Kit réfléchit…' : 'Demander à Kit'}
+            </button>
+          )}
+          {kitAccepted && <span className="ml-auto text-xs text-green-400 italic">✓ tâche planifiée</span>}
+        </div>
+
+        {/* Suggestion Kit */}
+        {kitSug && !kitAccepted && (
+          <div className="mt-2 rounded-lg border border-orange-800/30 bg-orange-950/20 p-3 space-y-2">
+            <p className="text-sm text-zinc-200">{kitSug.nextAction}</p>
+            <p className="text-xs text-zinc-500 italic">{kitSug.reason}</p>
+            <div className="flex gap-2">
+              <button onClick={acceptKit} className="rounded px-2.5 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 hover:bg-orange-500/30 transition-colors">
+                Planifier aujourd'hui
+              </button>
+              <button onClick={() => void fetchKit()} disabled={kitLoading} className="text-xs text-zinc-500 hover:text-zinc-300">↻ Autre</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Jalons (repliables) */}
+      {expanded && (
+        <div className="border-t border-zinc-800/60 px-4 py-3 space-y-1">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] uppercase tracking-wider text-zinc-600">Jalons</span>
+            {milestones.length > 0 && <span className="text-[10px] text-zinc-600">{doneMs}/{milestones.length} atteints</span>}
+          </div>
+          {milestones.length === 0 && !addingMs && (
+            <p className="text-xs text-zinc-600 italic py-1">Aucun jalon — découpe en étapes concrètes.</p>
+          )}
+          {milestones.map((m: Milestone) => (
+            <div key={m.id} className="flex items-center gap-2 py-1 group/ms">
+              <button onClick={() => toggleMilestone(m.id)}
+                className={['w-4 h-4 rounded flex-shrink-0 border flex items-center justify-center transition-colors',
+                  m.done ? 'border-green-500 bg-green-500/20' : 'border-zinc-600 hover:border-zinc-400',
+                ].join(' ')}>
+                {m.done && <svg width={8} height={8} viewBox="0 0 10 10"><path d="M1.6 5.2L4 7.4 8.4 2.6" fill="none" stroke="#4ade80" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" /></svg>}
+              </button>
+              <span className={['flex-1 text-sm', m.done ? 'line-through text-zinc-600' : 'text-zinc-300'].join(' ')}>{m.title}</span>
+              {m.targetDate && <span className="text-xs text-zinc-600">{fmtDate(m.targetDate)}</span>}
+              <button onClick={() => deleteMilestone(m.id)}
+                className="opacity-0 group-hover/ms:opacity-100 text-zinc-600 hover:text-red-400 transition-opacity">
+                <TrashIcon className="h-3 w-3" />
+              </button>
+            </div>
+          ))}
+          {addingMs ? (
+            <div className="mt-1 space-y-1.5 rounded-lg border border-zinc-700/50 bg-zinc-800/50 p-2.5">
+              <input ref={msInputRef} autoFocus value={newMsTitle} onChange={e => setNewMsTitle(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') submitMs(); if (e.key === 'Escape') { setAddingMs(false); setNewMsTitle('') } }}
+                placeholder="Titre du jalon…"
+                className="w-full bg-transparent text-sm text-zinc-200 placeholder-zinc-600 outline-none border-b border-zinc-700 pb-1" />
+              <input type="date" value={newMsDate} onChange={e => setNewMsDate(e.target.value)}
+                className="bg-zinc-900 border border-zinc-700 rounded px-2 py-1 text-xs text-zinc-400 outline-none" />
               <div className="flex gap-2">
-                <button onClick={saveProgress} className="rounded px-2.5 py-1 text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors">
-                  Mettre à jour
-                </button>
-                <button onClick={() => setShowSlider(false)} className="rounded px-2.5 py-1 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
-                  Annuler
-                </button>
+                <button onClick={submitMs} className="rounded px-2.5 py-1 text-xs bg-teal-500/20 text-teal-300 border border-teal-500/30 hover:bg-teal-500/30 transition-colors">Ajouter</button>
+                <button onClick={() => { setAddingMs(false); setNewMsTitle('') }} className="text-xs text-zinc-500 hover:text-zinc-300">Annuler</button>
               </div>
             </div>
+          ) : (
+            <button onClick={() => { setAddingMs(true); setTimeout(() => msInputRef.current?.focus(), 50) }}
+              className="mt-1 flex items-center gap-1 text-xs text-zinc-600 hover:text-zinc-400 transition-colors">
+              <PlusSmIcon className="h-3 w-3" />Ajouter un jalon
+            </button>
           )}
         </div>
-      </div>
+      )}
     </div>
   )
 }
@@ -1027,6 +1206,30 @@ function ChecklistIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+    </svg>
+  )
+}
+
+function ChevronDownIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+    </svg>
+  )
+}
+
+function SparklesIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+    </svg>
+  )
+}
+
+function PlusSmIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
     </svg>
   )
 }
