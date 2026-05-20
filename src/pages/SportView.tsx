@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { Plus, Dumbbell, Footprints, X, Check, ChevronRight } from 'lucide-react'
+import { useStore } from '../store'
 import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
-import type { MuscuSession, Run, SportGoal, Exercise, Split } from '../types/sport'
+import type { MuscuSession, Run, Exercise, Split } from '../types/sport'
 
 // ─── localStorage helpers ─────────────────────────────────────────────────────
 
 const LS_MUSCU = 'aetheris-sport-muscu-v1'
 const LS_RUNS  = 'aetheris-sport-runs-v1'
-const LS_GOALS = 'aetheris-sport-goals-v1'
 
 function load<T>(key: string, fallback: T): T {
   try {
@@ -1074,84 +1074,6 @@ function CourseProgress({ runs }: { runs: Run[] }) {
   )
 }
 
-// ─── GoalRow ──────────────────────────────────────────────────────────────────
-
-function GoalRow({
-  goal,
-  last,
-  onDelete,
-}: {
-  goal: SportGoal
-  last: boolean
-  onDelete: () => void
-}) {
-  return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: 10,
-        padding: '11px 0',
-        borderBottom: last ? 'none' : '1px solid var(--paper-2)',
-      }}
-    >
-      <div
-        style={{
-          width: 7,
-          height: 7,
-          borderRadius: '50%',
-          background: 'var(--terra)',
-          marginTop: 5,
-          flexShrink: 0,
-        }}
-      />
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div
-          style={{
-            fontFamily: 'var(--font-sans)',
-            fontSize: 14.5,
-            fontWeight: 500,
-            color: 'var(--ink)',
-            lineHeight: 1.3,
-          }}
-        >
-          {goal.title}
-        </div>
-        {goal.note && (
-          <div
-            style={{
-              fontFamily: 'var(--font-serif)',
-              fontStyle: 'italic',
-              fontSize: 13.5,
-              color: 'var(--ink-2)',
-              marginTop: 2,
-              lineHeight: 1.4,
-            }}
-          >
-            {goal.note}
-          </div>
-        )}
-      </div>
-      <button
-        onClick={onDelete}
-        style={{
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          color: 'var(--ink-4)',
-          padding: '2px 4px',
-          display: 'flex',
-          alignItems: 'center',
-          flexShrink: 0,
-        }}
-        title="Supprimer"
-      >
-        <X size={13} />
-      </button>
-    </div>
-  )
-}
-
 // ─── Splits ───────────────────────────────────────────────────────────────────
 
 function SplitsView({ splits }: { splits: Split[] }) {
@@ -1922,111 +1844,33 @@ function NewRunModal({
   )
 }
 
-// ─── GoalModal ────────────────────────────────────────────────────────────────
-
-function GoalModal({
-  sport,
-  onClose,
-  onSave,
-}: {
-  sport: 'muscu' | 'course'
-  onClose: () => void
-  onSave: (goal: SportGoal) => void
-}) {
-  const [title, setTitle] = useState('')
-  const [note, setNote] = useState('')
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!title.trim()) return
-    onSave({
-      id: crypto.randomUUID(),
-      sport,
-      title: title.trim(),
-      note: note.trim() || undefined,
-    })
-  }
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 110,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'color-mix(in srgb, var(--ink) 28%, transparent)',
-        animation: 'sportOverlayIn 200ms var(--ease)',
-        padding: 16,
-      }}
-      onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
-    >
-      <div
-        style={{
-          background: 'var(--paper-1)',
-          borderRadius: 16,
-          width: '100%',
-          maxWidth: 420,
-          boxShadow: 'var(--shadow-3)',
-          animation: 'sportFade 250ms var(--ease)',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 24px 14px', borderBottom: '1px solid var(--paper-2)' }}>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 20, fontWeight: 500, color: 'var(--ink)' }}>
-            Nouvel objectif
-          </span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--ink-3)', display: 'flex' }}>
-            <X size={18} />
-          </button>
-        </div>
-        <form onSubmit={handleSubmit} style={{ padding: '20px 24px 24px', display: 'flex', flexDirection: 'column', gap: 14 }}>
-          <div>
-            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 6 }}>
-              Objectif *
-            </label>
-            <input required autoFocus style={inputStyle} placeholder="ex: 3 séances / semaine" value={title} onChange={(e) => setTitle(e.target.value)} />
-          </div>
-          <div>
-            <label style={{ display: 'block', fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)', marginBottom: 6 }}>
-              Note (optionnel)
-            </label>
-            <input style={inputStyle} placeholder="Contexte, détails…" value={note} onChange={(e) => setNote(e.target.value)} />
-          </div>
-          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, paddingTop: 4 }}>
-            <button type="button" onClick={onClose} style={secondaryBtnStyle}>Annuler</button>
-            <button type="submit" style={primaryBtnStyle}><Plus size={14} /> Ajouter</button>
-          </div>
-        </form>
-      </div>
-    </div>
-  )
-}
-
 // ─── SportView ────────────────────────────────────────────────────────────────
 
 export function SportView() {
   const [sport, setSport] = useState<'muscu' | 'course'>('muscu')
   const [detailId, setDetailId] = useState<string | null>(null)
   const [showNewModal, setShowNewModal] = useState(false)
-  const [showGoalModal, setShowGoalModal] = useState(false)
   const [toast, setToast] = useState<string | null>(null)
 
   const [muscuSessions, setMuscuSessions] = useState<MuscuSession[]>(() =>
     load<MuscuSession[]>(LS_MUSCU, []),
   )
   const [runs, setRuns] = useState<Run[]>(() => load<Run[]>(LS_RUNS, []))
-  const [goals, setGoals] = useState<SportGoal[]>(() => load<SportGoal[]>(LS_GOALS, []))
+
+  // Objectif "En cours" pour le bandeau : premier objectif actif du domaine sport
+  const sportObjectives = useStore((s) => s.objectives)
+  const activeSportObj  = useMemo(
+    () => sportObjectives.find(o => o.domainId === 'sport' && !o.archived && o.progress < 100),
+    [sportObjectives],
+  )
 
   // Sync to localStorage
   useEffect(() => { localStorage.setItem(LS_MUSCU, JSON.stringify(muscuSessions)) }, [muscuSessions])
   useEffect(() => { localStorage.setItem(LS_RUNS, JSON.stringify(runs)) }, [runs])
-  useEffect(() => { localStorage.setItem(LS_GOALS, JSON.stringify(goals)) }, [goals])
 
   // ── Computed metrics ──────────────────────────────────────────────────────
 
   const muscuMonthSessions = muscuSessions.filter((s) => s.date.startsWith(currentMonthStr()))
-  const muscuGoals = goals.filter((g) => g.sport === 'muscu' && g.title)
   const lastMuscu = muscuSessions.slice().sort((a, b) => b.date.localeCompare(a.date))[0]
   const sortedMuscuSessions = useMemo(
     () => [...muscuSessions].sort((a, b) => b.date.localeCompare(a.date)),
@@ -2056,13 +1900,12 @@ export function SportView() {
     },
     {
       label: 'En cours',
-      value: muscuGoals[0]?.title ?? '—',
-      sub: muscuGoals[0]?.note?.slice(0, 60) ?? '',
+      value: activeSportObj?.title ?? '—',
+      sub: activeSportObj?.description?.slice(0, 60) ?? '',
     },
   ]
 
   const runMonthRuns = runs.filter((r) => r.date.startsWith(currentMonthStr()))
-  const courseGoals = goals.filter((g) => g.sport === 'course' && g.title)
   const lastRun = sortedRuns[0]
   const totalKmMonth = runMonthRuns.reduce((s, r) => s + r.distance, 0)
 
@@ -2082,13 +1925,12 @@ export function SportView() {
     },
     {
       label: 'En cours',
-      value: courseGoals[0]?.title ?? '—',
-      sub: courseGoals[0]?.note?.slice(0, 60) ?? '',
+      value: activeSportObj?.title ?? '—',
+      sub: activeSportObj?.description?.slice(0, 60) ?? '',
     },
   ]
 
   const bandeau = sport === 'muscu' ? muscuBandeau : courseBandeau
-  const filteredGoals = goals.filter((g) => g.sport === sport)
 
   // ── Handlers ──────────────────────────────────────────────────────────────
 
@@ -2104,16 +1946,6 @@ export function SportView() {
     setShowNewModal(false)
     setDetailId(run.id)
     setToast('Sortie enregistrée')
-  }
-
-  const addGoal = (goal: SportGoal) => {
-    setGoals((prev) => [...prev, goal])
-    setShowGoalModal(false)
-    setToast('Objectif ajouté')
-  }
-
-  const deleteGoal = (id: string) => {
-    setGoals((prev) => prev.filter((g) => g.id !== id))
   }
 
   return (
@@ -2276,9 +2108,8 @@ export function SportView() {
             )}
           </section>
 
-          {/* Aside: progression + objectifs */}
+          {/* Aside: progression seule */}
           <aside style={{ display: 'flex', flexDirection: 'column', gap: 36 }}>
-            {/* Progression */}
             <section
               style={{
                 background: 'var(--paper-1)',
@@ -2292,72 +2123,6 @@ export function SportView() {
               ) : (
                 <CourseProgress runs={runs} />
               )}
-            </section>
-
-            {/* Objectifs */}
-            <section>
-              <div
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                  marginBottom: 16,
-                }}
-              >
-                <Label>Objectifs</Label>
-              </div>
-              {filteredGoals.length > 0 && (
-                <div
-                  style={{
-                    background: 'var(--paper-1)',
-                    border: '1px solid var(--paper-2)',
-                    borderRadius: 12,
-                    padding: '4px 16px',
-                    marginBottom: 12,
-                  }}
-                >
-                  {filteredGoals.map((goal, i) => (
-                    <GoalRow
-                      key={goal.id}
-                      goal={goal}
-                      last={i === filteredGoals.length - 1}
-                      onDelete={() => deleteGoal(goal.id)}
-                    />
-                  ))}
-                </div>
-              )}
-              {/* + Ajouter un objectif */}
-              <button
-                onClick={() => setShowGoalModal(true)}
-                style={{
-                  width: '100%',
-                  padding: '10px 16px',
-                  borderRadius: 10,
-                  border: '1.5px dashed var(--ink-4)',
-                  background: 'transparent',
-                  color: 'var(--ink-3)',
-                  fontFamily: 'var(--font-sans)',
-                  fontSize: 13,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: 6,
-                  transition: 'border-color 150ms, color 150ms',
-                }}
-                onMouseEnter={(e) => {
-                  const el = e.currentTarget as HTMLElement
-                  el.style.borderColor = 'var(--terra)'
-                  el.style.color = 'var(--terra)'
-                }}
-                onMouseLeave={(e) => {
-                  const el = e.currentTarget as HTMLElement
-                  el.style.borderColor = 'var(--ink-4)'
-                  el.style.color = 'var(--ink-3)'
-                }}
-              >
-                <Plus size={13} /> Ajouter un objectif
-              </button>
             </section>
           </aside>
         </div>
@@ -2387,14 +2152,6 @@ export function SportView() {
         ) : (
           <NewRunModal onClose={() => setShowNewModal(false)} onSave={addRun} />
         ))}
-
-      {showGoalModal && (
-        <GoalModal
-          sport={sport}
-          onClose={() => setShowGoalModal(false)}
-          onSave={addGoal}
-        />
-      )}
 
       {/* ── Toast ─────────────────────────────────────────────────────────── */}
       {toast && <Toast message={toast} onDone={() => setToast(null)} />}

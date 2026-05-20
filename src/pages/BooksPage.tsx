@@ -36,12 +36,6 @@ function fmtDate(iso: string | undefined) {
 
 function getCurrentYear() { return new Date().getFullYear() }
 
-function getWeeksElapsed(): number {
-  const now  = new Date()
-  const jan1 = new Date(now.getFullYear(), 0, 1)
-  return Math.max(1, Math.ceil((now.getTime() - jan1.getTime()) / (7 * 86400000)))
-}
-
 function compressImage(file: File, maxSize = 300): Promise<string> {
   return new Promise((resolve) => {
     const reader = new FileReader()
@@ -1047,16 +1041,10 @@ function StatsSection() {
 
 export function BooksPage() {
   const bibliotheque   = useBookStore((s) => s.bibliotheque)
-  const objectifAnnuel = useBookStore((s) => s.objectifAnnuel)
   const livreEnCours   = useBookStore((s) => s.livreEnCours)
   const _hasHydrated   = useBookStore((s) => s._hasHydrated)
 
-  const year          = getCurrentYear()
-  const livresAnnee   = bibliotheque.filter((b) => b.dateLecture?.startsWith(String(year))).length
-  const weeksElapsed  = getWeeksElapsed()
-  const weeklyRate    = livresAnnee / weeksElapsed
-  const projected     = Math.round(weeklyRate * 52)
-  const pct           = Math.round(Math.min(100, (livresAnnee / objectifAnnuel) * 100))
+  const year = getCurrentYear()
 
   const [critiqueModal, setCritiqueModal] = useState<{ open: boolean; livre?: BookCritique | null; fromFile?: BookAttente | null }>({ open: false })
   const [fileModal,     setFileModal]     = useState(false)
@@ -1102,43 +1090,6 @@ export function BooksPage() {
             </div>
           </div>
 
-          {/* Objectif annuel */}
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr auto', gap: 24, alignItems: 'center', background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '18px 22px' }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 16 }}>
-                <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>Objectif {year}</span>
-                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--fg)', letterSpacing: '-0.01em' }}>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', fontSize: 22 }}>{livresAnnee}</span>
-                    <span style={{ color: 'var(--fg-subtle)' }}> / </span>
-                    <span style={{ fontVariantNumeric: 'tabular-nums', fontFamily: 'var(--font-mono)', fontSize: 22, color: 'var(--fg-muted)' }}>{objectifAnnuel}</span>
-                    <span style={{ color: 'var(--fg-subtle)', fontStyle: 'italic', fontSize: 16 }}> livres</span>
-                  </span>
-                </div>
-                <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12, color: 'var(--fg-muted)', letterSpacing: '0.06em', fontVariantNumeric: 'tabular-nums' }}>{pct}%</span>
-              </div>
-              <ProgressBar value={livresAnnee} max={objectifAnnuel} height={8} />
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--fg-subtle)', letterSpacing: '0.06em' }}>
-                {['JAN','FÉV','MAR','AVR','MAI','JUI','JUI','AOÛ','SEP','OCT','NOV','DÉC'].map((m) => <span key={m}>{m}</span>)}
-              </div>
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, paddingLeft: 24, borderLeft: '1px solid var(--paper-2)' }}>
-              <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>au rythme actuel</span>
-              {livresAnnee > 0 ? (
-                <>
-                  <span style={{ fontFamily: 'var(--font-serif)', fontSize: 20, color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}>
-                    <span style={{ fontFamily: 'var(--font-mono)' }}>{projected}</span>
-                    <span style={{ color: 'var(--fg-subtle)', fontStyle: 'italic', fontSize: 14 }}> livres en {year}</span>
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, fontStyle: 'italic', color: projected >= objectifAnnuel ? 'var(--sage-deep)' : 'var(--terra)' }}>
-                    {projected >= objectifAnnuel ? '→ objectif atteignable.' : '→ il faut accélérer un peu.'}
-                  </span>
-                </>
-              ) : (
-                <span style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--fg-muted)' }}>Aucune lecture cette année.</span>
-              )}
-            </div>
-          </div>
         </header>
 
         {/* ── En cours ────────────────────────────────────────────────────── */}

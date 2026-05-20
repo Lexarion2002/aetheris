@@ -9,7 +9,7 @@ import {
 import { useStore } from '../store'
 import { computeReport } from '../utils/financeUtils'
 import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
-import type { Transaction, SavingsGoal, FinanceCategory } from '../types'
+import type { Transaction, FinanceCategory } from '../types'
 
 // ─── Design-system palettes for donut segments ────────────────────────────────
 
@@ -121,9 +121,6 @@ export function FinancePage() {
   const [showTxModal,    setShowTxModal]    = useState(false)
   const [editTx,         setEditTx]         = useState<Transaction | undefined>()
   const [budgetCat,      setBudgetCat]      = useState<string | null>(null)
-  const [showGoalModal,  setShowGoalModal]  = useState(false)
-  const [editGoal,       setEditGoal]       = useState<SavingsGoal | undefined>()
-  const [contributeGoal, setContributeGoal] = useState<SavingsGoal | undefined>()
   const [txType,         setTxType]         = useState<'all' | 'income' | 'expense'>('all')
   const [txCat,          setTxCat]          = useState('')
   const [txPage,         setTxPage]         = useState(1)
@@ -132,7 +129,6 @@ export function FinancePage() {
 
   const transactions      = useStore((s) => s.transactions)
   const categoryBudgets   = useStore((s) => s.categoryBudgets)
-  const savingsGoals      = useStore((s) => s.savingsGoals)
   const financeCategories = useStore((s) => s.financeCategories)
   const deleteTransaction = useStore((s) => s.deleteTransaction)
 
@@ -319,50 +315,6 @@ export function FinancePage() {
         </div>
       </section>
 
-      {/* ── Épargne ─────────────────────────────────────────────────────────── */}
-      <section style={{ marginBottom: 40 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 16 }}>
-          <SectionHead label="Objectifs d'épargne" meta={`${savingsGoals.length} en cours`} />
-          <button
-            onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
-            style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--terra)', background: 'transparent', border: 0, cursor: 'pointer', marginBottom: 14 }}>
-            + Nouvel objectif
-          </button>
-        </div>
-
-        {savingsGoals.length === 0 ? (
-          <div style={{ background: 'var(--paper-1)', border: '1px dashed var(--ink-4)', borderRadius: 12, padding: '40px 32px', display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 14 }}>
-            <div style={{ width: 44, height: 44, borderRadius: 12, background: 'var(--paper-2)', display: 'grid', placeItems: 'center', fontSize: 20 }}>🎯</div>
-            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 18, color: 'var(--ink-2)', maxWidth: '48ch', lineHeight: 1.4, margin: 0 }}>
-              Rien encore. Un voyage, un instrument, un déménagement — mets un nom sur ce que tu mets de côté.
-            </p>
-            <button
-              onClick={() => { setEditGoal(undefined); setShowGoalModal(true) }}
-              style={{ fontFamily: 'var(--font-sans)', fontWeight: 500, fontSize: 14, padding: '8px 16px', borderRadius: 8, background: 'var(--terra)', color: 'var(--paper-1)', border: '1px solid transparent', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              + Créer mon premier objectif
-            </button>
-          </div>
-        ) : (
-          <>
-            <SavingsConsolidated goals={savingsGoals} />
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginTop: 20 }}>
-              {[...savingsGoals]
-                .sort((a, b) => {
-                  if (!a.targetDate && !b.targetDate) return 0
-                  if (!a.targetDate) return 1
-                  if (!b.targetDate) return -1
-                  return a.targetDate.localeCompare(b.targetDate)
-                })
-                .map(goal => (
-                  <SavingsCard key={goal.id} goal={goal}
-                    onEdit={() => { setEditGoal(goal); setShowGoalModal(true) }}
-                    onContribute={() => setContributeGoal(goal)} />
-                ))}
-            </div>
-          </>
-        )}
-      </section>
-
       {/* ── Transactions ────────────────────────────────────────────────────── */}
       <section>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
@@ -463,8 +415,6 @@ export function FinancePage() {
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {showTxModal && <TransactionModal tx={editTx} onClose={() => { setShowTxModal(false); setEditTx(undefined) }} />}
       {budgetCat && <BudgetModal category={budgetCat} current={budgetMap.get(budgetCat) ?? 0} onClose={() => setBudgetCat(null)} />}
-      {showGoalModal && <SavingsGoalModal goal={editGoal} onClose={() => { setShowGoalModal(false); setEditGoal(undefined) }} />}
-      {contributeGoal && <ContributeModal goal={contributeGoal} onClose={() => setContributeGoal(undefined)} />}
       {showCsvModal && <CSVImportModal onClose={() => setShowCsvModal(false)} />}
       {showPdfModal && <PDFImportModal onClose={() => setShowPdfModal(false)} />}
     </div>
@@ -852,183 +802,6 @@ function ContextLine({ month, monthTx, categoryBudgets, financeCategories }: {
   )
 }
 
-// ─── SavingsConsolidated ──────────────────────────────────────────────────────
-
-function SavingsConsolidated({ goals }: { goals: SavingsGoal[] }) {
-  const totalTarget  = goals.reduce((s, g) => s + g.targetAmount, 0)
-  const totalSaved   = goals.reduce((s, g) => s + g.currentAmount, 0)
-  const globalPct    = totalTarget > 0 ? Math.round((totalSaved / totalTarget) * 100) : 0
-
-  // Contribution mensuelle totale nécessaire
-  const now = new Date()
-  const totalContribNeeded = goals
-    .filter((g) => g.currentAmount < g.targetAmount && !g.paused)
-    .reduce((sum, g) => {
-      if (!g.targetDate) return sum
-      const target   = new Date(g.targetDate)
-      const months   = Math.max(1, (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth())
-      const needed   = (g.targetAmount - g.currentAmount) / months
-      return sum + needed
-    }, 0)
-
-  return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex items-center gap-6 text-sm">
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-subtle)] mb-0.5">Total visé</p>
-            <p className="font-semibold text-[var(--fg)]">{fmt(totalTarget)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-subtle)] mb-0.5">Total épargné</p>
-            <p className="font-semibold text-[var(--positive)]">{fmt(totalSaved)}</p>
-          </div>
-          <div>
-            <p className="text-[10px] uppercase tracking-wide text-[var(--fg-subtle)] mb-0.5">Progression</p>
-            <p className="font-semibold text-[var(--fg)]">{globalPct}%</p>
-          </div>
-        </div>
-        {totalContribNeeded > 0 && (
-          <p className="text-xs text-[var(--fg-muted)] self-end">
-            Pour être dans les temps, épargner{' '}
-            <span className="font-semibold text-[var(--fg)]">{fmt(totalContribNeeded)}/mois</span>
-          </p>
-        )}
-      </div>
-      {/* Progress bar */}
-      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-[var(--paper-3)]">
-        <div className="h-full rounded-full bg-[var(--positive)] transition-all duration-700" style={{ width: `${globalPct}%` }} />
-      </div>
-    </div>
-  )
-}
-
-// ─── SavingsCard ──────────────────────────────────────────────────────────────
-
-function SavingsCard({ goal, onEdit, onContribute }: {
-  goal: SavingsGoal; onEdit: () => void; onContribute: () => void
-}) {
-  const deleteSavingsGoal  = useStore((s) => s.deleteSavingsGoal)
-  const updateSavingsGoal  = useStore((s) => s.updateSavingsGoal)
-  const [confirmDel, setConfirmDel] = useState(false)
-
-  const pct       = goal.targetAmount > 0 ? Math.min(100, (goal.currentAmount / goal.targetAmount) * 100) : 0
-  const remaining = Math.max(0, goal.targetAmount - goal.currentAmount)
-  const achieved  = remaining === 0
-
-  const now = new Date()
-  let monthsLeft: number | null = null
-  if (goal.targetDate) {
-    const target = new Date(goal.targetDate)
-    monthsLeft = Math.max(0, (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth())
-  }
-
-  const contribNeeded = !achieved && monthsLeft !== null && monthsLeft > 0
-    ? Math.ceil(remaining / monthsLeft)
-    : null
-
-  // Status: paused > achieved > en_bonne_voie / a_accelerer
-  // "En bonne voie" if avg monthly contributions since creation >= contribNeeded
-  const monthsSinceCreation = Math.max(1, (Date.now() - new Date(goal.createdAt).getTime()) / (1000 * 60 * 60 * 24 * 30.5))
-  const avgMonthlyContrib   = goal.currentAmount / monthsSinceCreation
-
-  type GoalStatus = 'achieved' | 'en_pause' | 'en_bonne_voie' | 'a_accelerer'
-  let status: GoalStatus = 'a_accelerer'
-  if (achieved)         status = 'achieved'
-  else if (goal.paused) status = 'en_pause'
-  else if (contribNeeded !== null && avgMonthlyContrib >= contribNeeded) status = 'en_bonne_voie'
-
-  const STATUS_LABELS: Record<GoalStatus, string> = {
-    achieved:       'Objectif atteint',
-    en_pause:       'En pause',
-    en_bonne_voie:  'En bonne voie',
-    a_accelerer:    'À accélérer',
-  }
-  const STATUS_CLS: Record<GoalStatus, string> = {
-    achieved:      'bg-[var(--sage-soft)] text-[var(--positive)]',
-    en_pause:      'bg-[var(--paper-3)] text-[var(--fg-muted)]',
-    en_bonne_voie: 'bg-[var(--terra-soft)] text-[var(--accent)]',
-    a_accelerer:   'bg-amber-500/15 text-amber-400',
-  }
-
-  return (
-    <div className="flex flex-col gap-4 rounded-2xl border border-[var(--border)] bg-[var(--bg-elev)] p-5">
-
-      {/* Header */}
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-sm font-semibold leading-tight text-[var(--fg)] truncate">{goal.title}</p>
-          <p className="mt-0.5 text-xl font-bold tabular-nums text-[var(--fg)]">{fmtDec(goal.targetAmount)}</p>
-        </div>
-        <div className="flex shrink-0 items-center gap-1">
-          <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${STATUS_CLS[status]}`}>
-            {STATUS_LABELS[status]}
-          </span>
-          <button onClick={onEdit} className="rounded p-1 text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors" title="Modifier">✎</button>
-          {confirmDel
-            ? <button onClick={() => deleteSavingsGoal(goal.id)} className="rounded px-1.5 py-0.5 text-[10px] text-[var(--danger)] hover:text-[var(--danger)] transition-colors">Confirmer</button>
-            : <button onClick={() => setConfirmDel(true)} className="rounded p-1 text-xs text-[var(--fg-subtle)] hover:text-[var(--danger)] transition-colors" title="Supprimer">✕</button>
-          }
-        </div>
-      </div>
-
-      {/* Progress */}
-      <div>
-        <div className="mb-1.5 flex items-end justify-between text-xs">
-          <span className="font-semibold text-[var(--positive)] tabular-nums">{fmtDec(goal.currentAmount)}</span>
-          <span className="text-[var(--fg-muted)] tabular-nums">/ {fmtDec(goal.targetAmount)}</span>
-        </div>
-        <div className="h-2 w-full overflow-hidden rounded-full bg-[var(--paper-3)]">
-          <div className="h-full rounded-full bg-[var(--positive)] transition-all duration-700" style={{ width: `${pct}%` }} />
-        </div>
-      </div>
-
-      {/* Details */}
-      <div className="space-y-1.5 text-xs">
-        {goal.targetDate && (
-          <div className="flex items-center justify-between">
-            <span className="text-[var(--fg-muted)]">Date cible</span>
-            <span className="text-[var(--fg-muted)]">
-              {new Date(goal.targetDate + 'T00:00:00').toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
-              {monthsLeft !== null && monthsLeft > 0 && (
-                <span className="ml-1 text-[var(--fg-subtle)]">({monthsLeft} mois)</span>
-              )}
-            </span>
-          </div>
-        )}
-        <div className="flex items-center justify-between">
-          {achieved ? (
-            <span className="text-[var(--positive)] font-medium">Objectif atteint !</span>
-          ) : contribNeeded !== null ? (
-            <>
-              <span className="text-[var(--fg-muted)]">À épargner / mois</span>
-              <span className="font-semibold text-[var(--fg)] tabular-nums">{fmt(contribNeeded)}</span>
-            </>
-          ) : !goal.targetDate ? (
-            <span className="text-[var(--fg-subtle)]">Aucune date cible définie</span>
-          ) : null}
-        </div>
-      </div>
-
-      {/* Footer actions */}
-      <div className="mt-auto flex items-center gap-2">
-        <button onClick={onContribute}
-          className="flex-1 rounded-xl border border-[var(--sage-soft)] bg-[var(--sage-soft)] py-2 text-xs font-medium text-[var(--positive)] hover:bg-[var(--sage-soft)] transition-colors">
-          + Contribuer
-        </button>
-        {!achieved && (
-          <button
-            onClick={() => updateSavingsGoal(goal.id, { paused: !goal.paused })}
-            className="rounded-xl border border-[var(--border)] bg-[var(--bg-elev)] px-3 py-2 text-xs text-[var(--fg-subtle)] hover:text-[var(--fg-muted)] transition-colors"
-            title={goal.paused ? 'Reprendre' : 'Mettre en pause'}
-          >
-            {goal.paused ? '▶' : '⏸'}
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
 
 // ─── Shared modal primitives ──────────────────────────────────────────────────
 
@@ -1208,112 +981,6 @@ function BudgetModal({ category, current, onClose }: { category: string; current
   )
 }
 
-// ─── SavingsGoalModal ─────────────────────────────────────────────────────────
-
-function SavingsGoalModal({ goal, onClose }: { goal?: SavingsGoal; onClose: () => void }) {
-  const addSavingsGoal    = useStore((s) => s.addSavingsGoal)
-  const updateSavingsGoal = useStore((s) => s.updateSavingsGoal)
-  const [title,      setTitle]      = useState(goal?.title ?? '')
-  const [target,     setTarget]     = useState(goal?.targetAmount.toString() ?? '')
-  const [current,    setCurrent]    = useState(goal?.currentAmount.toString() ?? '0')
-  const [targetDate, setTargetDate] = useState(goal?.targetDate?.slice(0, 7) ?? '')
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const payload = {
-      title:         title.trim(),
-      targetAmount:  parseFloat(target),
-      currentAmount: parseFloat(current) || 0,
-      targetDate:    targetDate ? `${targetDate}-01` : null,
-    }
-    if (goal) updateSavingsGoal(goal.id, payload)
-    else      addSavingsGoal(payload)
-    onClose()
-  }
-
-  return (
-    <Modal onClose={onClose} title={goal ? "Modifier l'objectif" : "Nouvel objectif d'épargne"} maxW="max-w-sm">
-      <form onSubmit={handleSubmit} className="space-y-4 p-5">
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Titre</label>
-          <input type="text" value={title} onChange={(e) => setTitle(e.target.value)}
-            placeholder="Vacances, Voiture, Fond d'urgence…" required autoFocus
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Objectif (€)</label>
-            <input type="number" min="1" value={target} onChange={(e) => setTarget(e.target.value)} placeholder="5 000" required
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Déjà épargné (€)</label>
-            <input type="number" min="0" value={current} onChange={(e) => setCurrent(e.target.value)} placeholder="0"
-              className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
-          </div>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Date cible (optionnel)</label>
-          <input type="month" value={targetDate} onChange={(e) => setTargetDate(e.target.value)}
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] outline-none focus:border-[var(--border-strong)] transition-colors [color-scheme:light]" />
-        </div>
-        <ModalActions onClose={onClose} disabled={!title.trim() || !target} label={goal ? 'Enregistrer' : 'Créer'} />
-      </form>
-    </Modal>
-  )
-}
-
-// ─── ContributeModal ──────────────────────────────────────────────────────────
-
-function ContributeModal({ goal, onClose }: { goal: SavingsGoal; onClose: () => void }) {
-  const contributeSavingsGoal = useStore((s) => s.contributeSavingsGoal)
-  const [amount, setAmount]   = useState('')
-  const remaining = Math.max(0, goal.targetAmount - goal.currentAmount)
-
-  useEffect(() => {
-    const h = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    const v = parseFloat(amount)
-    if (v > 0) contributeSavingsGoal(goal.id, v)
-    onClose()
-  }
-
-  return (
-    <Modal onClose={onClose} title="Contribuer à l'objectif" maxW="max-w-sm">
-      <form onSubmit={handleSubmit} className="space-y-4 p-5">
-        <div className="rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-4 py-3">
-          <p className="text-sm font-medium text-[var(--fg)]">{goal.title}</p>
-          <p className="mt-0.5 text-xs text-[var(--fg-muted)]">{fmtDec(remaining)} restants pour atteindre l'objectif</p>
-        </div>
-        <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--fg-muted)]">Montant à ajouter (€)</label>
-          <input type="number" min="0.01" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)}
-            placeholder="100" required autoFocus
-            className="w-full rounded-xl border border-[var(--border)] bg-[var(--paper-2)] px-3 py-2.5 text-sm text-[var(--fg)] placeholder-[var(--fg-subtle)] outline-none focus:border-[var(--border-strong)] transition-colors" />
-        </div>
-        <div className="flex justify-end gap-2">
-          <button type="button" onClick={onClose}
-            className="rounded-xl px-4 py-2 text-sm text-[var(--fg-muted)] hover:bg-[var(--paper-3)] transition-colors">Annuler</button>
-          <button type="submit" disabled={!amount || parseFloat(amount) <= 0}
-            className="rounded-xl bg-[var(--positive)] px-4 py-2 text-sm font-medium text-white hover:bg-[var(--positive-hover)] transition-colors disabled:opacity-40">
-            Contribuer
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
 
 // ─── CSV Import ────────────────────────────────────────────────────────────────
 
