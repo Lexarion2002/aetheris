@@ -76,6 +76,9 @@ interface AetherisState {
   decrementCounter: (id: string, by?: number) => void
   setCounterValue:  (id: string, value: number) => void
 
+  // Habitudes journalières (kind === 'counter' avec cadence === 'daily' et dailyTarget défini)
+  logDailyValue:    (id: string, value: number, dateIso?: string) => void
+
   // Milestone actions
   addMilestone: (milestone: Omit<Milestone, 'id' | 'createdAt'>) => Milestone
   updateMilestone: (id: string, updates: Partial<Omit<Milestone, 'id' | 'createdAt'>>) => void
@@ -426,6 +429,32 @@ export const useStore = createPersistedStore<AetherisState>(
             const progress = Math.min(100, Math.round((current / target) * 100))
             return {
               ...o, current, progress,
+              progressHistory: trackProgress(o.progressHistory, progress),
+              updatedAt: now(),
+            }
+          }),
+        })),
+
+      logDailyValue: (id, value, dateIso) =>
+        set((s) => ({
+          objectives: s.objectives.map((o) => {
+            if (o.id !== id || o.kind !== 'counter') return o
+            const date = dateIso ?? today()
+            const log = o.dailyLog ?? []
+            // Upsert : si une entrée existe déjà pour cette date, on la remplace
+            const newLog = log.some((e) => e.date === date)
+              ? log.map((e) => (e.date === date ? { date, value } : e))
+              : [...log, { date, value }]
+            // current = somme cumulée
+            const totalCurrent = newLog.reduce((sum, e) => sum + e.value, 0)
+            const target = o.target ?? 1
+            const cappedCurrent = Math.max(0, Math.min(target, totalCurrent))
+            const progress = Math.min(100, Math.round((cappedCurrent / target) * 100))
+            return {
+              ...o,
+              dailyLog: newLog,
+              current:  cappedCurrent,
+              progress,
               progressHistory: trackProgress(o.progressHistory, progress),
               updatedAt: now(),
             }

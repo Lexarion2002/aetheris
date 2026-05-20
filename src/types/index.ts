@@ -26,6 +26,7 @@ export interface Task {
   timeEstimate: number | null  // minutes
   dueDate: string | null        // ISO date — échéance dure
   plannedDate?: string | null   // ISO date — jour où on prévoit de la faire
+  plannedTime?: string | null   // heure de début "HH:MM" si la tâche est cadrée
   notes?: string
   objectiveId?: string         // lien vers un objectif
   milestoneId?: string         // lien vers un jalon
@@ -65,6 +66,11 @@ export interface ProgressEntry {
 export type ObjectiveKind    = 'single' | 'counter'
 export type ObjectiveCadence = 'daily' | 'weekly' | 'monthly' | 'free'
 
+export interface DailyLogEntry {
+  date:  string   // YYYY-MM-DD
+  value: number   // valeur ajoutée ce jour-là (ex: 1000 mots, 1 séance)
+}
+
 export interface Objective {
   id: string
   domainId: string
@@ -84,6 +90,14 @@ export interface Objective {
   target?:  number              // ex: 52 (livres à lire)
   current?: number              // ex: 7 (déjà lus)
   cadence?: ObjectiveCadence    // rythme attendu pour rester dans les clous
+
+  // Habitude quotidienne (quand cadence === 'daily')
+  // Si défini, l'objectif fonctionne comme une habitude journalière :
+  //   - dailyTarget = quantité visée chaque jour (ex: 1000 mots, 1 séance)
+  //   - dailyLog = historique des valeurs réalisées par jour
+  // current devient la somme cumulée des valeurs du log.
+  dailyTarget?: number
+  dailyLog?:    DailyLogEntry[]
 }
 
 // ─── Expense ──────────────────────────────────────────────────────────────────

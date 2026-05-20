@@ -8,6 +8,7 @@ import { useTimerStore } from '../store/timerStore'
 import { TaskFormModal } from '../components/TaskFormModal'
 import { ObjectivesPage } from './ObjectivesPage'
 import { generateWeekPlan, type WeekPlanItem } from '../lib/aiService'
+import { expandDomains } from '../utils/standaloneDomains'
 import type { Domain, Task, TimeSession } from '../types'
 import {
   getWeekDays, getWeekBounds, getISOWeekNumber, isCurrentWeek,
@@ -158,6 +159,18 @@ function WeekTaskCard({
         </span>
 
         <span style={{ color: 'var(--ink-4)' }}>·</span>
+
+        {task.plannedTime && (
+          <>
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+              fontSize: 11, color: 'var(--terra)', fontWeight: 500, letterSpacing: '0.02em',
+            }}>
+              {task.plannedTime}
+            </span>
+            <span style={{ color: 'var(--ink-4)' }}>·</span>
+          </>
+        )}
 
         <span style={{
           fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
@@ -356,6 +369,10 @@ function WeekDayColumn({
     const aDone = a.status === 'done' ? 1 : 0
     const bDone = b.status === 'done' ? 1 : 0
     if (aDone !== bDone) return aDone - bDone
+    // Trier par plannedTime d'abord si disponible (planning chronologique)
+    if (a.plannedTime && b.plannedTime) return a.plannedTime.localeCompare(b.plannedTime)
+    if (a.plannedTime && !b.plannedTime) return -1
+    if (!a.plannedTime && b.plannedTime) return 1
     return prioLevel(a.priority) - prioLevel(b.priority)
   })
   const total = tasks.length
@@ -677,7 +694,12 @@ function KitWeekPlanModal({
                 </span>
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {dayItems.map(item => {
+                {[...dayItems].sort((a, b) => {
+                  if (a.startTime && b.startTime) return a.startTime.localeCompare(b.startTime)
+                  if (a.startTime && !b.startTime) return -1
+                  if (!a.startTime && b.startTime) return 1
+                  return 0
+                }).map(item => {
                   const dom = domains.find(d => d.id === item.domainId)
                   const isSkipped = skipped.has(item.idx)
                   return (
@@ -700,6 +722,11 @@ function KitWeekPlanModal({
                       />
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 2 }}>
+                          {item.startTime && (
+                            <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 11, color: 'var(--terra)', fontWeight: 500 }}>
+                              {item.startTime}
+                            </span>
+                          )}
                           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
                             {dom?.name ?? '?'}
                           </span>
@@ -898,7 +925,8 @@ export function WeekView() {
     try {
       const active = objectives.filter(o => !o.archived && o.progress < 100)
       const items = await generateWeekPlan({
-        domains, objectives: active, milestones,
+        domains: expandDomains(domains),
+        objectives: active, milestones,
         recentTasks: tasks.slice(-30),
         scheduleBlocks,
       }, bounds.start)
@@ -948,6 +976,7 @@ export function WeekView() {
         timeEstimate: item.timeEstimate,
         dueDate:      null,
         plannedDate:  dayDateIsoFromOffset(bounds.start, item.dayOffset),
+        plannedTime:  item.startTime ?? null,
         objectiveId:  item.objectiveId,
         milestoneId:  item.milestoneId,
       })

@@ -5,6 +5,7 @@ import { useWritingStore } from '../store/writingStore'
 import { useSportStore } from '../store/sportStore'
 import { useCareerStore } from '../store/careerStore'
 import { suggestTodayTasks } from '../lib/aiService'
+import { expandDomains } from '../utils/standaloneDomains'
 import { computeDailyStreak, type DailyStreak } from '../utils/streaks'
 import type { Task } from '../types'
 import type { Tache, SousTache } from '../store/droitStore'
@@ -120,6 +121,14 @@ function TaskRow({ task, objective, onToggle, onUnplan }: {
 
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
+          {task.plannedTime && (
+            <span style={{
+              fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums',
+              fontSize: 13, color: 'var(--terra)', fontWeight: 500,
+            }}>
+              {task.plannedTime}
+            </span>
+          )}
           <span style={{
             fontFamily: 'var(--font-serif)', fontSize: 16,
             color: task.status === 'done' ? 'var(--ink-3)' : 'var(--ink)',
@@ -326,9 +335,16 @@ export function TodayPage() {
     [tasks, timeSessions, extraActivityDates],
   )
 
-  // Tasks du store principal planifiées pour aujourd'hui
+  // Tasks du store principal planifiées pour aujourd'hui (triées par heure si dispo)
   const plannedTasks = useMemo(
-    () => tasks.filter((t) => t.plannedDate === today && t.status !== 'cancelled'),
+    () => tasks
+      .filter((t) => t.plannedDate === today && t.status !== 'cancelled')
+      .sort((a, b) => {
+        if (a.plannedTime && b.plannedTime) return a.plannedTime.localeCompare(b.plannedTime)
+        if (a.plannedTime && !b.plannedTime) return -1
+        if (!a.plannedTime && b.plannedTime) return 1
+        return 0
+      }),
     [tasks, today],
   )
 
@@ -462,7 +478,8 @@ export function TodayPage() {
 
       const scheduleBlocks = useStore.getState().scheduleBlocks
       const items = await suggestTodayTasks({
-        domains, objectives: activeObjectives, milestones,
+        domains: expandDomains(domains),
+        objectives: activeObjectives, milestones,
         recentTasks: tasks.slice(-30),
         scheduleBlocks,
       }, 5)
@@ -478,6 +495,7 @@ export function TodayPage() {
           timeEstimate: item.timeEstimate,
           dueDate:      null,
           plannedDate:  today,
+          plannedTime:  item.startTime ?? null,
           objectiveId:  item.objectiveId,
           milestoneId:  item.milestoneId,
         })

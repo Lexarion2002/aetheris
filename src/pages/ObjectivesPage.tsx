@@ -443,15 +443,49 @@ function MilestonesSection({
 function CounterMeta({ obj }: { obj: Objective }) {
   const incrementCounter = useStore((s) => s.incrementCounter)
   const decrementCounter = useStore((s) => s.decrementCounter)
+  const logDailyValue    = useStore((s) => s.logDailyValue)
   const target = obj.target ?? 0
   const current = obj.current ?? 0
   const isComplete = current >= target
 
+  const isHabit = obj.cadence === 'daily' && !!obj.dailyTarget
   const cadenceLabel = obj.cadence === 'daily' ? '/ jour'
     : obj.cadence === 'weekly' ? '/ semaine'
     : obj.cadence === 'monthly' ? '/ mois'
     : ''
 
+  const today = new Date().toISOString().split('T')[0]
+  const todayLog = obj.dailyLog?.find((e) => e.date === today)
+  const todayValue = todayLog?.value ?? 0
+  const dailyTarget = obj.dailyTarget ?? 1
+
+  // Pour les habitudes : bouton "+target aujourd'hui"
+  if (isHabit) {
+    const isDoneToday = todayValue >= dailyTarget
+    return (
+      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
+        <button
+          onClick={(e) => { e.stopPropagation(); logDailyValue(obj.id, todayValue + dailyTarget) }}
+          disabled={isComplete}
+          style={{
+            padding: '4px 12px', borderRadius: 6,
+            border: '1px solid ' + (isDoneToday ? 'var(--sage)' : 'var(--terra)'),
+            background: isDoneToday ? 'var(--sage-soft)' : 'var(--terra)',
+            color: isDoneToday ? 'var(--sage-deep)' : 'var(--paper-1)',
+            cursor: isComplete ? 'default' : 'pointer',
+            fontFamily: 'var(--font-sans)', fontSize: 12, fontWeight: 500,
+          }}
+        >
+          {isDoneToday ? `✓ ${todayValue} aujourd'hui` : `+ ${dailyTarget} aujourd'hui`}
+        </button>
+        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)' }}>
+          objectif {dailyTarget}/jour
+        </span>
+      </div>
+    )
+  }
+
+  // Counter classique
   return (
     <div style={{ display: 'inline-flex', alignItems: 'center', gap: 10 }}>
       <button
@@ -490,6 +524,46 @@ function CounterMeta({ obj }: { obj: Objective }) {
           {cadenceLabel}
         </span>
       )}
+    </div>
+  )
+}
+
+// ─── HabitHeatmap ──────────────────────────────────────────────────────────────
+// Mini heatmap des 30 derniers jours pour les habitudes
+
+function HabitHeatmap({ obj }: { obj: Objective }) {
+  if (!obj.dailyTarget) return null
+  const dailyTarget = obj.dailyTarget
+  const log = obj.dailyLog ?? []
+  const logMap = new Map(log.map((e) => [e.date, e.value]))
+
+  const days: Array<{ date: string; value: number; intensity: number }> = []
+  for (let i = 29; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const iso = d.toISOString().split('T')[0]
+    const value = logMap.get(iso) ?? 0
+    const intensity = value >= dailyTarget ? 4
+      : value > dailyTarget * 0.66 ? 3
+      : value > dailyTarget * 0.33 ? 2
+      : value > 0 ? 1
+      : 0
+    days.push({ date: iso, value, intensity })
+  }
+
+  return (
+    <div style={{ display: 'flex', gap: 2, flexWrap: 'nowrap' }}>
+      {days.map((d) => (
+        <div
+          key={d.date}
+          title={`${d.date} · ${d.value} ${d.value > 0 ? '/ ' + dailyTarget : ''}`}
+          style={{
+            width: 12, height: 12, borderRadius: 2,
+            background: d.intensity === 0 ? 'var(--paper-2)' : 'var(--sage)',
+            opacity: d.intensity === 0 ? 0.6 : 0.2 + d.intensity * 0.2,
+          }}
+        />
+      ))}
     </div>
   )
 }
@@ -592,9 +666,11 @@ function ObjectiveCard({
               )}
             </div>
 
-            {/* Droite : sparkline + anneau (ou compteur) */}
+            {/* Droite : sparkline ou heatmap (habitude) + anneau */}
             <div style={{ display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0, paddingTop: 2 }}>
-              <Sparkline values={sparkValues} />
+              {obj.kind === 'counter' && obj.cadence === 'daily' && obj.dailyTarget
+                ? <HabitHeatmap obj={obj} />
+                : <Sparkline values={sparkValues} />}
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Ring value={obj.progress} color={ringColor} />
                 {obj.kind === 'counter' && obj.target ? (

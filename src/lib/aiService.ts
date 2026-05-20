@@ -126,18 +126,32 @@ function buildContext(ctx: Ctx): string {
   const today = new Date().toISOString().split('T')[0]
   const activeDomains = ctx.domains.map(d => `- ${d.name}${d.description ? ` (${d.description})` : ''}`).join('\n')
 
+  const daysUntil = (iso: string): number => {
+    const d = new Date(iso + 'T12:00:00')
+    const t = new Date(today + 'T12:00:00')
+    return Math.round((d.getTime() - t.getTime()) / 86400000)
+  }
   const activeObjectives = ctx.objectives
     .filter(o => !o.archived)
     .map(o => {
       const domain = ctx.domains.find(d => d.id === o.domainId)
       const ms = ctx.milestones.filter(m => m.objectiveId === o.id)
       const open = ms.filter(m => !m.done)
-      const due = o.targetDate ? `, échéance ${o.targetDate}` : ''
-      const overdue = o.targetDate && o.targetDate < today ? ' [EN RETARD]' : ''
+      let urgency = ''
+      let due = ''
+      if (o.targetDate) {
+        const days = daysUntil(o.targetDate)
+        due = `, échéance ${o.targetDate}`
+        if (days < 0) urgency = ` [EN RETARD de ${-days} j]`
+        else if (days <= 3) urgency = ` [URGENT — ${days} j restants]`
+        else if (days <= 14) urgency = ` [PROCHE — ${days} j restants]`
+        else if (days <= 30) urgency = ` [${days} j restants]`
+      }
+      const kindTag = o.kind === 'counter' ? ` (compteur ${o.current ?? 0}/${o.target ?? '?'})` : ''
       const msText = open.length > 0
         ? `\n    Jalons ouverts : ${open.slice(0, 5).map(m => m.title + (m.targetDate ? ` (${m.targetDate})` : '')).join(' / ')}`
         : ''
-      return `- [${domain?.name ?? '?'}] "${o.title}" — progression ${o.progress}%${due}${overdue}${msText}`
+      return `- [${domain?.name ?? '?'}] "${o.title}"${kindTag} — progression ${o.progress}%${due}${urgency}${msText}`
     })
     .join('\n')
 
@@ -199,6 +213,7 @@ export interface TodaySuggestion {
   title:        string
   reason:       string
   timeEstimate: number
+  startTime?:   string          // "HH:MM" si Kit propose un créneau précis
   objectiveId?: string
   milestoneId?: string
 }
@@ -222,10 +237,11 @@ export async function suggestTodayTasks(ctx: Ctx, maxItems = 5): Promise<TodaySu
               title:           { type: 'string', description: 'Titre clair et actionnable de la tâche' },
               reason:          { type: 'string', description: 'En une phrase, pourquoi cette tâche aujourd\'hui' },
               time_estimate:   { type: 'integer', description: 'Temps estimé en minutes', minimum: 10, maximum: 240 },
+              start_time:      { type: 'string', description: 'Heure de début proposée au format HH:MM (24h), respectant les plages bloquées' },
               objective_title: { type: 'string', description: 'Titre exact de l\'objectif lié, si applicable' },
               milestone_title: { type: 'string', description: 'Titre exact du jalon lié, si applicable' },
             },
-            required: ['domain_name', 'title', 'reason', 'time_estimate'],
+            required: ['domain_name', 'title', 'reason', 'time_estimate', 'start_time'],
           },
         },
       },
@@ -244,11 +260,23 @@ export async function suggestTodayTasks(ctx: Ctx, maxItems = 5): Promise<TodaySu
         role: 'user',
         content: `${userContext}
 
-Propose 3 à ${maxItems} tâches concrètes pour aujourd'hui, ancrées dans les objectifs actifs et les domaines. Priorise ce qui débloque les objectifs en retard. Diversifie les domaines si possible. Chaque tâche doit pouvoir être faite en une session de focus (10–120 min).
+Propose 3 à ${maxItems} tâches concrètes pour aujourd'hui, ancrées dans les objectifs actifs et les domaines.
 
-CONTRAINTES :
-- Tiens compte de l'emploi du temps récurrent : si l'utilisateur est en cours / au travail / engagé une bonne partie de la journée, propose moins de tâches et plus courtes.
-- Ne propose pas de tâches qui empièteraient sur les plages bloquées.`,
+PRIORITÉS strictes :
+- Objectifs [EN RETARD] ou [URGENT] : au moins une tâche dessus aujourd'hui si possible
+- Objectifs [PROCHE] (≤14j) : à inclure si la capacité du jour le permet
+- Objectifs counter : propose une session qui fait avancer le compteur
+- Diversifie les domaines, ne mets pas 5 tâches Droit le même jour si plusieurs objectifs autres sont aussi urgents
+
+Chaque tâche doit pouvoir être faite en une session de focus (10–120 min) et être concrète (pas "réfléchir à X").
+
+CONTRAINTES D'EMPLOI DU TEMPS — créneaux précis :
+- Pour chaque tâche, propose une heure de début (start_time HH:MM) qui s'insère dans le créneau libre du jour
+- Tiens compte des plages bloquées de l'emploi du temps : ne pose JAMAIS une tâche pendant un cours / un engagement
+- Espace les tâches : ne mets pas deux tâches qui se chevauchent
+- Préfère les créneaux matinaux (09:00-12:00) pour le travail intense, après-midi (14:00-18:00) pour le reste, soir (20:00-22:00) pour les routines légères
+- Si la journée est majoritairement occupée par cours/travail/engagements : propose 2-3 tâches max, courtes (30-45 min), placées dans les pauses
+- Si la journée est libre : tu peux aller jusqu'à ${maxItems}`,
       },
     ],
   })
@@ -259,6 +287,7 @@ CONTRAINTES :
       title: string
       reason: string
       time_estimate: number
+      start_time?: string
       objective_title?: string
       milestone_title?: string
     }>
@@ -277,6 +306,7 @@ CONTRAINTES :
       title:        t.title,
       reason:       t.reason,
       timeEstimate: t.time_estimate,
+      startTime:    t.start_time && /^\d{2}:\d{2}$/.test(t.start_time) ? t.start_time : undefined,
       objectiveId:  objective?.id,
       milestoneId:  milestone?.id,
     }
@@ -356,8 +386,9 @@ export interface WeekPlanItem {
   domainId:     string
   title:        string
   reason:       string
-  dayOffset:    number  // 0 = lundi, 6 = dimanche
+  dayOffset:    number          // 0 = lundi, 6 = dimanche
   timeEstimate: number
+  startTime?:   string          // "HH:MM" si Kit propose un créneau précis
   objectiveId?: string
   milestoneId?: string
 }
@@ -373,7 +404,7 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<Wee
       properties: {
         items: {
           type: 'array',
-          maxItems: 12,
+          maxItems: 16,
           items: {
             type: 'object',
             properties: {
@@ -382,10 +413,11 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<Wee
               reason:          { type: 'string' },
               day_offset:      { type: 'integer', minimum: 0, maximum: 6, description: '0=lundi, 6=dimanche' },
               time_estimate:   { type: 'integer', minimum: 10, maximum: 240 },
+              start_time:      { type: 'string', description: 'Heure de début au format HH:MM (24h), respectant les plages bloquées' },
               objective_title: { type: 'string' },
               milestone_title: { type: 'string' },
             },
-            required: ['domain_name', 'title', 'reason', 'day_offset', 'time_estimate'],
+            required: ['domain_name', 'title', 'reason', 'day_offset', 'time_estimate', 'start_time'],
           },
         },
       },
@@ -406,17 +438,29 @@ export async function generateWeekPlan(ctx: Ctx, weekStart: string): Promise<Wee
 
 SEMAINE CIBLE : du ${weekStart} (lundi) au dimanche suivant.
 
-Génère un plan équilibré de 6 à 12 tâches réparties sur la semaine. Règles :
-- Mix les domaines, ne surcharge pas un seul jour
-- Une tâche par objectif actif au minimum si l'objectif a une échéance proche
-- Évite le dimanche pour le travail intense
-- Total < 2h par jour idéalement
-- Les tâches doivent débloquer concrètement les objectifs (pas de "réfléchir à X")
+Génère un plan dense et utile — vise 10 à 12 tâches pour la semaine, plus si plusieurs objectifs ont des échéances proches.
 
-CONTRAINTES D'EMPLOI DU TEMPS :
-- Respecte les plages récurrentes : pour un jour majoritairement occupé par des cours / du travail, propose moins de tâches (1 max) et courtes (30 min).
-- Pour les jours libres, tu peux en mettre 2 ou 3.
-- Le créneau utile = la portion du jour qui n'est PAS dans une plage bloquée.`,
+PRIORITÉS strictes :
+- Objectifs marqués [EN RETARD] ou [URGENT] : au moins 2-3 tâches par objectif sur la semaine
+- Objectifs [PROCHE] (≤14j) : au moins 1-2 tâches
+- Objectifs [≤30j restants] : au moins 1 tâche
+- Objectifs counter : propose des sessions concrètes qui font avancer le compteur (ex: pour "Lire 52 livres", propose "Lire 30 pages de X")
+- Objectifs sans échéance : 1 tâche optionnelle si capacité reste
+
+RÉGLES de répartition :
+- Mix les domaines mais charge davantage les jours où une échéance approche
+- Les tâches doivent être concrètes et actionnables (pas "réfléchir à X" mais "rédiger l'intro de X", "ficher l'arrêt Y")
+- Évite le dimanche pour le travail intense
+- Un même objectif urgent peut avoir 2-3 tâches espacées dans la semaine
+
+CONTRAINTES D'EMPLOI DU TEMPS — créneaux précis :
+- Pour CHAQUE tâche, propose une heure de début (start_time HH:MM) qui s'insère dans le créneau libre du jour
+- Tiens compte des plages bloquées : ne pose JAMAIS une tâche pendant un cours / engagement
+- Sur un jour donné, espace les tâches : pas deux qui se chevauchent (respecte time_estimate)
+- Préfère matin (09:00-12:00) pour le travail intense, après-midi (14:00-18:00) pour le reste, soir (20:00-22:00) pour les routines légères
+- Respecte les plages récurrentes : si un jour est majoritairement occupé (>5h), 1-2 tâches max placées dans les pauses
+- Sur les jours libres, tu peux mettre 3-4 tâches
+- Le créneau utile = la portion du jour qui n'est PAS dans une plage bloquée`,
       },
     ],
   })
@@ -428,6 +472,7 @@ CONTRAINTES D'EMPLOI DU TEMPS :
       reason: string
       day_offset: number
       time_estimate: number
+      start_time?: string
       objective_title?: string
       milestone_title?: string
     }>
@@ -447,6 +492,7 @@ CONTRAINTES D'EMPLOI DU TEMPS :
       reason:       item.reason,
       dayOffset:    Math.max(0, Math.min(6, item.day_offset)),
       timeEstimate: item.time_estimate,
+      startTime:    item.start_time && /^\d{2}:\d{2}$/.test(item.start_time) ? item.start_time : undefined,
       objectiveId:  objective?.id,
       milestoneId:  milestone?.id,
     }

@@ -2,19 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react'
 import { Circle } from 'lucide-react'
 import { useStore } from '../store'
 import { getDomainIcon } from '../utils/domainColors'
-import type { Domain, Objective, ObjectiveKind, ObjectiveCadence } from '../types'
-
-const STATIC_DOMAINS: Domain[] = [
-  { id: 'musique',  name: 'Musique',        color: 'purple', icon: '', description: '' },
-  { id: 'cuisine',  name: 'Cuisine',        color: 'orange', icon: '', description: '' },
-  { id: 'achats',   name: 'Achats',         color: 'teal',   icon: '', description: '' },
-  { id: 'films',    name: 'Films & Séries', color: 'red',    icon: '', description: '' },
-  { id: 'livres',   name: 'Livres',         color: 'blue',   icon: '', description: '' },
-  { id: 'cabinet',  name: 'Cabinet',        color: 'gray',   icon: '', description: '' },
-  { id: 'ecriture', name: 'Écriture',       color: 'indigo', icon: '', description: '' },
-  { id: 'droit',    name: 'Droit',          color: 'indigo', icon: '', description: '' },
-  { id: 'sport',    name: 'Sport',          color: 'green',  icon: '', description: '' },
-]
+import { expandDomains } from '../utils/standaloneDomains'
+import type { Objective, ObjectiveKind, ObjectiveCadence } from '../types'
 
 interface Props {
   domainId?:  string
@@ -51,8 +40,7 @@ const fieldStyle: React.CSSProperties = {
 
 export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose }: Props) {
   const storeDomains    = useStore((s) => s.domains)
-  const storeIds        = new Set(storeDomains.map((d) => d.id))
-  const domains         = [...storeDomains, ...STATIC_DOMAINS.filter((d) => !storeIds.has(d.id))]
+  const domains         = expandDomains(storeDomains)
   const tasks           = useStore((s) => s.tasks)
   const addObjective    = useStore((s) => s.addObjective)
   const updateObjective = useStore((s) => s.updateObjective)
@@ -70,6 +58,7 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
   const [counterTarget,  setCounterTarget]  = useState<number>(objective?.target ?? 52)
   const [counterCurrent, setCounterCurrent] = useState<number>(objective?.current ?? 0)
   const [counterCadence, setCounterCadence] = useState<ObjectiveCadence>(objective?.cadence ?? 'weekly')
+  const [dailyTarget,    setDailyTarget]    = useState<number>(objective?.dailyTarget ?? 1)
 
   const [linkedTaskIds, setLinkedTaskIds] = useState<Set<string>>(() =>
     new Set(objective ? tasks.filter((t) => t.objectiveId === objective.id).map((t) => t.id) : [])
@@ -120,6 +109,7 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
         target:  counterTarget,
         current: counterCurrent,
         cadence: counterCadence,
+        ...(counterCadence === 'daily' && dailyTarget > 0 ? { dailyTarget } : {}),
       } : {}),
     }
     if (isEdit) {
@@ -386,6 +376,23 @@ export function ObjectiveFormModal({ domainId: propDomainId, objective, onClose 
                   })}
                 </div>
               </div>
+              {counterCadence === 'daily' && (
+                <div>
+                  <label style={labelStyle}>Objectif quotidien (habitude)</label>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+                    <input
+                      type="number"
+                      min={1}
+                      value={dailyTarget}
+                      onChange={(e) => setDailyTarget(Math.max(1, parseInt(e.target.value || '1', 10)))}
+                      style={{ ...fieldStyle, fontFamily: 'var(--font-mono)', flex: 1 }}
+                    />
+                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)', fontStyle: 'italic' }}>
+                      par jour (ex: 1000 mots, 30 min, 1 séance)
+                    </span>
+                  </div>
+                </div>
+              )}
               <div>
                 <label style={labelStyle}>Échéance globale (optionnel)</label>
                 <input
