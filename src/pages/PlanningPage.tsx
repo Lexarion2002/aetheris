@@ -1,13 +1,14 @@
 import { useState, type CSSProperties } from 'react'
-import { Plus, X, ChevronRight } from 'lucide-react'
+import { Plus, X, ChevronRight, Check } from 'lucide-react'
 import { usePlanningStore } from '../store/planningStore'
 import { useStore } from '../store'
+import { nanoid } from '../utils/nanoid'
 import type {
   Identity, IdentityStatus,
   Okr, OkrStatus,
   Rock, RockStatus,
 } from '../store/planningStore'
-import type { Objective } from '../types'
+import type { Objective, Domain } from '../types'
 
 // =============================================================================
 // MVP brut — voir docs/planning/SPEC.md
@@ -718,11 +719,27 @@ function KrEditForm({ domains, initial, onSave, onCancel }: {
   onSave: (d: { title: string, description: string, dueDate: string, targetValue: string, domainId: string }) => void
   onCancel: () => void
 }) {
+  const addDomain = useStore((s) => s.addDomain)
   const [title, setTitle] = useState(initial?.title ?? '')
   const [description, setDescription] = useState(initial?.description ?? '')
   const [dueDate, setDueDate] = useState(initial?.dueDate ?? '')
   const [targetValue, setTargetValue] = useState(initial?.targetValue ?? '')
   const [domainId, setDomainId] = useState(initial?.domainId ?? domains[0]?.id ?? '')
+
+  // Création de domaine inline
+  const [creatingDomain, setCreatingDomain]  = useState(false)
+  const [newDomainName, setNewDomainName]    = useState('')
+
+  const handleCreateDomain = () => {
+    const name = newDomainName.trim()
+    if (!name) return
+    const newId = nanoid()
+    // addDomain accepte un id optionnel via cast (cf. store/index.ts)
+    addDomain({ id: newId, name, color: 'gray', icon: '◇', description: '' } as Omit<Domain, 'id'>)
+    setDomainId(newId)
+    setNewDomainName('')
+    setCreatingDomain(false)
+  }
 
   const canSave = title.trim().length > 0 && domainId
 
@@ -760,12 +777,55 @@ function KrEditForm({ domains, initial, onSave, onCancel }: {
             onChange={(e) => setDueDate(e.target.value)}
           />
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 160 }}>
           <span style={labelStyle}>Domaine</span>
-          <select style={input} value={domainId} onChange={(e) => setDomainId(e.target.value)}>
-            {domains.length === 0 && <option value="">— aucun domaine —</option>}
-            {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
+          {creatingDomain ? (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <input
+                autoFocus
+                style={{ ...input, flex: 1 }}
+                placeholder="Ex. Écriture"
+                value={newDomainName}
+                onChange={(e) => setNewDomainName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') { e.preventDefault(); handleCreateDomain() }
+                  if (e.key === 'Escape') { setCreatingDomain(false); setNewDomainName('') }
+                }}
+              />
+              <button
+                onClick={handleCreateDomain}
+                style={{ ...ghostBtn, color: 'var(--terra)' }}
+                title="Créer (Entrée)"
+              >
+                <Check size={14} />
+              </button>
+              <button
+                onClick={() => { setCreatingDomain(false); setNewDomainName('') }}
+                style={ghostBtn}
+                title="Annuler (Échap)"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ) : (
+            <div style={{ display: 'flex', gap: 4 }}>
+              <select
+                style={{ ...input, flex: 1 }}
+                value={domainId}
+                onChange={(e) => setDomainId(e.target.value)}
+              >
+                {domains.length === 0 && <option value="">— aucun —</option>}
+                {domains.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+              </select>
+              <button
+                onClick={() => setCreatingDomain(true)}
+                style={{ ...ghostBtn, border: '1px solid var(--border)', borderRadius: 8 }}
+                title="Créer un nouveau domaine"
+              >
+                <Plus size={14} />
+              </button>
+            </div>
+          )}
         </div>
       </div>
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
