@@ -1,12 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ArrowUpRight, Landmark, ShoppingBag, BookOpen, Film, Briefcase, PenLine, Scale, Music, Dumbbell, ChefHat } from 'lucide-react'
+import { ArrowUpRight, Landmark, ShoppingBag, BookOpen, Film, Briefcase, Scale, Music, Dumbbell, ChefHat } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
 import { useWritingStore } from '../store/writingStore'
-import { useTodayStore } from '../store/todayStore'
-import type { TodayTask } from '../store/todayStore'
 import { useDroitStore } from '../store/droitStore'
 import { useMusicStore } from '../store/musicStore'
 import { useSportStore } from '../store/sportStore'
@@ -46,8 +44,6 @@ const weekAgoStr = () => { const d = new Date(); d.setDate(d.getDate() - 7); ret
 const fmtDate    = (iso: string) =>
   new Date(iso).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })
 
-const WRITING_STAGE_ORDER = ['idée', 'ouverture', 'développement', 'fin', 'jet', 'révision', 'terminé']
-
 function trunc(text: string, max: number): string {
   const words = text.trim().split(/\s+/)
   return words.length <= max ? text : words.slice(0, max).join(' ') + '…'
@@ -68,23 +64,17 @@ function topSavingsGoal(goals: SavingsGoal[]): SavingsGoal | null {
 // ─── DashHeader ───────────────────────────────────────────────────────────────
 
 function DashHeader({
-  date, doneCount, totalCount, weekType, hasCareerInfo, cabinetNom,
+  date, weekType, hasCareerInfo, cabinetNom,
 }: {
   date:          Date
-  doneCount:     number
-  totalCount:    number
   weekType:      string
   hasCareerInfo: boolean
   cabinetNom:    string
 }) {
-  const pct = totalCount > 0 ? doneCount / totalCount : 0
-
   return (
     <header style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 32, marginBottom: 48 }}>
       <div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14, fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-          <span>Aujourd'hui</span>
-          <span style={{ color: 'var(--ink-4)' }}>·</span>
           <span>semaine {getWeekNumber(date)}</span>
         </div>
 
@@ -101,20 +91,6 @@ function DashHeader({
               : 'Semaine académique.'}
           </p>
         )}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 6, paddingBottom: 8, flexShrink: 0 }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-          Avancement du jour
-        </span>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 36, color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>{doneCount}</span>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 22, color: 'var(--ink-3)', fontStyle: 'italic' }}>sur</span>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 36, color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>{totalCount}</span>
-        </div>
-        <div style={{ width: 180, height: 3, background: 'var(--paper-2)', borderRadius: 999, overflow: 'hidden' }}>
-          <div style={{ width: `${pct * 100}%`, height: '100%', background: 'var(--sage)', transition: 'width 320ms ease' }} />
-        </div>
       </div>
     </header>
   )
@@ -181,252 +157,6 @@ function OngoingCard({
         </div>
       </div>
     </div>
-  )
-}
-
-// ─── TodaySection ─────────────────────────────────────────────────────────────
-
-interface SelectableItem {
-  sourceId:     string
-  sourceDomain: string
-  label:        string
-  sublabel?:    string
-  domainGroup:  string
-}
-
-function TodayTaskRow({ task, last, onToggle, onRemove }: {
-  task:     TodayTask
-  last:     boolean
-  onToggle: () => void
-  onRemove: () => void
-}) {
-  const [hover, setHover] = useState(false)
-  return (
-    <div
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'flex', alignItems: 'center', gap: 14, padding: '12px 18px',
-        borderBottom: last ? 'none' : '1px solid var(--paper-2)',
-        transition: 'background 120ms ease',
-      }}
-    >
-      {/* Checkbox */}
-      <button
-        onClick={onToggle}
-        role="checkbox"
-        aria-checked={task.done}
-        style={{
-          width: 14, height: 14, padding: 0, flexShrink: 0,
-          border: `1px solid ${task.done ? 'var(--terra)' : 'var(--ink-4)'}`,
-          background: task.done ? 'var(--terra)' : 'transparent',
-          borderRadius: 3, cursor: 'pointer',
-          display: 'grid', placeItems: 'center',
-          transition: 'background 180ms ease, border-color 180ms ease',
-        }}
-      >
-        {task.done && (
-          <svg viewBox="0 0 12 12" width="10" height="10" fill="none"
-            stroke="var(--paper-1)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="2,6.5 5,9 10,3" />
-          </svg>
-        )}
-      </button>
-
-      {/* Label + meta */}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{
-            fontFamily: 'var(--font-serif)', fontSize: 16,
-            color: task.done ? 'var(--ink-3)' : 'var(--ink)',
-            textDecoration: task.done ? 'line-through' : 'none',
-            textDecorationColor: 'var(--ink-4)',
-          }}>{task.label}</span>
-          <span style={{
-            fontFamily: 'var(--font-mono)', fontSize: 10, letterSpacing: '0.08em',
-            textTransform: 'uppercase', color: 'var(--ink-3)', flexShrink: 0,
-          }}>{task.sourceDomain}</span>
-        </div>
-        {task.sublabel && (
-          <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic', color: 'var(--ink-3)', marginTop: 2 }}>
-            {task.sublabel}
-          </div>
-        )}
-      </div>
-
-      {/* Remove */}
-      <button
-        onClick={onRemove}
-        aria-label="Retirer"
-        style={{
-          opacity: hover ? 0.6 : 0, background: 'transparent', border: 0,
-          cursor: 'pointer', padding: 4, color: 'var(--ink-3)',
-          fontSize: 18, lineHeight: 1, display: 'flex', alignItems: 'center',
-          transition: 'opacity 180ms ease',
-        }}
-      >×</button>
-    </div>
-  )
-}
-
-function TodaySection() {
-  const tasks      = useTodayStore((s) => s.tasks)
-  const addTask    = useTodayStore((s) => s.addTask)
-  const toggleTask = useTodayStore((s) => s.toggleTask)
-  const removeTask = useTodayStore((s) => s.removeTask)
-
-  const droitTaches    = useDroitStore((s) => s.taches)
-  const writingStories = useWritingStore((s) => s.stories)
-
-  const [panelOpen, setPanelOpen] = useState(false)
-
-  const existingSourceIds = useMemo(() => new Set(tasks.map((t) => t.sourceId)), [tasks])
-
-  const availableItems = useMemo((): SelectableItem[] => {
-    const items: SelectableItem[] = []
-
-    for (const tache of droitTaches) {
-      const progress = tache.subtasks.length > 0
-        ? Math.round((tache.subtasks.filter((s) => s.done).length / tache.subtasks.length) * 100)
-        : (tache.manualProgress ?? 0)
-      if (progress >= 100) continue
-
-      if (tache.subtasks.length > 0) {
-        for (const st of tache.subtasks.filter((s) => !s.done)) {
-          if (!existingSourceIds.has(st.id)) {
-            items.push({ sourceId: st.id, sourceDomain: 'droit', label: st.label, sublabel: tache.matiere, domainGroup: 'Droit' })
-          }
-        }
-      } else {
-        if (!existingSourceIds.has(tache.id)) {
-          items.push({ sourceId: tache.id, sourceDomain: 'droit', label: tache.title, sublabel: tache.matiere, domainGroup: 'Droit' })
-        }
-      }
-    }
-
-    for (const story of writingStories.filter((s) => s.status === 'active')) {
-      if (!existingSourceIds.has(story.id)) {
-        items.push({ sourceId: story.id, sourceDomain: 'ecriture', label: `Écriture — ${story.title}`, domainGroup: 'Écriture' })
-      }
-    }
-
-    return items
-  }, [droitTaches, writingStories, existingSourceIds])
-
-  const groupedItems = useMemo(() => {
-    const groups: Record<string, SelectableItem[]> = {}
-    for (const item of availableItems) {
-      if (!groups[item.domainGroup]) groups[item.domainGroup] = []
-      groups[item.domainGroup].push(item)
-    }
-    return groups
-  }, [availableItems])
-
-  const doneCount = tasks.filter((t) => t.done).length
-
-  return (
-    <section style={{ marginBottom: 56 }}>
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
-        <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 28, color: 'var(--ink)', margin: 0 }}>
-          Aujourd'hui
-        </h2>
-        <button
-          onClick={() => setPanelOpen(!panelOpen)}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500,
-            background: panelOpen ? 'var(--paper-2)' : 'var(--terra)',
-            color: panelOpen ? 'var(--ink-2)' : 'var(--paper-1)',
-            border: 0, borderRadius: 8, padding: '6px 14px', cursor: 'pointer',
-            transition: 'background 180ms ease, color 180ms ease',
-          }}
-        >
-          + Planifier
-        </button>
-      </div>
-
-      {/* Panel de sélection */}
-      {panelOpen && (
-        <div style={{
-          background: 'var(--paper-1)', border: '1px solid var(--paper-2)',
-          borderRadius: 12, padding: '16px 20px', marginBottom: 16,
-        }}>
-          {availableItems.length === 0 ? (
-            <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', color: 'var(--ink-3)', fontSize: 14, margin: 0 }}>
-              Toutes les tâches sont planifiées.
-            </p>
-          ) : (
-            Object.entries(groupedItems).map(([group, items]) => (
-              <div key={group} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-                    {group}
-                  </span>
-                  <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, color: 'var(--ink-4)' }}>
-                    {items.length}
-                  </span>
-                </div>
-                {items.map((item) => (
-                  <button
-                    key={item.sourceId}
-                    onClick={() => addTask({ sourceId: item.sourceId, sourceDomain: item.sourceDomain, label: item.label, sublabel: item.sublabel })}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--paper-2)')}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-                    style={{
-                      display: 'flex', flexDirection: 'column', gap: 2,
-                      width: '100%', textAlign: 'left',
-                      background: 'transparent', border: 0, cursor: 'pointer',
-                      padding: '6px 8px', borderRadius: 6,
-                      transition: 'background 120ms ease',
-                    }}
-                  >
-                    <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14, color: 'var(--ink)' }}>{item.label}</span>
-                    {item.sublabel && (
-                      <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, fontStyle: 'italic', color: 'var(--ink-3)' }}>{item.sublabel}</span>
-                    )}
-                  </button>
-                ))}
-              </div>
-            ))
-          )}
-          <div style={{ marginTop: 12, borderTop: '1px solid var(--paper-2)', paddingTop: 12 }}>
-            <button
-              onClick={() => setPanelOpen(false)}
-              style={{
-                background: 'transparent', border: '1px solid var(--paper-2)',
-                borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
-                fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-2)',
-              }}
-            >Fermer</button>
-          </div>
-        </div>
-      )}
-
-      {/* Liste ou placeholder */}
-      {tasks.length === 0 ? (
-        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, padding: '24px 22px', fontFamily: 'var(--font-serif)', fontSize: 16, fontStyle: 'italic', color: 'var(--ink-3)' }}>
-          Rien de planifié · commence par ajouter une tâche
-        </div>
-      ) : (
-        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
-          {tasks.map((task, i) => (
-            <TodayTaskRow
-              key={task.id}
-              task={task}
-              last={i === tasks.length - 1}
-              onToggle={() => toggleTask(task.id)}
-              onRemove={() => removeTask(task.id)}
-            />
-          ))}
-          <div style={{ padding: '10px 18px', borderTop: '1px solid var(--paper-2)' }}>
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
-              {doneCount} sur {tasks.length} tâche{tasks.length > 1 ? 's' : ''} faite{doneCount > 1 ? 's' : ''}
-            </span>
-          </div>
-        </div>
-      )}
-    </section>
   )
 }
 
@@ -638,11 +368,6 @@ export function Dashboard() {
   const droit        = useDroitStore()
   void law  // utilisé via useLawStore() pour la rehydratation, pas directement ici
 
-  const clearIfNewDay = useTodayStore((s) => s.clearIfNewDay)
-  const todayTasks    = useTodayStore((s) => s.tasks)
-
-  useEffect(() => { clearIfNewDay() }, [clearIfNewDay])
-
   const today    = new Date()
   const monthStr = today.toISOString().slice(0, 7)
   const waStr    = weekAgoStr()
@@ -652,36 +377,12 @@ export function Dashboard() {
   const hasCareerInfo = !!(career.cabinetInfo.nom || career.cabinetInfo.maitreStage)
   const cabinetNom    = career.cabinetInfo.nom ?? ''
 
-  const doneCount  = todayTasks.filter(t => t.done).length
-  const totalCount = todayTasks.length
-
   const monthBalance = useMemo(() => computeMonthBalance(transactions, monthStr), [transactions, monthStr])
   const topGoal      = useMemo(() => topSavingsGoal(savingsGoals), [savingsGoals])
   const todayTxTotal = useMemo(() => {
     const d = todayStr()
     return transactions.filter(t => t.type === 'expense' && t.date === d).reduce((s, t) => s + t.amount, 0)
   }, [transactions])
-
-  // Writing
-  const activeWritingStory = useMemo(
-    () => writing.stories.find((s) => s.status === 'active'),
-    [writing.stories],
-  )
-  const activeWritingSessions = useMemo(
-    () => activeWritingStory?.sessions ?? [],
-    [activeWritingStory],
-  )
-  const lastWritingDays = useMemo(() => {
-    const latest = activeWritingSessions.map((s) => s.date).sort().at(-1)
-    if (!latest) return null
-    const d = daysUntil(latest + 'T23:59:59')
-    return d !== null ? Math.abs(d) : null
-  }, [activeWritingSessions])
-  const writingSessionsWeek  = activeWritingSessions.filter((s) => s.date >= waStr).length
-  const writingSessionsTotal = activeWritingSessions.length
-  const writingProgressIndex = activeWritingStory ? WRITING_STAGE_ORDER.indexOf(activeWritingStory.stage) : -1
-  const writingProgress = writingProgressIndex >= 0 ? (writingProgressIndex + 1) / WRITING_STAGE_ORDER.length : 0
-  const writingDomain        = domains.find(d => d.name.trim().toLowerCase() === 'écriture')
 
   // Books: lus cette année (BookCritique.dateLecture = YYYY-MM-DD)
   const booksThisYear = useMemo(() => {
@@ -796,7 +497,6 @@ export function Dashboard() {
   }).length
   const sportSessionsWeekCount = sport.historique.filter((h) => h.date >= startWeekIso).length
   const careerActiveCount = career.missions.filter((m) => m.stade !== 'rendu').length
-  const writingActiveStoriesCount = writing.stories.filter((s) => s.status === 'active').length
   const booksReadCount = books.bibliotheque.length
   const booksTarget = books.objectifAnnuel || 0
   const filmsViewedCount = films.items.filter((it) => it.status === 'vu').length
@@ -822,12 +522,6 @@ export function Dashboard() {
       primary: String(sportSessionsWeekCount), unit: sportSessionsWeekCount > 1 ? 'séances cette sem.' : 'séance cette sem.',
       secondary: sport.historique.length > 0 ? `${sport.historique.length} séances au total` : 'aucune séance enregistrée',
       showCondition: !existingDomainNames.has('sport'),
-    },
-    {
-      name: 'Écriture', icon: PenLine, path: '/ecriture',
-      primary: String(writingActiveStoriesCount), unit: writingActiveStoriesCount > 1 ? 'récits actifs' : 'récit actif',
-      secondary: writing.stories.length > 0 ? `${writing.stories.length} récits au total` : 'aucun récit',
-      showCondition: !existingDomainNames.has('écriture') && !existingDomainNames.has('ecriture'),
     },
     {
       name: 'Musique', icon: Music, path: '/musique',
@@ -865,7 +559,6 @@ export function Dashboard() {
   const visibleStandalone = standaloneCards.filter((c) => c.showCondition !== false)
 
   // Icons for ongoing cards
-  const writingIcon = getDomainIcon('Écriture')
   const bookIcon    = getDomainIcon('Livres')
   const musicIcon   = getDomainIcon('Musique')
   const financeIcon = getDomainIcon('Finance')
@@ -880,8 +573,6 @@ export function Dashboard() {
       {/* ── 1. Header ──────────────────────────────────────────────────────── */}
       <DashHeader
         date={today}
-        doneCount={doneCount}
-        totalCount={totalCount}
         weekType={weekType}
         hasCareerInfo={hasCareerInfo}
         cabinetNom={cabinetNom}
@@ -898,27 +589,7 @@ export function Dashboard() {
           </span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
-          {/* Writing */}
-          <OngoingCard
-            label={activeWritingStory ? 'Nouvelle en cours' : 'Écriture'}
-            title={activeWritingStory
-              ? activeWritingStory.title
-              : writingSessionsTotal > 0
-              ? `${writingSessionsTotal} session${writingSessionsTotal > 1 ? 's' : ''} enregistrée${writingSessionsTotal > 1 ? 's' : ''}`
-              : 'Pas encore démarré'}
-            meta={activeWritingStory?.nextAction
-              ? trunc(activeWritingStory.nextAction, 10)
-              : writingSessionsWeek > 0
-              ? `${writingSessionsWeek} session${writingSessionsWeek > 1 ? 's' : ''} cette semaine`
-              : 'Aucune session cette semaine'}
-            kicker={lastWritingDays === null ? 'Pas encore' : lastWritingDays === 0 ? "Aujourd'hui" : `il y a ${lastWritingDays}j`}
-            progress={writingProgress}
-            progressLabel={activeWritingStory ? 'progression narrative' : 'aucune nouvelle active'}
-            icon={writingIcon}
-            onClick={() => navigate(writingDomain ? `/domain/${writingDomain.id}` : '/ecriture')}
-          />
-
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
           {/* Books ou Music */}
           {books.livreEnCours ? (
             <OngoingCard
@@ -985,10 +656,7 @@ export function Dashboard() {
         </div>
       </section>
 
-      {/* ── 3. Aujourd'hui ─────────────────────────────────────────────────── */}
-      <TodaySection />
-
-      {/* ── 4. Domaines ────────────────────────────────────────────────────── */}
+      {/* ── 3. Domaines ────────────────────────────────────────────────────── */}
       <section>
         <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', marginBottom: 20 }}>
           <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 28, color: 'var(--ink)', margin: 0 }}>

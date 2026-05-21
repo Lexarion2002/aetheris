@@ -7,10 +7,8 @@ import { isSupabaseReady } from '../lib/supabase'
 const ROUTE_META: Record<string, { title: string; subtitle: string }> = {
   '/dashboard':  { title: 'Dashboard',   subtitle: "Vue d'ensemble de tous vos domaines" },
   '/focus':      { title: 'Focus',       subtitle: 'Analytique des sessions de concentration' },
-  '/objectives': { title: 'Objectifs',   subtitle: 'Suivi de vos objectifs par domaine' },
   '/finances':   { title: 'Finances',    subtitle: 'Budgets, dépenses et statistiques' },
   '/analytics':  { title: 'Analytics',   subtitle: 'Performances hebdomadaires et mensuelles' },
-  '/week':       { title: 'Semaine',     subtitle: 'Calendrier hebdomadaire des tâches' },
   '/settings':   { title: 'Paramètres', subtitle: "Configuration de l'application" },
 }
 

@@ -85,18 +85,6 @@ export function SettingsPage() {
   // Notifications
   const [notifDeadlines,  setNotifDeadlines]       = useState(false)
 
-  // Anthropic API key — lue/écrite dans le store sync Supabase
-  const storedApiKey       = useStore((s) => s.anthropicApiKey)
-  const setAnthropicApiKey = useStore((s) => s.setAnthropicApiKey)
-  const [apiKey,      setApiKeyLocal] = useState(storedApiKey)
-  const [apiKeySaved, setApiKeySaved] = useState(false)
-
-  // Kit — instructions permanentes
-  const storedKitInstructions = useStore((s) => s.kitInstructions ?? '')
-  const setKitInstructions    = useStore((s) => s.setKitInstructions)
-  const [kitInstructionsLocal, setKitInstructionsLocal] = useState(storedKitInstructions)
-  const [kitInstructionsSaved, setKitInstructionsSaved] = useState(false)
-
   // Import/export
   const [importStatus,    setImportStatus]         = useState<'idle' | 'success' | 'error'>('idle')
   const [importMsg,       setImportMsg]            = useState('')
@@ -518,67 +506,6 @@ export function SettingsPage() {
               Réinitialiser
             </button>
           )}
-        </div>
-      </Section>
-
-      {/* ── Kit (IA) ──────────────────────────────────────────────────────── */}
-      <Section title="Kit · l'intelligence d'Aetheris" description="Connecte une clé Anthropic pour que Kit propose tes tâches du jour, ton plan de semaine et te relance sur les objectifs en retard">
-        <div className="space-y-3">
-          <div>
-            <p style={rowLabel}>Clé API Anthropic</p>
-            <p style={rowSublabel}>
-              Récupère ta clé sur{' '}
-              <a href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer" style={{ color: 'var(--terra)', textDecoration: 'underline' }}>
-                console.anthropic.com
-              </a>
-              {' '}— elle reste dans ton navigateur, jamais transmise ailleurs qu'à l'API.
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => { setApiKeyLocal(e.target.value); setApiKeySaved(false) }}
-              placeholder="sk-ant-…"
-              className={`flex-1 ${inputCls} px-3 py-2 text-sm font-mono`}
-              autoComplete="off"
-            />
-            <button
-              onClick={() => { setAnthropicApiKey(apiKey); setApiKeySaved(true); setTimeout(() => setApiKeySaved(false), 2000) }}
-              className={actionBtn}
-            >
-              {apiKeySaved ? '✓ Enregistré' : 'Enregistrer'}
-            </button>
-          </div>
-          {!apiKey && (
-            <p className="text-xs italic" style={{ color: 'var(--fg-subtle)' }}>
-              Sans clé, les suggestions Kit sont désactivées — tout le reste d'Aetheris fonctionne normalement.
-            </p>
-          )}
-
-          {/* Instructions permanentes pour Kit */}
-          <div style={{ marginTop: 24, borderTop: '1px solid var(--paper-2)', paddingTop: 18 }}>
-            <p style={rowLabel}>Instructions permanentes</p>
-            <p style={rowSublabel}>
-              Règles que Kit doit suivre à chaque génération de plan (semaine ou jour). Exemples : « pas de droit le dimanche », « écriture toujours le matin », « jamais plus de 2h de focus avant midi ».
-            </p>
-            <textarea
-              value={kitInstructionsLocal}
-              onChange={(e) => { setKitInstructionsLocal(e.target.value); setKitInstructionsSaved(false) }}
-              rows={5}
-              placeholder="- Pas de tâches avant 9h&#10;- L'écriture doit se faire le matin&#10;- Garder le dimanche soir libre"
-              className={`${inputCls} w-full px-3 py-2 text-sm`}
-              style={{ resize: 'vertical', fontFamily: 'var(--font-sans)' }}
-            />
-            <div className="flex justify-end mt-2">
-              <button
-                onClick={() => { setKitInstructions(kitInstructionsLocal); setKitInstructionsSaved(true); setTimeout(() => setKitInstructionsSaved(false), 2000) }}
-                className={actionBtn}
-              >
-                {kitInstructionsSaved ? '✓ Enregistré' : 'Enregistrer'}
-              </button>
-            </div>
-          </div>
         </div>
       </Section>
 

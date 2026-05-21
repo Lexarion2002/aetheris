@@ -10,7 +10,6 @@ import { LawPage }            from './LawPage'
 import { CareerView }        from './CareerView'
 import { SportView }         from './SportView'
 import { MusicPage }         from './MusicPage'
-import { suggestMilestoneRecovery } from '../lib/aiService'
 import type { Task, SubTask, Objective, Milestone, Priority, TaskStatus, TimeSession } from '../types'
 import type { PomodoroPhase } from '../store/pomodoroStore'
 
@@ -552,7 +551,6 @@ function HabitHeatmap({ obj }: { obj: Objective }) {
 // ─── ObjectiveCard ────────────────────────────────────────────────────────────
 
 function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective) => void }) {
-  const domains              = useStore((s) => s.domains)
   const deleteObjective      = useStore((s) => s.deleteObjective)
   const setObjectiveProgress = useStore((s) => s.setObjectiveProgress)
   const incrementCounter     = useStore((s) => s.incrementCounter)
@@ -562,9 +560,6 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
   const addMilestone         = useStore((s) => s.addMilestone)
   const toggleMilestone      = useStore((s) => s.toggleMilestone)
   const deleteMilestone      = useStore((s) => s.deleteMilestone)
-  const addTask              = useStore((s) => s.addTask)
-  const kitEnabled           = useStore((s) => !!s.anthropicApiKey)
-
   const milestones = useMemo(
     () => allMilestones.filter(m => m.objectiveId === obj.id).sort((a, b) => a.position - b.position),
     [allMilestones, obj.id],
@@ -577,9 +572,6 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
   const [addingMs,    setAddingMs]    = useState(false)
   const [newMsTitle,  setNewMsTitle]  = useState('')
   const [newMsDate,   setNewMsDate]   = useState('')
-  const [kitLoading,  setKitLoading]  = useState(false)
-  const [kitSug,      setKitSug]      = useState<{ nextAction: string; reason: string; timeEstimate: number } | null>(null)
-  const [kitAccepted, setKitAccepted] = useState(false)
   const msInputRef = useRef<HTMLInputElement>(null)
 
   const done        = obj.progress >= 100
@@ -601,21 +593,6 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
     const pos = milestones.length > 0 ? Math.max(...milestones.map(m => m.position)) + 1 : 0
     addMilestone({ objectiveId: obj.id, title: newMsTitle.trim(), targetDate: newMsDate || null, done: false, position: pos })
     setNewMsTitle(''); setNewMsDate(''); setAddingMs(false)
-  }
-
-  const fetchKit = async () => {
-    setKitLoading(true)
-    try {
-      const domain = domains.find(d => d.id === obj.domainId)
-      const result = await suggestMilestoneRecovery(obj, milestones, domain)
-      setKitSug(result)
-    } catch { /* ignore */ } finally { setKitLoading(false) }
-  }
-
-  const acceptKit = () => {
-    if (!kitSug) return
-    addTask({ domainId: obj.domainId, title: kitSug.nextAction, status: 'todo', priority: 'high', timeEstimate: kitSug.timeEstimate, dueDate: null, plannedDate: today, objectiveId: obj.id })
-    setKitAccepted(true)
   }
 
   return (
@@ -744,7 +721,7 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
           </div>
         )}
 
-        {/* Footer : jalons + Kit */}
+        {/* Footer : jalons */}
         <div className="mt-3 flex items-center gap-3">
           <button onClick={() => setExpanded(!expanded)}
             className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors">
@@ -752,29 +729,7 @@ function ObjectiveCard({ obj, onEdit }: { obj: Objective; onEdit: (o: Objective)
             Jalons
             {milestones.length > 0 && <span className="ml-0.5 text-zinc-600">({doneMs}/{milestones.length})</span>}
           </button>
-          {isOverdue && kitEnabled && !kitAccepted && (
-            <button onClick={() => void fetchKit()} disabled={kitLoading}
-              className="ml-auto flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs border border-orange-800/40 text-orange-400 hover:bg-orange-500/10 transition-colors">
-              <SparklesIcon className="h-3 w-3" />
-              {kitLoading ? 'Kit réfléchit…' : 'Demander à Kit'}
-            </button>
-          )}
-          {kitAccepted && <span className="ml-auto text-xs text-green-400 italic">✓ tâche planifiée</span>}
         </div>
-
-        {/* Suggestion Kit */}
-        {kitSug && !kitAccepted && (
-          <div className="mt-2 rounded-lg border border-orange-800/30 bg-orange-950/20 p-3 space-y-2">
-            <p className="text-sm text-zinc-200">{kitSug.nextAction}</p>
-            <p className="text-xs text-zinc-500 italic">{kitSug.reason}</p>
-            <div className="flex gap-2">
-              <button onClick={acceptKit} className="rounded px-2.5 py-1 text-xs bg-orange-500/20 text-orange-300 border border-orange-500/30 hover:bg-orange-500/30 transition-colors">
-                Planifier aujourd'hui
-              </button>
-              <button onClick={() => void fetchKit()} disabled={kitLoading} className="text-xs text-zinc-500 hover:text-zinc-300">↻ Autre</button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Jalons (repliables) */}
@@ -1214,14 +1169,6 @@ function ChevronDownIcon({ className }: { className?: string }) {
   return (
     <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
       <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-    </svg>
-  )
-}
-
-function SparklesIcon({ className }: { className?: string }) {
-  return (
-    <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
     </svg>
   )
 }

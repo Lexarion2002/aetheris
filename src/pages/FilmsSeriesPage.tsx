@@ -1,7 +1,6 @@
 import { useState, useRef, Fragment } from 'react'
 import { Film, Tv, Check, Edit2, Trash2, Plus, Play, Bookmark } from 'lucide-react'
 import { useFilmSerieStore } from '../store/filmSerieStore'
-import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { FilmSerie, FilmSerieType, FilmSerieStatus } from '../store/filmSerieStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1029,12 +1028,6 @@ export function FilmsSeriesPage() {
         onCritique={setCritiqueTarget}
         onEdit={setEditTarget}
         onRemove={removeItem}
-      />
-
-      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
-      <DomainObjectivesSection
-        domainId="films"
-        subtitle="« Choisir ce qu'on regarde, ne pas se laisser regarder. »"
       />
 
       {/* ── Modals ──────────────────────────────────────────────────────────────── */}

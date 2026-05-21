@@ -4,7 +4,6 @@ import 'react-image-crop/dist/ReactCrop.css'
 import { saveImage as dbSaveImage, loadImage as dbLoadImage, deleteImage as dbDeleteImage } from '../lib/imageDb'
 import { Plus, ArrowRight, X, Check, ImagePlus, Link2, Crop as CropIcon } from 'lucide-react'
 import { useShoppingStore } from '../store/shoppingStore'
-import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import { useStore } from '../store'
 import { computeMonthBalance } from '../utils/financeUtils'
 import type {
@@ -1926,12 +1925,6 @@ export function ShoppingPage() {
         <SectionTitle>Historique</SectionTitle>
         <HistoryList bought={bought} categories={categories} onDelete={removeBoughtItem} />
       </section>
-
-      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
-      <DomainObjectivesSection
-        domainId="achats"
-        subtitle="« Acheter peu, choisir lentement. »"
-      />
 
       {/* ── Panels ────────────────────────────────────────────────────────────── */}
       {decidingItem && (

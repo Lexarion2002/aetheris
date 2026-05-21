@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, PenLine, Scale, Music, Dumbbell } from 'lucide-react'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, Scale, Music, Dumbbell } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -102,7 +102,6 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
   const tasks    = useStore((s) => s.tasks)
   const law      = useLawStore()
   const career   = useCareerStore()
-  const hasWritingDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'écriture')
   const hasLawDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'droit')
   const hasMusicDomain = domains.some((domain) => domain.name.trim().toLowerCase() === 'musique')
 
@@ -135,21 +134,9 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
       {/* ── Navigation principale ───────────────────────────────────────────────── */}
       <div className="space-y-0.5">
         {sectionLabel('Navigation')}
-        <NavLink to="/today" onClick={onNavigate} className={linkCls}>
-          <span className="text-xs w-4 text-center">◎</span>
-          Aujourd'hui
-        </NavLink>
         <NavLink to="/dashboard" end onClick={onNavigate} className={linkCls}>
           <span className="text-xs w-4 text-center">⊹</span>
           Dashboard
-        </NavLink>
-        <NavLink to="/schedule" onClick={onNavigate} className={linkCls}>
-          <span className="text-xs w-4 text-center">⊞</span>
-          Emploi du temps
-        </NavLink>
-        <NavLink to="/week" onClick={onNavigate} className={linkCls}>
-          <span className="text-xs w-4 text-center">▦</span>
-          Semaine
         </NavLink>
       </div>
 
@@ -285,22 +272,6 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
           <Briefcase size={14} className="shrink-0" />
           <span className="truncate">Cabinet</span>
         </NavLink>
-        {!hasWritingDomain && (
-          <NavLink to="/ecriture" onClick={onNavigate}
-            className={({ isActive }) =>
-              [
-                'flex items-center gap-2.5 rounded-lg px-3 py-1.5 text-sm transition-all duration-150 outline-none',
-                'focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]',
-                isActive
-                  ? 'bg-[var(--paper-3)] text-[var(--fg)] font-medium'
-                  : 'text-[var(--fg-muted)] hover:bg-[var(--paper-2)] hover:text-[var(--fg)]',
-              ].join(' ')
-            }
-          >
-            <PenLine size={14} className="shrink-0" />
-            <span className="truncate">Écriture</span>
-          </NavLink>
-        )}
         {/* Sport — page standalone */}
         <NavLink to="/sport" onClick={onNavigate}
           className={({ isActive }) =>

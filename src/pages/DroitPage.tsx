@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react'
-import { ChevronRight, Plus, X, Trash2, BookOpen, Sparkles } from 'lucide-react'
+import { ChevronRight, Plus, X, Trash2, BookOpen } from 'lucide-react'
 import { useDroitStore } from '../store/droitStore'
 import { FlashcardCreateModal } from '../components/FlashcardCreateModal'
 import { FlashcardReviewModal } from '../components/FlashcardReviewModal'
@@ -760,7 +760,7 @@ function RevisionsSection() {
           fontFamily: 'var(--font-serif)', fontStyle: 'italic',
           fontSize: 14, color: 'var(--ink-3)', lineHeight: 1.5,
         }}>
-          Pas encore de cartes. Crée-les manuellement ou colle un texte de cours dans le mode <Sparkles size={11} style={{ verticalAlign: 'baseline' }} /> Kit — il en générera 5 à 10 à valider.
+          Pas encore de cartes. Crée-les manuellement à partir d'un cours ou d'une fiche de révision.
         </div>
       )}
 

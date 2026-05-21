@@ -138,16 +138,6 @@ interface AetherisState {
   updateRoutine:   (id: string, updates: Partial<Omit<Routine, 'id' | 'createdAt' | 'updatedAt'>>) => void
   deleteRoutine:   (id: string) => void
 
-  // Kit (IA) — clé Anthropic stockée dans le store sync Supabase
-  anthropicApiKey:    string
-  setAnthropicApiKey: (key: string) => void
-
-  // Kit — instructions persistantes données par l'utilisateur (ex: "pas de
-  // droit le dimanche", "écriture toujours le matin"). Injectées dans les
-  // prompts à chaque appel.
-  kitInstructions:    string
-  setKitInstructions: (text: string) => void
-
   // Migrations one-shot (booléens persistants pour éviter double-migration)
   _migratedSportObjectives?: boolean
   _migratedBookAnnualGoal?:  boolean
@@ -198,10 +188,8 @@ export const useStore = createPersistedStore<AetherisState>(
         soundEnabled:            true,
       },
       userContext: '',
-      anthropicApiKey: '',
       scheduleBlocks: [],
       routines:       [],
-      kitInstructions: '',
 
       // ── Seed / Onboarding ────────────────────────────────────────────────────
 
@@ -666,12 +654,6 @@ export const useStore = createPersistedStore<AetherisState>(
       // ── Dashboard context ────────────────────────────────────────────────────
 
       setUserContext: (ctx) => set({ userContext: ctx }),
-
-      // ── Kit (IA) ─────────────────────────────────────────────────────────────
-
-      setAnthropicApiKey: (key) => set({ anthropicApiKey: key.trim() }),
-
-      setKitInstructions: (text) => set({ kitInstructions: text }),
 
       setMigrationFlag: (key, v) => set({ [key]: v } as Partial<AetherisState>),
 

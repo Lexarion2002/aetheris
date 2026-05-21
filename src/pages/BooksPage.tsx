@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { useBookStore } from '../store/bookStore'
-import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { BookCritique, BookAttente, BookEnCours, BookType, BookSource } from '../store/bookStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -1119,12 +1118,6 @@ export function BooksPage() {
           </span>
         </footer>
       </div>
-
-      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
-      <DomainObjectivesSection
-        domainId="livres"
-        subtitle="« Lire en profondeur, pas en surface. »"
-      />
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {critiqueModal.open && (

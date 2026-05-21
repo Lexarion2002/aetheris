@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMusicStore } from '../store/musicStore'
-import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type { AlbumCritique, AlbumAttente, AlbumTag } from '../store/musicStore'
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -764,12 +763,6 @@ export function MusicPage() {
       <FileAttenteSection
         onNew={() => setFileModal(true)}
         onEdit={album => setCritiqueModal({ open: true, album })}
-      />
-
-      {/* ── Objectifs ───────────────────────────────────────────────────────── */}
-      <DomainObjectivesSection
-        domainId="musique"
-        subtitle="« Construire une discothèque vivante, pas une étagère. »"
       />
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}

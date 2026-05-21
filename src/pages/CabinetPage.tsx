@@ -1,13 +1,13 @@
 import { useState } from 'react'
 import {
-  Plus, Archive, Users, Flame, Circle, CircleDashed,
-  AtSign, Mail, Check, Trash2, Pencil,
+  Plus, Archive, Users,
+  Mail, Trash2, Pencil,
 } from 'lucide-react'
 import { useCabinetStore } from '../store/cabinetStore'
 import { DomainObjectivesSection } from '../components/DomainObjectivesSection'
 import type {
-  CabinetDossier, CabinetTache, CabinetNote, CabinetContact,
-  DossierType, DossierStatut, TachePriorite, TacheStatut, NoteType, ContactRole,
+  CabinetDossier, CabinetNote, CabinetContact,
+  DossierType, DossierStatut, NoteType, ContactRole,
 } from '../store/cabinetStore'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -33,12 +33,6 @@ function fmtDateLong(iso: string): string {
   if (!iso) return ''
   const d = new Date(iso + 'T00:00:00')
   return `${JOURS[d.getDay()]} ${d.getDate()} ${MOIS[d.getMonth()]}`
-}
-
-function isUrgent(iso: string): boolean {
-  if (!iso) return false
-  const diff = (new Date(iso).getTime() - Date.now()) / 86400000
-  return diff >= 0 && diff <= 3
 }
 
 function noteTone(type: NoteType): 'terra' | 'sauge' | 'ink' {
@@ -189,55 +183,6 @@ function CaseModal({ mode, dossier, onClose }: {
         <div style={mRow}><span style={mLabel}>Statut</span>{chipOpts<DossierStatut>([['en cours', 'En cours'], ['en attente', 'En attente'], ['clôturé', 'Clôturé']], statut, setStatut)}</div>
         <div style={mRow}><span style={mLabel}>Échéance</span><input type="date" style={mInput} value={deadline} onChange={(e) => setDeadline(e.target.value)} /></div>
         <ModalButtons onCancel={onClose} onSubmit={handleSubmit} disabled={!nom.trim()} submitLabel={isEdit ? 'Enregistrer' : 'Ajouter'} />
-      </div>
-    </div>
-  )
-}
-
-// ─── ModalAddTache ────────────────────────────────────────────────────────────
-
-function ModalAddTache({ onClose }: { onClose: () => void }) {
-  const addTache  = useCabinetStore((s) => s.addTache)
-  const dossiers  = useCabinetStore((s) => s.dossiers)
-  const [titre,     setTitre]     = useState('')
-  const [avocat,    setAvocat]    = useState('')
-  const [dossierId, setDossierId] = useState('')
-  const [priorite,  setPriorite]  = useState<TachePriorite>('normal')
-  const [statut,    setStatut]    = useState<TacheStatut>('à faire')
-  const [rendu,     setRendu]     = useState('')
-
-  const dossiersActifs = [...dossiers]
-    .filter((d) => d.statut === 'en cours' || d.statut === 'en attente')
-    .sort((a, b) => b.ref.localeCompare(a.ref))
-
-  function handleSubmit() {
-    if (!titre.trim()) return
-    addTache({ titre: titre.trim(), avocat: avocat.trim(), priorite, statut, rendu, dossierId: dossierId || undefined })
-    onClose()
-  }
-
-  return (
-    <div style={mOverlay} onClick={(e) => { if (e.target === e.currentTarget) onClose() }}>
-      <div style={mBox}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <h2 style={{ fontFamily: 'var(--font-serif)', fontWeight: 500, fontSize: 22, color: 'var(--ink)', margin: 0 }}>Nouvelle tâche</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'var(--ink-3)', fontSize: 20, cursor: 'pointer' }}>×</button>
-        </div>
-        <div style={mRow}><span style={mLabel}>Intitulé *</span><input style={mInput} placeholder="Ex : Note de synthèse — non-concurrence" value={titre} onChange={(e) => setTitre(e.target.value)} autoFocus /></div>
-        <div style={mRow}><span style={mLabel}>Demandé par</span><input style={mInput} placeholder="Ex : M. Marchais" value={avocat} onChange={(e) => setAvocat(e.target.value)} /></div>
-        <div style={mRow}>
-          <span style={mLabel}>Dossier associé</span>
-          <select style={{ ...mInput, appearance: 'none' }} value={dossierId} onChange={(e) => setDossierId(e.target.value)}>
-            <option value="">— Sans dossier —</option>
-            {dossiersActifs.map((d) => (
-              <option key={d.id} value={d.id}>{d.nom} — {d.ref}</option>
-            ))}
-          </select>
-        </div>
-        <div style={mRow}><span style={mLabel}>Priorité</span>{chipOpts<TachePriorite>([['urgent', 'Urgent'], ['normal', 'Normal'], ['quand possible', 'Quand possible']], priorite, setPriorite)}</div>
-        <div style={mRow}><span style={mLabel}>Statut</span>{chipOpts<TacheStatut>([['à faire', 'À faire'], ['en cours', 'En cours'], ['rendu', 'Rendu']], statut, setStatut)}</div>
-        <div style={mRow}><span style={mLabel}>À rendre le</span><input type="date" style={mInput} value={rendu} onChange={(e) => setRendu(e.target.value)} /></div>
-        <ModalButtons onCancel={onClose} onSubmit={handleSubmit} disabled={!titre.trim()} />
       </div>
     </div>
   )
@@ -459,140 +404,6 @@ function DossierRow({ dossier, last, onEdit, onRemove }: {
   )
 }
 
-// ─── TachesSection ────────────────────────────────────────────────────────────
-
-function TachesSection({ onAdd }: { onAdd: () => void }) {
-  const taches      = useCabinetStore((s) => s.taches)
-  const dossiers    = useCabinetStore((s) => s.dossiers)
-  const updateTache = useCabinetStore((s) => s.updateTache)
-  const removeTache = useCabinetStore((s) => s.removeTache)
-  const [filterDossier, setFilterDossier] = useState('')
-
-  const actives = taches.filter((t) => t.statut !== 'rendu').length
-  const rendues = taches.filter((t) => t.statut === 'rendu').length
-
-  // Dossiers qui ont au moins une tâche rattachée
-  const dossiersAvecTaches = dossiers.filter((d) =>
-    taches.some((t) => t.dossierId === d.id)
-  )
-
-  const filtered = filterDossier
-    ? taches.filter((t) => t.dossierId === filterDossier)
-    : taches
-
-  // Lookup ref par id pour le badge dans TacheRow
-  const dossierRefById = Object.fromEntries(dossiers.map((d) => [d.id, d.ref]))
-
-  return (
-    <section style={{ marginBottom: 56 }}>
-      <SectionHeader
-        eyebrow="02"
-        title="Tâches & recherches"
-        count={`${actives} en cours · ${rendues} rendues`}
-        action={
-          <button onClick={onAdd} style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px', borderRadius: 8, border: 'none', background: 'var(--terra)', color: 'var(--paper-1)', fontFamily: 'var(--font-sans)', fontSize: 13, fontWeight: 500, cursor: 'pointer' }}>
-            <Plus size={14} /> Tâche
-          </button>
-        }
-      />
-      {dossiersAvecTaches.length > 0 && (
-        <div style={{ display: 'flex', gap: 6, marginBottom: 14, flexWrap: 'wrap' }}>
-          <button onClick={() => setFilterDossier('')} style={{
-            fontFamily: 'var(--font-sans)', fontSize: 13, padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
-            background: !filterDossier ? 'var(--paper-3)' : 'var(--paper-1)',
-            border: `1px solid ${!filterDossier ? 'var(--ink-4)' : 'var(--paper-2)'}`, color: 'var(--ink)',
-          }}>Tous les dossiers</button>
-          {dossiersAvecTaches.map((d) => (
-            <button key={d.id} onClick={() => setFilterDossier(d.id)} style={{
-              fontFamily: 'var(--font-sans)', fontSize: 13, padding: '4px 10px', borderRadius: 999, cursor: 'pointer',
-              background: filterDossier === d.id ? 'var(--paper-3)' : 'var(--paper-1)',
-              border: `1px solid ${filterDossier === d.id ? 'var(--ink-4)' : 'var(--paper-2)'}`, color: 'var(--ink)',
-            }}>{d.ref}</button>
-          ))}
-        </div>
-      )}
-      {filtered.length === 0 ? (
-        <div style={{ padding: '32px 0', textAlign: 'center', color: 'var(--ink-3)', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 15 }}>Aucune tâche</div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {filtered.map((t) => (
-            <TacheRow key={t.id} tache={t}
-              dossierRef={t.dossierId ? dossierRefById[t.dossierId] : undefined}
-              onToggle={() => updateTache(t.id, { statut: t.statut === 'rendu' ? 'à faire' : 'rendu' })}
-              onRemove={() => removeTache(t.id)} />
-          ))}
-        </div>
-      )}
-    </section>
-  )
-}
-
-function TacheRow({ tache, dossierRef, onToggle, onRemove }: {
-  tache: CabinetTache; dossierRef?: string; onToggle: () => void; onRemove: () => void
-}) {
-  const [hover, setHover] = useState(false)
-  const done = tache.statut === 'rendu'
-  const urgent = isUrgent(tache.rendu) && !done
-
-  const prioriteStyle: Record<TachePriorite, { color: string; bg: string; icon: React.ReactNode }> = {
-    'urgent':         { color: 'var(--terra-deep)', bg: 'var(--terra-soft)', icon: <Flame size={12} color="var(--terra-deep)" /> },
-    'normal':         { color: 'var(--ink)',        bg: 'var(--paper-2)',    icon: <Circle size={12} color="var(--ink)" /> },
-    'quand possible': { color: 'var(--ink-2)',      bg: 'transparent',       icon: <CircleDashed size={12} color="var(--ink-2)" /> },
-  }
-  const p = prioriteStyle[tache.priorite]
-
-  const statutDot: Record<TacheStatut, string> = {
-    'à faire':  'var(--ink-4)',
-    'en cours': 'var(--terra)',
-    'rendu':    'var(--sage)',
-  }
-
-  return (
-    <div
-      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
-      style={{
-        display: 'grid', gridTemplateColumns: '20px 1fr 160px 130px 90px 36px',
-        gap: 18, alignItems: 'center', padding: '14px 18px', borderRadius: 10,
-        background: hover ? 'var(--paper-1)' : 'transparent',
-        border: `1px solid ${hover ? 'var(--paper-2)' : 'transparent'}`,
-        transition: 'background var(--dur) var(--ease), border-color var(--dur) var(--ease)',
-        cursor: 'pointer', opacity: done ? 0.55 : 1,
-      }}>
-      <div onClick={onToggle} style={{ width: 18, height: 18, borderRadius: 5, border: `1.5px solid ${done ? 'var(--sage)' : 'var(--ink-4)'}`, background: done ? 'var(--sage)' : 'transparent', display: 'grid', placeItems: 'center', transition: 'all var(--dur) var(--ease)', cursor: 'pointer', flexShrink: 0 }}>
-        {done && <Check size={12} color="var(--paper-1)" />}
-      </div>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4, flexWrap: 'wrap' }}>
-          <span style={{ fontFamily: 'var(--font-sans)', fontSize: 14.5, color: 'var(--ink)', lineHeight: 1.4, textDecoration: done ? 'line-through' : 'none', textDecorationColor: 'var(--ink-3)' }}>{tache.titre}</span>
-          {dossierRef && (
-            <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.06em', padding: '1px 6px', borderRadius: 4, background: 'var(--terra-soft)', color: 'var(--terra-deep)', fontWeight: 500, flexShrink: 0 }}>{dossierRef}</span>
-          )}
-        </div>
-        {tache.avocat && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>
-            <AtSign size={11} /><span style={{ fontStyle: 'italic' }}>demandé par</span> {tache.avocat}
-          </div>
-        )}
-      </div>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '4px 10px', borderRadius: 6, background: p.bg, width: 'fit-content' }}>
-        {p.icon}
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 10.5, letterSpacing: '0.1em', textTransform: 'uppercase', color: p.color, fontWeight: 500 }}>{tache.priorite}</span>
-      </div>
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-        <span style={{ width: 7, height: 7, borderRadius: 999, background: statutDot[tache.statut], flexShrink: 0 }} />
-        <span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink)', fontWeight: 500 }}>{tache.statut}</span>
-      </div>
-      <div style={{ textAlign: 'right' }}>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 9.5, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)', display: 'block', marginBottom: 2 }}>{done ? 'rendu le' : 'à rendre'}</span>
-        <span style={{ fontFamily: 'var(--font-mono)', fontSize: 12.5, fontVariantNumeric: 'tabular-nums', color: urgent ? 'var(--terra)' : 'var(--ink)', fontWeight: urgent ? 600 : 500 }}>{fmtDate(tache.rendu)}</span>
-      </div>
-      <button onClick={onRemove} style={{ width: 26, height: 26, borderRadius: 6, background: 'transparent', border: '1px solid var(--paper-2)', color: 'var(--ink-3)', cursor: 'pointer', display: 'grid', placeItems: 'center', opacity: hover ? 1 : 0, transition: 'opacity var(--dur) var(--ease)' }}>
-        <Trash2 size={12} />
-      </button>
-    </div>
-  )
-}
-
 // ─── NotesSection ─────────────────────────────────────────────────────────────
 
 function NotesSection({ onAdd }: { onAdd: () => void }) {
@@ -768,7 +579,6 @@ export function CabinetPage() {
   const [selectedCase, setSelectedCase] = useState<CabinetDossier | null>(null)
   const [isCaseModalOpen, setIsCaseModalOpen] = useState(false)
   const [caseModalMode, setCaseModalMode] = useState<'create' | 'edit'>('create')
-  const [showAddTache,   setShowAddTache]   = useState(false)
   const [showAddNote,    setShowAddNote]    = useState(false)
   const [showAddContact, setShowAddContact] = useState(false)
 
@@ -816,7 +626,6 @@ export function CabinetPage() {
 
       {/* ── Sections ────────────────────────────────────────────────────────── */}
       <DossiersSection onAdd={openCreateCaseModal} onEdit={openEditCaseModal} />
-      <TachesSection   onAdd={() => setShowAddTache(true)} />
       <NotesSection    onAdd={() => setShowAddNote(true)} />
       <ContactsSection onAdd={() => setShowAddContact(true)} />
 
@@ -828,7 +637,6 @@ export function CabinetPage() {
 
       {/* ── Modals ──────────────────────────────────────────────────────────── */}
       {isCaseModalOpen && <CaseModal mode={caseModalMode} dossier={selectedCase} onClose={closeCaseModal} />}
-      {showAddTache   && <ModalAddTache   onClose={() => setShowAddTache(false)} />}
       {showAddNote    && <ModalAddNote    onClose={() => setShowAddNote(false)} />}
       {showAddContact && <ModalAddContact onClose={() => setShowAddContact(false)} />}
     </div>

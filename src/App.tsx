@@ -19,7 +19,6 @@ const DomainView     = lazy(() => import('./pages/DomainView').then((m) => ({ de
 const FocusDashboard = lazy(() => import('./pages/FocusDashboard').then((m) => ({ default: m.FocusDashboard })))
 const FinancePage    = lazy(() => import('./pages/FinancePage').then((m) => ({ default: m.FinancePage })))
 const AnalyticsPage  = lazy(() => import('./pages/AnalyticsPage').then((m) => ({ default: m.AnalyticsPage })))
-const WeekView       = lazy(() => import('./pages/WeekView').then((m) => ({ default: m.WeekView })))
 const SettingsPage   = lazy(() => import('./pages/SettingsPage').then((m) => ({ default: m.SettingsPage })))
 const CategoriesPage = lazy(() => import('./pages/CategoriesPage').then((m) => ({ default: m.CategoriesPage })))
 const MusicPage      = lazy(() => import('./pages/MusicPage').then((m) => ({ default: m.MusicPage })))
@@ -28,11 +27,8 @@ const ShoppingPage      = lazy(() => import('./pages/ShoppingPage').then((m) => 
 const FilmsSeriesPage   = lazy(() => import('./pages/FilmsSeriesPage').then((m) => ({ default: m.FilmsSeriesPage })))
 const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ default: m.BooksPage })))
 const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => ({ default: m.CabinetPage })))
-const EcriturePage      = lazy(() => import('./pages/EcriturePage').then((m) => ({ default: m.EcriturePage })))
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
 const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
-const TodayPage         = lazy(() => import('./pages/TodayPage').then((m) => ({ default: m.TodayPage })))
-const SchedulePage      = lazy(() => import('./pages/SchedulePage').then((m) => ({ default: m.SchedulePage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -93,18 +89,8 @@ export default function App() {
 
   // Nettoyage des anciennes clés localStorage (migration unique)
   useEffect(() => {
-    const LEGACY_KEYS = ['aetheris-v2', 'aetheris-store']
+    const LEGACY_KEYS = ['aetheris-v2', 'aetheris-store', 'aetheris-anthropic-key']
     LEGACY_KEYS.forEach((k) => localStorage.removeItem(k))
-
-    // Migration : clé Anthropic isolée → store sync Supabase
-    const legacyAnthropicKey = localStorage.getItem('aetheris-anthropic-key')
-    if (legacyAnthropicKey) {
-      const state = useStore.getState()
-      if (!state.anthropicApiKey) {
-        state.setAnthropicApiKey(legacyAnthropicKey)
-      }
-      try { localStorage.removeItem('aetheris-anthropic-key') } catch { /* ignore */ }
-    }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -155,14 +141,10 @@ export default function App() {
         {/* ── App (requires onboarding) ─────────────────────────────────────── */}
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
           <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
-          <Route path="today"     element={<Suspense fallback={<PageLoader />}><TodayPage /></Suspense>} />
           <Route path="domain/:id" element={<Suspense fallback={<PageLoader />}><DomainView /></Suspense>} />
           <Route path="focus" element={<Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>} />
-          <Route path="objectives" element={<Navigate to="/week" replace />} />
           <Route path="finances" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
           <Route path="analytics" element={<Suspense fallback={<PageLoader />}><AnalyticsPage /></Suspense>} />
-          <Route path="week" element={<Suspense fallback={<PageLoader />}><WeekView /></Suspense>} />
-          <Route path="schedule" element={<Suspense fallback={<PageLoader />}><SchedulePage /></Suspense>} />
           <Route path="settings" element={<Suspense fallback={<PageLoader />}><SettingsPage /></Suspense>} />
           <Route path="categories" element={<Suspense fallback={<PageLoader />}><CategoriesPage /></Suspense>} />
           <Route path="musique" element={<Suspense fallback={<PageLoader />}><MusicPage /></Suspense>} />
@@ -171,7 +153,6 @@ export default function App() {
           <Route path="films" element={<Suspense fallback={<PageLoader />}><FilmsSeriesPage /></Suspense>} />
           <Route path="livres"   element={<Suspense fallback={<PageLoader />}><BooksPage /></Suspense>} />
           <Route path="cabinet" element={<Suspense fallback={<PageLoader />}><CabinetPage /></Suspense>} />
-          <Route path="ecriture" element={<Suspense fallback={<PageLoader />}><EcriturePage /></Suspense>} />
           <Route path="droit" element={<Suspense fallback={<PageLoader />}><DroitPage /></Suspense>} />
           <Route path="sport" element={<Suspense fallback={<PageLoader />}><SportView /></Suspense>} />
         </Route>
