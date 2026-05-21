@@ -98,6 +98,16 @@ export interface Objective {
   // current devient la somme cumulée des valeurs du log.
   dailyTarget?: number
   dailyLog?:    DailyLogEntry[]
+
+  // ── Cascade de planification (docs/planning/SPEC.md) ────────────────────────
+  // Si parentOkrId est défini, cet Objective joue aussi le rôle de KR
+  // dans la cascade Vision → OKR → KR → Rock. Champ optionnel : un Objective
+  // sans parentOkrId continue de fonctionner comme avant (objectif local au domaine).
+  parentOkrId?: string
+
+  // Valeur cible textuelle libre pour un KR (ex: "≥80%", "31 nouvelles",
+  // "1er sept 2026"). Distincte de target (numérique pour les counters).
+  targetValue?: string
 }
 
 // ─── Expense ──────────────────────────────────────────────────────────────────

@@ -29,6 +29,7 @@ const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ 
 const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => ({ default: m.CabinetPage })))
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
 const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
+const PlanningPage      = lazy(() => import('./pages/PlanningPage').then((m) => ({ default: m.PlanningPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -141,6 +142,7 @@ export default function App() {
         {/* ── App (requires onboarding) ─────────────────────────────────────── */}
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
           <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="planning" element={<Suspense fallback={<PageLoader />}><PlanningPage /></Suspense>} />
           <Route path="domain/:id" element={<Suspense fallback={<PageLoader />}><DomainView /></Suspense>} />
           <Route path="focus" element={<Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>} />
           <Route path="finances" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />

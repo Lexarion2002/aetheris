@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, Scale, Music, Dumbbell } from 'lucide-react'
+import { Landmark, ShoppingBag, BookOpen, Film, Circle, Briefcase, Scale, Music, Dumbbell, Target } from 'lucide-react'
 import { useStore } from '../store'
 import { useLawStore } from '../store/lawStore'
 import { useCareerStore } from '../store/careerStore'
@@ -137,6 +137,10 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
         <NavLink to="/dashboard" end onClick={onNavigate} className={linkCls}>
           <span className="text-xs w-4 text-center">⊹</span>
           Dashboard
+        </NavLink>
+        <NavLink to="/planning" onClick={onNavigate} className={linkCls}>
+          <Target size={14} className="shrink-0" />
+          Planning
         </NavLink>
       </div>
 
