@@ -30,7 +30,6 @@ const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => (
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
 const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
 const PlanningPage             = lazy(() => import('./pages/PlanningPage').then((m) => ({ default: m.PlanningPage })))
-const PlanningDayPage          = lazy(() => import('./pages/PlanningDayPage').then((m) => ({ default: m.PlanningDayPage })))
 const PlanningWeekPage         = lazy(() => import('./pages/PlanningWeekPage').then((m) => ({ default: m.PlanningWeekPage })))
 const PlanningWeeklyReviewPage = lazy(() => import('./pages/PlanningWeeklyReviewPage').then((m) => ({ default: m.PlanningWeeklyReviewPage })))
 
@@ -146,8 +145,6 @@ export default function App() {
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
           <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
           <Route path="planning" element={<Suspense fallback={<PageLoader />}><PlanningPage /></Suspense>} />
-          <Route path="planning/day" element={<Suspense fallback={<PageLoader />}><PlanningDayPage /></Suspense>} />
-          <Route path="planning/day/:date" element={<Suspense fallback={<PageLoader />}><PlanningDayPage /></Suspense>} />
           <Route path="planning/week" element={<Suspense fallback={<PageLoader />}><PlanningWeekPage /></Suspense>} />
           <Route path="planning/week/:y/:w" element={<Suspense fallback={<PageLoader />}><PlanningWeekPage /></Suspense>} />
           <Route path="planning/review/new" element={<Suspense fallback={<PageLoader />}><PlanningWeeklyReviewPage /></Suspense>} />

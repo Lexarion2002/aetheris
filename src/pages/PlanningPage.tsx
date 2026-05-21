@@ -1,6 +1,6 @@
 import { useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, X, ChevronRight, Check, CalendarDays, CalendarRange, ClipboardCheck } from 'lucide-react'
+import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck } from 'lucide-react'
 import { usePlanningStore } from '../store/planningStore'
 import { useStore } from '../store'
 import { nanoid } from '../utils/nanoid'
@@ -165,9 +165,6 @@ export function PlanningPage() {
           </p>
         </div>
         <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <Link to="/planning/day" style={navBtnStyle}>
-            <CalendarDays size={14} /> Aujourd'hui
-          </Link>
           <Link to="/planning/week" style={navBtnStyle}>
             <CalendarRange size={14} /> Cette semaine
           </Link>

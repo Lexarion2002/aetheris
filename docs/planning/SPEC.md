@@ -52,8 +52,11 @@ Identité (Vision LT, ~10 ans)        — 3 max
              └── Rock (trimestriel)    — 5 max par trimestre
                   └── Mois (jalons)    — 1-3 jalons par mois
                        └── Semaine     — 3 MITs max
-                            └── Jour   — 1 priorité + 3 importantes + 5 secondaires
 ```
+
+**Note 2026-05-21** : le niveau **Jour** (1-3-5) a été retiré de la cascade
+Aetheris. La planification quotidienne **reste dans TickTick** qui fait déjà
+ce travail (vue Aujourd'hui, priorités, sous-tâches, Pomodoro). Voir §12.10.
 
 **Plafonds stricts appliqués dans l'UI** (anti-méta-fuite, cf. §10).
 
@@ -186,22 +189,7 @@ type Week = {
   updatedAt: string
 }
 
-// =============================================================================
-// JOUR — Plan 1-3-5. Une entrée unique par date.
-// =============================================================================
-type DayPlan = {
-  id: string
-  date: string                         // ISO date "YYYY-MM-DD"
-  dayType?: 'cabinet' | 'ecole' | 'libre'
-  priority?: string                    // LA chose absolue (1)
-  importants: string[]                 // max 3
-  secondaries: string[]                // max 5
-  energyExpected?: 'faible' | 'moyenne' | 'haute'
-  pivotQuestion?: string               // "Si je ne fais qu'UNE chose demain..."
-  prepChecklist?: { label: string, done: boolean }[]
-  createdAt: string
-  updatedAt: string
-}
+// JOUR — supprimé 2026-05-21. Cf. §12.10. Plan 1-3-5 vit dans TickTick.
 
 // =============================================================================
 // REVUE — Hebdo structurée + autres revues libres (Markdown).
@@ -254,12 +242,11 @@ type PlanningState = {
   rocks: Rock[]
   months: Month[]
   weeks: Week[]
-  dayPlans: DayPlan[]
   reviews: Review[]
   systemNotes: SystemNote[]
 
   // actions : CRUD pour chaque entité
-  // sélecteurs : getOkrsByIdentity, getKrsByOkr, getRocksByKr, getCurrentWeek, getCurrentDayPlan…
+  // sélecteurs : getOkrsByIdentity, getKrsByOkr, getRocksByKr, getCurrentWeek…
 }
 ```
 
@@ -278,8 +265,7 @@ Route racine : `/planning`. Toutes sous-routes protégées par auth.
 | `/planning/months/:year/:month` | Vue d'un mois : jalons + découpage hebdo + risque | 3 |
 | `/planning/week` | Semaine en cours : 3 MITs + risque (édition inline) | 3 |
 | `/planning/week/:isoYear/:isoWeek` | Lecture/édition d'une semaine passée ou future | 3 |
-| `/planning/day` | Plan du jour (aujourd'hui par défaut). Bouton « Planifier demain » | 3 |
-| `/planning/day/:date` | Plan d'un jour passé ou futur | 3 |
+| ~~`/planning/day`~~ | ~~Plan du jour~~ — supprimé 2026-05-21, voir §12.10 | — |
 | `/planning/review/new?kind=weekly` | Nouvelle revue hebdo (formulaire structuré, ~10 champs) | 3 |
 | `/planning/review/new?kind=monthly\|quarterly\|annual` | Nouvelle revue libre (éditeur Markdown) | 3 |
 | `/planning/review/:id` | Lecture/édition d'une revue | 3 |
@@ -290,7 +276,7 @@ Route racine : `/planning`. Toutes sous-routes protégées par auth.
 
 - **Nav latérale** : ajouter une entrée « Planning » entre « Focus » et « Finances ».
 - **Dashboard** : 2 widgets nouveaux :
-  - « Aujourd'hui » → résumé `DayPlan.priority` + 3 importantes
+  - ~~« Aujourd'hui »~~ — supprimé (cf. §12.10)
   - « Cette semaine » → 3 MITs + risque
 - **Pages domaine existantes** : sur chaque `Objective` qui a un `parentOkrId`,
   afficher une mention discrète « KR de [OKR.name] » avec lien vers `/planning/okrs/:id`.
@@ -302,11 +288,8 @@ Route racine : `/planning`. Toutes sous-routes protégées par auth.
 
 ### Au quotidien (J-1 le soir, ~10 min)
 
-1. Ouvre `/planning/day?date=demain`
-2. Définit la **priorité 1** (= l'action qui DOIT être faite — texte libre)
-3. Liste 3 **importantes** + 5 **secondaires** (texte libre)
-4. Coche la **prep checklist** (tenue, sac, Kindle, documents)
-5. En parallèle : créer/mettre à jour les vraies tâches exécutables dans **TickTick** si elles n'y sont pas déjà
+**Supprimé d'Aetheris le 2026-05-21** — vit entièrement dans TickTick.
+Voir §12.10.
 
 ### Le dimanche soir 20h (revue hebdo, 20-30 min)
 
@@ -375,8 +358,6 @@ l'erreur.
 | `Rock` par trimestre | 5 | Idem |
 | `Month.milestones` | 3 | Form limité |
 | `Week.mit{1,2,3}` | 3 champs | Schéma figé |
-| `DayPlan.importants` | 3 | Form limité |
-| `DayPlan.secondaries` | 5 | Form limité |
 
 ### Fonctionnalités explicitement HORS scope
 
@@ -426,7 +407,7 @@ pas d'action.
 3. **Pattern KV** (`stores` table + JSON) — pas de tables SQL relationnelles dédiées.
 4. **KR = `Objective` étendu** (option b validée) — pas de table KR séparée.
 5. **MITs en texte libre** dans `Week` — pas de lien avec TickTick.
-6. **1-3-5 en texte libre** dans `DayPlan` — pas de lien avec TickTick.
+6. ~~**1-3-5 en texte libre** dans `DayPlan`~~ — voir décision #10 (suppression).
 7. **Revue hebdo = formulaire structuré**. Mensuelle/trimestrielle/annuelle = Markdown libre.
 8. **Mois inclus** dans la cascade (entre Rock et Semaine) car ne rentre pas dans TickTick.
 9. ~~**Pas de code Aetheris-planif** avant le 13 juin 2026 (post-exposé).~~
@@ -437,6 +418,21 @@ pas d'action.
    sur les révisions partiels (1-5 juin). Si dans les 2 jours suivants
    l'usage révèle que ce code crée plus de friction qu'il n'en résout,
    on revient au plan original (Notion comme stop-gap jusqu'au 12 juin).
+
+10. **Suppression du niveau Jour (DayPlan) d'Aetheris** — décidé
+    2026-05-22 ~01h après livraison de `/planning/day`. Cause : la page
+    Day dupliquait directement la vue Aujourd'hui de TickTick (1-3-5 ≈
+    tâches priorisées). La frontière « Aetheris = sémantique, TickTick =
+    exécution » s'effondre au niveau quotidien. Décision :
+    - La planification quotidienne reste **100 % TickTick** (priorités
+      Low/Medium/High/Urgent, sous-tâches, Pomodoro, vue Aujourd'hui).
+    - Aetheris garde Identité → OKR → KR → Rock → Mois → Semaine + revues.
+    - Question pivot (« si je ne fais qu'UNE chose ») → optionnellement
+      en description de la tâche TickTick prioritaire, ou Apple Notes.
+    Code supprimé : `src/pages/PlanningDayPage.tsx`, routes `/planning/day`,
+    types `DayPlan`/`DayType`/`Energy`, actions `upsertDayPlan`/`deleteDayPlan`.
+    Le code reste accessible dans le commit `1e4a3ea` si réintroduction
+    nécessaire après usage réel.
 
 ---
 

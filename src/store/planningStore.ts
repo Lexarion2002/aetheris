@@ -75,22 +75,9 @@ export interface Week {
   updatedAt:       string
 }
 
-export type DayType = 'cabinet' | 'ecole' | 'libre'
-export type Energy  = 'faible'  | 'moyenne' | 'haute'
-
-export interface DayPlan {
-  id:               string
-  date:             string             // ISO "YYYY-MM-DD"
-  dayType?:         DayType
-  priority?:        string             // LA chose absolue
-  importants:       string[]           // max 3
-  secondaries:      string[]           // max 5
-  energyExpected?:  Energy
-  pivotQuestion?:   string
-  prepChecklist?:   { label: string, done: boolean }[]
-  createdAt:        string
-  updatedAt:        string
-}
+// NOTE : la planification quotidienne (1-3-5) reste dans TickTick.
+// Aetheris se concentre sur la cascade sémantique + MITs hebdo + revues.
+// DayPlan a été supprimé le 2026-05-21 (cf. SPEC.md §12).
 
 export type ReviewKind = 'weekly' | 'monthly' | 'quarterly' | 'annual'
 
@@ -141,7 +128,6 @@ export interface PlanningState {
   rocks:       Rock[]
   months:      Month[]
   weeks:       Week[]
-  dayPlans:    DayPlan[]
   reviews:     Review[]
   systemNotes: SystemNote[]
 
@@ -172,10 +158,6 @@ export interface PlanningState {
   /** Upsert par (isoYear, isoWeek) : crée si absent, met à jour sinon. */
   upsertWeek: (isoYear: number, isoWeek: number, patch: Partial<Omit<Week, 'id' | 'isoYear' | 'isoWeek' | 'createdAt' | 'updatedAt'>>) => Week
 
-  // ── DayPlan CRUD ───────────────────────────────────────────────────────────
-  upsertDayPlan: (date: string, patch: Partial<Omit<DayPlan, 'id' | 'date' | 'createdAt' | 'updatedAt'>>) => DayPlan
-  deleteDayPlan: (id: string) => void
-
   // ── Review CRUD ────────────────────────────────────────────────────────────
   addReview:    (data: Omit<Review, 'id' | 'createdAt' | 'updatedAt'>) => Review
   updateReview: (id: string, patch: Partial<Omit<Review, 'id' | 'createdAt' | 'updatedAt'>>) => void
@@ -203,7 +185,6 @@ export const usePlanningStore = createPersistedStore<PlanningState>(
     rocks:       [],
     months:      [],
     weeks:       [],
-    dayPlans:    [],
     reviews:     [],
     systemNotes: [],
 
@@ -340,31 +321,6 @@ export const usePlanningStore = createPersistedStore<PlanningState>(
       }
       set({ weeks: [...get().weeks, created] })
       return created
-    },
-
-    // ── DayPlan ──────────────────────────────────────────────────────────────
-    upsertDayPlan: (date, patch) => {
-      const existing = get().dayPlans.find((d) => d.date === date)
-      const ts = now()
-      if (existing) {
-        const updated: DayPlan = { ...existing, ...patch, updatedAt: ts }
-        set({ dayPlans: get().dayPlans.map((d) => (d.id === existing.id ? updated : d)) })
-        return updated
-      }
-      const created: DayPlan = {
-        id:          nanoid(),
-        date,
-        importants:  [],
-        secondaries: [],
-        createdAt:   ts,
-        updatedAt:   ts,
-        ...patch,
-      }
-      set({ dayPlans: [...get().dayPlans, created] })
-      return created
-    },
-    deleteDayPlan: (id) => {
-      set({ dayPlans: get().dayPlans.filter((d) => d.id !== id) })
     },
 
     // ── Review ───────────────────────────────────────────────────────────────
