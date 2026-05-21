@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react'
-import { Plus, X, ChevronRight, Check } from 'lucide-react'
+import { Link } from 'react-router-dom'
+import { Plus, X, ChevronRight, Check, CalendarDays, CalendarRange, ClipboardCheck } from 'lucide-react'
 import { usePlanningStore } from '../store/planningStore'
 import { useStore } from '../store'
 import { nanoid } from '../utils/nanoid'
@@ -81,6 +82,14 @@ const ghostBtn: CSSProperties = {
   padding: 4, borderRadius: 6,
 }
 
+const navBtnStyle: CSSProperties = {
+  display: 'inline-flex', alignItems: 'center', gap: 6,
+  background: 'var(--paper-1)', color: 'var(--fg)',
+  border: '1px solid var(--paper-2)', borderRadius: 8,
+  padding: '8px 14px', fontSize: 13, fontWeight: 500,
+  cursor: 'pointer', textDecoration: 'none',
+}
+
 // ─── Status badge ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -147,13 +156,25 @@ export function PlanningPage() {
       display: 'flex', flexDirection: 'column', gap: 40,
     }}>
       {/* Header */}
-      <header style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-        <span style={labelStyle}>Planification</span>
-        <h1 style={sectionTitle}>Cascade</h1>
-        <p style={{ color: 'var(--fg-muted)', fontSize: 13.5, lineHeight: 1.55, maxWidth: 640 }}>
-          Vision long terme → Objectifs annuels (OKR) → Résultats clés (KR) → Rocks trimestriels.
-          Les MITs hebdo, J-1 et revues arrivent en Phase 3.
-        </p>
+      <header style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <span style={labelStyle}>Planification</span>
+          <h1 style={sectionTitle}>Cascade</h1>
+          <p style={{ color: 'var(--fg-muted)', fontSize: 13.5, lineHeight: 1.55, maxWidth: 640 }}>
+            Vision long terme → Objectifs annuels (OKR) → Résultats clés (KR) → Rocks trimestriels.
+          </p>
+        </div>
+        <nav style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <Link to="/planning/day" style={navBtnStyle}>
+            <CalendarDays size={14} /> Aujourd'hui
+          </Link>
+          <Link to="/planning/week" style={navBtnStyle}>
+            <CalendarRange size={14} /> Cette semaine
+          </Link>
+          <Link to="/planning/review/new?kind=weekly" style={navBtnStyle}>
+            <ClipboardCheck size={14} /> Revue hebdo
+          </Link>
+        </nav>
       </header>
 
       {/* ── 1. Identités ──────────────────────────────────────────────────── */}

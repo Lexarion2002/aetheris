@@ -169,6 +169,8 @@ export interface PlanningState {
   addWeek:    (data: Omit<Week, 'id' | 'createdAt' | 'updatedAt'>) => Week
   updateWeek: (id: string, patch: Partial<Omit<Week, 'id' | 'createdAt' | 'updatedAt'>>) => void
   deleteWeek: (id: string) => void
+  /** Upsert par (isoYear, isoWeek) : crée si absent, met à jour sinon. */
+  upsertWeek: (isoYear: number, isoWeek: number, patch: Partial<Omit<Week, 'id' | 'isoYear' | 'isoWeek' | 'createdAt' | 'updatedAt'>>) => Week
 
   // ── DayPlan CRUD ───────────────────────────────────────────────────────────
   upsertDayPlan: (date: string, patch: Partial<Omit<DayPlan, 'id' | 'date' | 'createdAt' | 'updatedAt'>>) => DayPlan
@@ -319,6 +321,25 @@ export const usePlanningStore = createPersistedStore<PlanningState>(
     },
     deleteWeek: (id) => {
       set({ weeks: get().weeks.filter((w) => w.id !== id) })
+    },
+    upsertWeek: (isoYear, isoWeek, patch) => {
+      const existing = get().weeks.find((w) => w.isoYear === isoYear && w.isoWeek === isoWeek)
+      const ts = now()
+      if (existing) {
+        const updated: Week = { ...existing, ...patch, updatedAt: ts }
+        set({ weeks: get().weeks.map((w) => (w.id === existing.id ? updated : w)) })
+        return updated
+      }
+      const created: Week = {
+        id:        nanoid(),
+        isoYear,
+        isoWeek,
+        createdAt: ts,
+        updatedAt: ts,
+        ...patch,
+      }
+      set({ weeks: [...get().weeks, created] })
+      return created
     },
 
     // ── DayPlan ──────────────────────────────────────────────────────────────
