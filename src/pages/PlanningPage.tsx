@@ -1,6 +1,6 @@
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck } from 'lucide-react'
+import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck, ImagePlus, Pencil } from 'lucide-react'
 import { usePlanningStore } from '../store/planningStore'
 import { useStore } from '../store'
 import { nanoid } from '../utils/nanoid'
@@ -234,87 +234,276 @@ interface IdentitiesSectionProps {
 
 function IdentitiesSection({ identities, onAdd, onUpdate, onDelete }: IdentitiesSectionProps) {
   const [adding, setAdding] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
   const atCap = identities.length >= 3
+
+  const editingIdentity = editingId ? identities.find((i) => i.id === editingId) : null
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <SectionHeader title="Identités" subtitle="Vision long terme (~10 ans). Maximum 3." count={`${identities.length}/3`} />
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-        {identities.length === 0 && !adding && (
-          <p style={{ color: 'var(--fg-subtle)', fontSize: 13, fontStyle: 'italic' }}>
-            Aucune identité posée. Démarre avec ce que tu veux incarner à 35 ans.
-          </p>
-        )}
+      {identities.length === 0 && !adding && (
+        <p style={{ color: 'var(--fg-subtle)', fontSize: 13, fontStyle: 'italic' }}>
+          Aucune identité posée. Démarre avec ce que tu veux incarner à 35 ans.
+        </p>
+      )}
 
-        {identities.map((id) => (
-          <IdentityRow
-            key={id.id}
-            identity={id}
-            onUpdate={(patch) => onUpdate(id.id, patch)}
-            onDelete={() => onDelete(id.id)}
-          />
-        ))}
+      {identities.length > 0 && (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+          gap: 16,
+        }}>
+          {identities.map((id) => (
+            <IdentityCard
+              key={id.id}
+              identity={id}
+              onEdit={() => setEditingId(id.id)}
+              onDelete={() => onDelete(id.id)}
+            />
+          ))}
+        </div>
+      )}
 
-        {adding ? (
-          <IdentityEditForm
-            onSave={(data) => { onAdd(data); setAdding(false) }}
-            onCancel={() => setAdding(false)}
-          />
-        ) : (
+      {/* Edit modal-style inline form */}
+      {editingIdentity && (
+        <IdentityEditForm
+          initial={editingIdentity}
+          onSave={(data) => { onUpdate(editingIdentity.id, data); setEditingId(null) }}
+          onCancel={() => setEditingId(null)}
+        />
+      )}
+
+      {adding ? (
+        <IdentityEditForm
+          onSave={(data) => { onAdd(data); setAdding(false) }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        !editingIdentity && (
           <button
             disabled={atCap}
             onClick={() => setAdding(true)}
-            style={{ ...btnSubtle, opacity: atCap ? 0.4 : 1, cursor: atCap ? 'not-allowed' : 'pointer' }}
+            style={{ ...btnSubtle, opacity: atCap ? 0.4 : 1, cursor: atCap ? 'not-allowed' : 'pointer', alignSelf: 'flex-start' }}
             title={atCap ? 'Maximum 3 identités atteint' : 'Ajouter une identité'}
           >
             <Plus size={14} /> {atCap ? 'Maximum atteint' : 'Ajouter une identité'}
           </button>
-        )}
-      </div>
+        )
+      )}
     </section>
   )
 }
 
-function IdentityRow({ identity, onUpdate, onDelete }: {
+function IdentityCard({ identity, onEdit, onDelete }: {
   identity: Identity
-  onUpdate: (patch: Partial<Omit<Identity, 'id' | 'createdAt' | 'updatedAt'>>) => void
+  onEdit: () => void
   onDelete: () => void
 }) {
-  const [editing, setEditing] = useState(false)
+  const [hover, setHover] = useState(false)
+  const initial = identity.name.charAt(0).toUpperCase()
 
-  if (editing) {
-    return (
-      <IdentityEditForm
-        initial={identity}
-        onSave={(data) => { onUpdate(data); setEditing(false) }}
-        onCancel={() => setEditing(false)}
-      />
-    )
+  return (
+    <div
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        background: 'var(--paper-1)',
+        border: '1px solid var(--paper-2)',
+        borderRadius: 14,
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: 'column',
+        boxShadow: hover ? '0 6px 20px rgba(58, 46, 34, 0.08)' : '0 1px 2px rgba(58, 46, 34, 0.03)',
+        transform: hover ? 'translateY(-2px)' : 'translateY(0)',
+        transition: 'box-shadow 200ms ease, transform 200ms ease',
+      }}>
+      {/* Cover image / placeholder */}
+      <div style={{
+        position: 'relative',
+        width: '100%',
+        aspectRatio: '4 / 3',
+        background: identity.imageUrl
+          ? 'var(--paper-2)'
+          : 'linear-gradient(135deg, var(--paper-2) 0%, var(--paper-3) 100%)',
+        overflow: 'hidden',
+      }}>
+        {identity.imageUrl ? (
+          <img
+            src={identity.imageUrl}
+            alt={identity.name}
+            style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+          />
+        ) : (
+          <div style={{
+            position: 'absolute', inset: 0,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: 'var(--font-serif, var(--font-sans))',
+            fontSize: 72, fontWeight: 400,
+            color: 'var(--ink-4)',
+            letterSpacing: '-0.02em',
+          }}>
+            {initial}
+          </div>
+        )}
+
+        {/* Hover actions */}
+        <div style={{
+          position: 'absolute', top: 8, right: 8,
+          display: 'flex', gap: 4,
+          opacity: hover ? 1 : 0,
+          transition: 'opacity 150ms ease',
+        }}>
+          <button
+            onClick={onEdit}
+            title="Modifier"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 28, height: 28,
+              background: 'rgba(251, 246, 234, 0.92)',
+              border: '1px solid var(--paper-2)',
+              borderRadius: 7,
+              cursor: 'pointer',
+              color: 'var(--ink-2)',
+              backdropFilter: 'blur(6px)',
+            }}>
+            <Pencil size={13} />
+          </button>
+          <button
+            onClick={onDelete}
+            title="Supprimer"
+            style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: 28, height: 28,
+              background: 'rgba(251, 246, 234, 0.92)',
+              border: '1px solid var(--paper-2)',
+              borderRadius: 7,
+              cursor: 'pointer',
+              color: 'var(--ink-2)',
+              backdropFilter: 'blur(6px)',
+            }}>
+            <X size={13} />
+          </button>
+        </div>
+
+        {/* Horizon chip — bottom-left of image */}
+        <div style={{
+          position: 'absolute', bottom: 8, left: 8,
+          display: 'flex', gap: 4,
+        }}>
+          <span style={{
+            ...labelStyle,
+            fontSize: 9.5,
+            background: 'rgba(251, 246, 234, 0.92)',
+            color: 'var(--ink-2)',
+            padding: '3px 8px',
+            borderRadius: 6,
+            backdropFilter: 'blur(6px)',
+          }}>
+            {identity.horizon}
+          </span>
+        </div>
+      </div>
+
+      {/* Body */}
+      <div style={{ padding: 14, display: 'flex', flexDirection: 'column', gap: 8, flex: 1 }}>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, flexWrap: 'wrap' }}>
+          <h3 style={{
+            fontFamily: 'var(--font-serif, var(--font-sans))',
+            fontSize: 17, fontWeight: 500, color: 'var(--fg)', margin: 0,
+            letterSpacing: '-0.01em',
+            flex: 1,
+          }}>
+            {identity.name}
+          </h3>
+          <StatusBadge status={identity.status} />
+        </div>
+        {identity.description && (
+          <p style={{ color: 'var(--fg-muted)', fontSize: 13, lineHeight: 1.55, margin: 0 }}>
+            {identity.description}
+          </p>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function IdentityImageUpload({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [dragOver, setDragOver] = useState(false)
+
+  function handleFile(file: File) {
+    if (!file.type.startsWith('image/')) return
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        const MAX = 800
+        let { width, height } = img
+        if (width > MAX || height > MAX) {
+          const r = Math.min(MAX / width, MAX / height)
+          width = Math.round(width * r)
+          height = Math.round(height * r)
+        }
+        canvas.width = width; canvas.height = height
+        canvas.getContext('2d')?.drawImage(img, 0, 0, width, height)
+        onChange(canvas.toDataURL('image/jpeg', 0.82))
+      }
+      img.src = e.target?.result as string
+    }
+    reader.readAsDataURL(file)
   }
 
   return (
-    <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 8 }}>
-      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
-        <h3 style={{ fontSize: 15.5, fontWeight: 500, color: 'var(--fg)', margin: 0 }}>
-          {identity.name}
-        </h3>
-        <StatusBadge status={identity.status} />
-        <span style={{ ...labelStyle, fontSize: 10 }}>{identity.horizon}</span>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 2 }}>
-          <button style={ghostBtn} onClick={() => setEditing(true)} title="Modifier">
-            <ChevronRight size={14} />
-          </button>
-          <button style={ghostBtn} onClick={onDelete} title="Supprimer">
-            <X size={14} />
-          </button>
-        </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+      <span style={labelStyle}>Image</span>
+      <div
+        onClick={() => fileRef.current?.click()}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={() => setDragOver(false)}
+        onDrop={(e) => { e.preventDefault(); setDragOver(false); const f = e.dataTransfer.files[0]; if (f) handleFile(f) }}
+        style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '4 / 3',
+          borderRadius: 10,
+          border: `2px dashed ${dragOver ? 'var(--terra)' : 'var(--border)'}`,
+          background: dragOver ? 'var(--terra-soft)' : 'var(--paper)',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+          gap: 8, cursor: 'pointer', overflow: 'hidden',
+          transition: 'border-color 150ms ease, background 150ms ease',
+        }}>
+        {value ? (
+          <>
+            <img src={value} alt="aperçu" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <button type="button"
+              onClick={(e) => { e.stopPropagation(); onChange('') }}
+              style={{
+                position: 'absolute', top: 6, right: 6,
+                width: 26, height: 26, borderRadius: '50%',
+                background: 'rgba(251, 246, 234, 0.95)',
+                border: '1px solid var(--paper-2)',
+                color: 'var(--ink-2)',
+                cursor: 'pointer',
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                backdropFilter: 'blur(6px)',
+              }}>
+              <X size={14} />
+            </button>
+          </>
+        ) : (
+          <>
+            <ImagePlus size={26} color="var(--ink-4)" />
+            <span style={{ fontFamily: 'var(--font-sans)', fontSize: 12, color: 'var(--ink-3)' }}>
+              Glisse une image ou clique
+            </span>
+          </>
+        )}
       </div>
-      {identity.description && (
-        <p style={{ color: 'var(--fg-muted)', fontSize: 13, lineHeight: 1.55, margin: 0 }}>
-          {identity.description}
-        </p>
-      )}
+      <input ref={fileRef} type="file" accept="image/*" style={{ display: 'none' }}
+        onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFile(f) }} />
     </div>
   )
 }
@@ -328,47 +517,61 @@ function IdentityEditForm({ initial, onSave, onCancel }: {
   const [description, setDescription] = useState(initial?.description ?? '')
   const [horizon, setHorizon] = useState(initial?.horizon ?? '10 ans')
   const [status, setStatus] = useState<IdentityStatus>(initial?.status ?? 'en_construction')
+  const [imageUrl, setImageUrl] = useState(initial?.imageUrl ?? '')
 
   const canSave = name.trim().length > 0
 
   return (
-    <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <input
-        autoFocus
-        style={input}
-        placeholder="Ex. Avocat fiscaliste respecté"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-      />
-      <textarea
-        style={textareaStyle}
-        placeholder="Description en 1-2 phrases"
-        value={description}
-        onChange={(e) => setDescription(e.target.value)}
-      />
-      <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
-          <span style={labelStyle}>Horizon</span>
-          <input style={input} value={horizon} onChange={(e) => setHorizon(e.target.value)} />
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 140 }}>
-          <span style={labelStyle}>Statut</span>
-          <select
+    <div style={{ ...card, display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'minmax(200px, 280px) 1fr', gap: 16, alignItems: 'start' }}>
+        <IdentityImageUpload value={imageUrl} onChange={setImageUrl} />
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, minWidth: 0 }}>
+          <input
+            autoFocus
             style={input}
-            value={status}
-            onChange={(e) => setStatus(e.target.value as IdentityStatus)}
-          >
-            <option value="en_construction">En construction</option>
-            <option value="projection">Projection</option>
-          </select>
+            placeholder="Ex. Avocat fiscaliste respecté"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <textarea
+            style={textareaStyle}
+            placeholder="Description en 1-2 phrases"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 120 }}>
+              <span style={labelStyle}>Horizon</span>
+              <input style={input} value={horizon} onChange={(e) => setHorizon(e.target.value)} />
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, flex: 1, minWidth: 120 }}>
+              <span style={labelStyle}>Statut</span>
+              <select
+                style={input}
+                value={status}
+                onChange={(e) => setStatus(e.target.value as IdentityStatus)}
+              >
+                <option value="en_construction">En construction</option>
+                <option value="projection">Projection</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
+
       <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
         <button style={{ ...btnSubtle, border: 'none' }} onClick={onCancel}>Annuler</button>
         <button
           style={{ ...btnPrimary, opacity: canSave ? 1 : 0.4, cursor: canSave ? 'pointer' : 'not-allowed' }}
           disabled={!canSave}
-          onClick={() => onSave({ name: name.trim(), description: description.trim(), horizon: horizon.trim(), status })}
+          onClick={() => onSave({
+            name: name.trim(),
+            description: description.trim(),
+            horizon: horizon.trim(),
+            status,
+            imageUrl: imageUrl || undefined,
+          })}
         >
           Enregistrer
         </button>
