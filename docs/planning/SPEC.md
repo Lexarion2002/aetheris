@@ -429,7 +429,14 @@ pas d'action.
 6. **1-3-5 en texte libre** dans `DayPlan` — pas de lien avec TickTick.
 7. **Revue hebdo = formulaire structuré**. Mensuelle/trimestrielle/annuelle = Markdown libre.
 8. **Mois inclus** dans la cascade (entre Rock et Semaine) car ne rentre pas dans TickTick.
-9. **Pas de code Aetheris-planif** avant le 13 juin 2026 (post-exposé).
+9. ~~**Pas de code Aetheris-planif** avant le 13 juin 2026 (post-exposé).~~
+   **AMENDÉ 2026-05-21 ~22h** : décision révisée. Code démarré ce soir avec
+   un cadre serré (2h max, MVP minimum : `planningStore` + 1 seul écran
+   `/planning` éditable brut, pas de Hub fancy). Motivation : stress de
+   l'absence de structure visible. Risque assumé : empiète marginalement
+   sur les révisions partiels (1-5 juin). Si dans les 2 jours suivants
+   l'usage révèle que ce code crée plus de friction qu'il n'en résout,
+   on revient au plan original (Notion comme stop-gap jusqu'au 12 juin).
 
 ---
 
