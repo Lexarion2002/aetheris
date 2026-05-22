@@ -1,6 +1,7 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck, ImagePlus, Pencil, BookOpen, CalendarDays, FileText } from 'lucide-react'
+import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck, ImagePlus, Pencil, BookOpen, CalendarDays, FileText, Download } from 'lucide-react'
+import { SYSTEM_NOTES_SEED } from '../lib/systemNotesSeed'
 import { usePlanningStore } from '../store/planningStore'
 import { useStore } from '../store'
 import { nanoid } from '../utils/nanoid'
@@ -330,15 +331,54 @@ const SYSTEM_NOTES: { slug: string, title: string, hint: string }[] = [
 ]
 
 function SystemNotesSection() {
-  const systemNotes = usePlanningStore((s) => s.systemNotes)
+  const systemNotes      = usePlanningStore((s) => s.systemNotes)
+  const upsertSystemNote = usePlanningStore((s) => s.upsertSystemNote)
+
+  const emptyCount = SYSTEM_NOTES.filter((n) => {
+    const ex = systemNotes.find((sn) => sn.slug === n.slug)
+    return !ex?.contentMd?.trim()
+  }).length
+
+  const importAll = () => {
+    if (emptyCount < SYSTEM_NOTES.length) {
+      // Au moins une note a déjà du contenu — confirmer avant d'écraser
+      const ok = confirm(
+        `Importer les ${SYSTEM_NOTES_SEED.length} notes depuis Notion ?\n\n` +
+        `Cela ÉCRASE le contenu actuel des notes déjà remplies.`,
+      )
+      if (!ok) return
+    }
+    for (const seed of SYSTEM_NOTES_SEED) {
+      upsertSystemNote(seed.slug, { title: seed.title, contentMd: seed.contentMd })
+    }
+  }
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <SectionHeader
         title="Notes système"
         subtitle="Les piliers déclaratifs : règles, profil, stack, protocole."
-        count={`${systemNotes.length}/${SYSTEM_NOTES.length}`}
+        count={`${SYSTEM_NOTES.length - emptyCount}/${SYSTEM_NOTES.length}`}
       />
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button
+          onClick={importAll}
+          style={{
+            ...btnSubtle,
+            background: emptyCount === SYSTEM_NOTES.length ? 'var(--terra)' : 'transparent',
+            color:      emptyCount === SYSTEM_NOTES.length ? 'var(--paper)' : 'var(--fg-muted)',
+            border:    `1px ${emptyCount === SYSTEM_NOTES.length ? 'solid' : 'dashed'} ${emptyCount === SYSTEM_NOTES.length ? 'var(--terra)' : 'var(--border)'}`,
+          }}
+          title="Importe les 4 notes système depuis le hub Memory Notion"
+        >
+          <Download size={13} />
+          {emptyCount === SYSTEM_NOTES.length
+            ? 'Importer les 4 notes depuis Notion'
+            : emptyCount === 0
+              ? 'Réimporter les notes depuis Notion'
+              : `Importer les ${emptyCount} notes vides depuis Notion`}
+        </button>
+      </div>
       <div style={{
         display: 'grid',
         gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
