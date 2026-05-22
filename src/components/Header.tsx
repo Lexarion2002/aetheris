@@ -53,7 +53,7 @@ export function Header({ onMenuToggle, onSearchOpen }: HeaderProps) {
           </span>
         )}
         <button
-          onClick={() => navigate('/dashboard')}
+          onClick={() => navigate('/planning')}
           className="min-w-0 text-left hover:opacity-70 transition-opacity"
         >
           <h1 className="text-sm font-semibold truncate text-[var(--fg)]">

@@ -46,10 +46,10 @@ export function LandingPage() {
 
         {/* CTA */}
         <button
-          onClick={() => navigate(onboarded ? '/dashboard' : '/onboarding')}
+          onClick={() => navigate(onboarded ? '/planning' : '/onboarding')}
           className="mt-12 rounded-xl bg-teal-500 px-10 py-3.5 text-sm font-semibold text-zinc-950 hover:bg-teal-400 active:scale-95 transition-all duration-150"
         >
-          {onboarded ? 'Ouvrir le dashboard →' : 'Commencer →'}
+          {onboarded ? 'Ouvrir le hub →' : 'Commencer →'}
         </button>
 
         {/* Sub-text */}

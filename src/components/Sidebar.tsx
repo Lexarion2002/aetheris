@@ -110,7 +110,7 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
 
       {/* ── Brand ──────────────────────────────────────────────────────────────── */}
       <button
-        onClick={() => { navigate('/dashboard'); onNavigate?.() }}
+        onClick={() => { navigate('/planning'); onNavigate?.() }}
         className="mb-3 flex items-center gap-2.5 rounded-xl px-2 py-1.5 hover:bg-[var(--paper-2)] transition-colors outline-none focus-visible:ring-1 focus-visible:ring-[var(--border-focus)]"
       >
         <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-[var(--terra-soft)] bg-[var(--terra-soft)] text-xs text-[var(--terra)] select-none">
@@ -134,13 +134,9 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
       {/* ── Navigation principale ───────────────────────────────────────────────── */}
       <div className="space-y-0.5">
         {sectionLabel('Navigation')}
-        <NavLink to="/dashboard" end onClick={onNavigate} className={linkCls}>
-          <span className="text-xs w-4 text-center">⊹</span>
-          Dashboard
-        </NavLink>
-        <NavLink to="/planning" onClick={onNavigate} className={linkCls}>
+        <NavLink to="/planning" end onClick={onNavigate} className={linkCls}>
           <Target size={14} className="shrink-0" />
-          Planning
+          Hub
         </NavLink>
       </div>
 

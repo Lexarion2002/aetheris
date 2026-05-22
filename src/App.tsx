@@ -14,7 +14,6 @@ import type { User } from '@supabase/supabase-js'
 
 // ─── Lazy page imports ────────────────────────────────────────────────────────
 
-const Dashboard      = lazy(() => import('./pages/Dashboard').then((m) => ({ default: m.Dashboard })))
 const DomainView     = lazy(() => import('./pages/DomainView').then((m) => ({ default: m.DomainView })))
 const FocusDashboard = lazy(() => import('./pages/FocusDashboard').then((m) => ({ default: m.FocusDashboard })))
 const FinancePage    = lazy(() => import('./pages/FinancePage').then((m) => ({ default: m.FinancePage })))
@@ -147,7 +146,7 @@ export default function App() {
 
         {/* ── App (requires onboarding) ─────────────────────────────────────── */}
         <Route element={onboarded ? <Layout /> : <Navigate to="/" replace />}>
-          <Route path="dashboard" element={<Suspense fallback={<PageLoader />}><Dashboard /></Suspense>} />
+          <Route path="dashboard" element={<Navigate to="/planning" replace />} />
           <Route path="planning" element={<Suspense fallback={<PageLoader />}><PlanningPage /></Suspense>} />
           <Route path="planning/week" element={<Suspense fallback={<PageLoader />}><PlanningWeekPage /></Suspense>} />
           <Route path="planning/week/:y/:w" element={<Suspense fallback={<PageLoader />}><PlanningWeekPage /></Suspense>} />
