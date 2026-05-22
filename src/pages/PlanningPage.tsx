@@ -90,6 +90,93 @@ const navBtnStyle: CSSProperties = {
   cursor: 'pointer', textDecoration: 'none',
 }
 
+// ─── Helpers de progression (cascade Rocks → KR → OKR) ──────────────────────
+
+/**
+ * Progression d'un Rock selon son statut.
+ * Retourne null pour 'abandonne' (le Rock est exclu du calcul).
+ */
+function rockProgressValue(status: RockStatus): number | null {
+  switch (status) {
+    case 'a_faire':    return 0
+    case 'en_cours':   return 0.5
+    case 'termine':    return 1
+    case 'abandonne':  return null
+  }
+}
+
+/**
+ * Progression dérivée d'un KR (0–1).
+ * - S'il a des Rocks liés non abandonnés → moyenne de leurs progressions
+ * - Sinon → fallback sur Objective.progress (0–100, normalisé)
+ */
+function krProgressDerived(kr: Objective, rocks: Rock[]): { value: number, fromRocks: boolean } {
+  const linkedRocks = rocks.filter((r) => r.krIds.includes(kr.id))
+  const usableValues = linkedRocks
+    .map((r) => rockProgressValue(r.status))
+    .filter((v): v is number => v !== null)
+
+  if (usableValues.length > 0) {
+    const avg = usableValues.reduce((a, b) => a + b, 0) / usableValues.length
+    return { value: avg, fromRocks: true }
+  }
+  return { value: (kr.progress ?? 0) / 100, fromRocks: false }
+}
+
+/**
+ * Progression dérivée d'un OKR (0–1) : moyenne des KR liés.
+ */
+function okrProgressDerived(krs: Objective[], rocks: Rock[]): number {
+  if (krs.length === 0) return 0
+  const sum = krs.reduce((acc, kr) => acc + krProgressDerived(kr, rocks).value, 0)
+  return sum / krs.length
+}
+
+// ─── ProgressBar ─────────────────────────────────────────────────────────────
+
+function ProgressBar({
+  value, height = 6, showLabel = true, tone = 'terra',
+}: {
+  value: number              // 0–1
+  height?: number
+  showLabel?: boolean
+  tone?: 'terra' | 'sage'
+}) {
+  const clamped = Math.max(0, Math.min(1, value))
+  const pct = Math.round(clamped * 100)
+  const fill = tone === 'sage' ? 'var(--sage-deep)' : 'var(--terra)'
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+      <div style={{
+        flex: 1,
+        height,
+        background: 'var(--paper-2)',
+        borderRadius: height / 2,
+        overflow: 'hidden',
+      }}>
+        <div style={{
+          width: `${pct}%`,
+          height: '100%',
+          background: fill,
+          borderRadius: height / 2,
+          transition: 'width 250ms ease',
+        }} />
+      </div>
+      {showLabel && (
+        <span style={{
+          ...labelStyle, fontSize: 10,
+          color: pct > 0 ? 'var(--fg)' : 'var(--fg-subtle)',
+          fontVariantNumeric: 'tabular-nums',
+          minWidth: 32, textAlign: 'right',
+        }}>
+          {pct}%
+        </span>
+      )}
+    </div>
+  )
+}
+
 // ─── Status badge ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -193,6 +280,7 @@ export function PlanningPage() {
         okrs={okrsThisYear}
         identities={identities}
         domains={domains}
+        rocks={rocks}
         currentYear={currentYear}
         onAddOkr={addOkr}
         onUpdateOkr={updateOkr}
@@ -659,6 +747,7 @@ interface OkrsSectionProps {
   okrs:           Okr[]
   identities:     Identity[]
   domains:        { id: string, name: string }[]
+  rocks:          Rock[]
   currentYear:    number
   onAddOkr:       (data: Omit<Okr, 'id' | 'createdAt' | 'updatedAt' | 'sortOrder'>) => Okr
   onUpdateOkr:    (id: string, patch: Partial<Omit<Okr, 'id' | 'createdAt' | 'updatedAt'>>) => void
@@ -670,7 +759,7 @@ interface OkrsSectionProps {
 }
 
 function OkrsSection({
-  okrs, identities, domains, currentYear,
+  okrs, identities, domains, rocks, currentYear,
   onAddOkr, onUpdateOkr, onDeleteOkr,
   onAddKr, onUpdateKr, onDeleteKr, getKrs,
 }: OkrsSectionProps) {
@@ -698,6 +787,7 @@ function OkrsSection({
             okr={okr}
             identities={identities}
             krs={getKrs(okr.id)}
+            rocks={rocks}
             domains={domains}
             onUpdate={(patch) => onUpdateOkr(okr.id, patch)}
             onDelete={() => onDeleteOkr(okr.id)}
@@ -728,10 +818,11 @@ function OkrsSection({
   )
 }
 
-function OkrCard({ okr, identities, krs, domains, onUpdate, onDelete, onAddKr, onUpdateKr, onDeleteKr }: {
+function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onAddKr, onUpdateKr, onDeleteKr }: {
   okr: Okr
   identities: Identity[]
   krs: Objective[]
+  rocks: Rock[]
   domains: { id: string, name: string }[]
   onUpdate: (patch: Partial<Omit<Okr, 'id' | 'createdAt' | 'updatedAt'>>) => void
   onDelete: () => void
@@ -743,6 +834,7 @@ function OkrCard({ okr, identities, krs, domains, onUpdate, onDelete, onAddKr, o
   const [addingKr, setAddingKr] = useState(false)
   const linkedIdentities = identities.filter((i) => okr.identityIds.includes(i.id))
   const krAtCap = krs.length >= 4
+  const okrProgress = okrProgressDerived(krs, rocks)
 
   if (editing) {
     return (
@@ -769,8 +861,12 @@ function OkrCard({ okr, identities, krs, domains, onUpdate, onDelete, onAddKr, o
         </div>
       </div>
 
+      <div style={{ marginTop: 10 }}>
+        <ProgressBar value={okrProgress} height={6} />
+      </div>
+
       {okr.description && (
-        <p style={{ color: 'var(--fg-muted)', fontSize: 13, lineHeight: 1.5, margin: '6px 0 0' }}>
+        <p style={{ color: 'var(--fg-muted)', fontSize: 13, lineHeight: 1.5, margin: '8px 0 0' }}>
           {okr.description}
         </p>
       )}
@@ -805,15 +901,20 @@ function OkrCard({ okr, identities, krs, domains, onUpdate, onDelete, onAddKr, o
           </p>
         )}
 
-        {krs.map((kr) => (
-          <KrRow
-            key={kr.id}
-            kr={kr}
-            domains={domains}
-            onUpdate={(patch) => onUpdateKr(kr.id, patch)}
-            onDelete={() => onDeleteKr(kr.id)}
-          />
-        ))}
+        {krs.map((kr) => {
+          const krProg = krProgressDerived(kr, rocks)
+          return (
+            <KrRow
+              key={kr.id}
+              kr={kr}
+              domains={domains}
+              progress={krProg.value}
+              progressFromRocks={krProg.fromRocks}
+              onUpdate={(patch) => onUpdateKr(kr.id, patch)}
+              onDelete={() => onDeleteKr(kr.id)}
+            />
+          )
+        })}
 
         {addingKr ? (
           <KrEditForm
@@ -935,9 +1036,11 @@ function OkrEditForm({ currentYear, identities, initial, onSave, onCancel }: {
 // KR rows (Objective avec parentOkrId)
 // =============================================================================
 
-function KrRow({ kr, domains, onUpdate, onDelete }: {
+function KrRow({ kr, domains, progress, progressFromRocks, onUpdate, onDelete }: {
   kr: Objective
   domains: { id: string, name: string }[]
+  progress: number
+  progressFromRocks: boolean
   onUpdate: (patch: Partial<Omit<Objective, 'id' | 'createdAt' | 'updatedAt'>>) => void
   onDelete: () => void
 }) {
@@ -996,6 +1099,17 @@ function KrRow({ kr, domains, onUpdate, onDelete }: {
             {kr.description && <span style={{ fontStyle: 'italic' }}>{kr.description}</span>}
           </div>
         )}
+        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <ProgressBar value={progress} height={4} />
+          {!progressFromRocks && (
+            <span
+              style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}
+              title="Pas de Rock lié — progression issue du champ KR (manuel)"
+            >
+              manuel
+            </span>
+          )}
+        </div>
       </div>
       <div style={{ display: 'flex', gap: 2 }}>
         <button style={ghostBtn} onClick={() => setEditing(true)}><ChevronRight size={12} /></button>
