@@ -1,6 +1,6 @@
 import { useRef, useState, type CSSProperties } from 'react'
 import { Link } from 'react-router-dom'
-import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck, ImagePlus, Pencil } from 'lucide-react'
+import { Plus, X, ChevronRight, Check, CalendarRange, ClipboardCheck, ImagePlus, Pencil, BookOpen, CalendarDays, FileText } from 'lucide-react'
 import { usePlanningStore } from '../store/planningStore'
 import { useStore } from '../store'
 import { nanoid } from '../utils/nanoid'
@@ -168,8 +168,14 @@ export function PlanningPage() {
           <Link to="/planning/week" style={navBtnStyle}>
             <CalendarRange size={14} /> Cette semaine
           </Link>
+          <Link to={`/planning/months/${currentYear}/${new Date().getMonth() + 1}`} style={navBtnStyle}>
+            <CalendarDays size={14} /> Ce mois-ci
+          </Link>
           <Link to="/planning/review/new?kind=weekly" style={navBtnStyle}>
             <ClipboardCheck size={14} /> Revue hebdo
+          </Link>
+          <Link to="/planning/reviews" style={navBtnStyle}>
+            <FileText size={14} /> Historique revues
           </Link>
         </nav>
       </header>
@@ -217,7 +223,72 @@ export function PlanningPage() {
         onUpdate={updateRock}
         onDelete={deleteRock}
       />
+
+      {/* ── 4. Notes système ──────────────────────────────────────────────── */}
+      <SystemNotesSection />
     </div>
+  )
+}
+
+// =============================================================================
+// Section: Notes système (4 piliers)
+// =============================================================================
+
+const SYSTEM_NOTES: { slug: string, title: string, hint: string }[] = [
+  { slug: 'anti_abandon_rules', title: 'Règles anti-abandon', hint: 'Plafonds · 9 règles · J+30/60/90' },
+  { slug: 'profile',            title: 'Profil & règles',     hint: 'Identité · ton · format de réponse' },
+  { slug: 'stack_reference',    title: 'Stack — Référence',   hint: '11 outils · inflation zéro' },
+  { slug: 'protocole_re_entree', title: 'Protocole de re-entrée', hint: 'Retour après rupture · 24h max' },
+]
+
+function SystemNotesSection() {
+  const systemNotes = usePlanningStore((s) => s.systemNotes)
+
+  return (
+    <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+      <SectionHeader
+        title="Notes système"
+        subtitle="Les piliers déclaratifs : règles, profil, stack, protocole."
+        count={`${systemNotes.length}/${SYSTEM_NOTES.length}`}
+      />
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+        gap: 12,
+      }}>
+        {SYSTEM_NOTES.map((n) => {
+          const existing = systemNotes.find((sn) => sn.slug === n.slug)
+          const hasContent = !!existing?.contentMd?.trim()
+          return (
+            <Link
+              key={n.slug}
+              to={`/planning/notes/${n.slug}`}
+              style={{
+                ...card,
+                padding: 16,
+                textDecoration: 'none', color: 'inherit',
+                display: 'flex', flexDirection: 'column', gap: 6,
+                cursor: 'pointer',
+                opacity: hasContent ? 1 : 0.78,
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <BookOpen size={14} style={{ color: 'var(--fg-subtle)' }} />
+                <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--fg)' }}>{n.title}</span>
+              </div>
+              <p style={{ margin: 0, fontSize: 12.5, color: 'var(--fg-muted)' }}>{n.hint}</p>
+              <span style={{
+                ...labelStyle, fontSize: 9.5,
+                color: hasContent ? 'var(--sage-deep)' : 'var(--fg-subtle)',
+                marginTop: 2,
+              }}>
+                {hasContent ? 'Rempli' : 'Vide'}
+              </span>
+            </Link>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 

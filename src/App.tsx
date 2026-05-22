@@ -32,6 +32,10 @@ const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ 
 const PlanningPage             = lazy(() => import('./pages/PlanningPage').then((m) => ({ default: m.PlanningPage })))
 const PlanningWeekPage         = lazy(() => import('./pages/PlanningWeekPage').then((m) => ({ default: m.PlanningWeekPage })))
 const PlanningWeeklyReviewPage = lazy(() => import('./pages/PlanningWeeklyReviewPage').then((m) => ({ default: m.PlanningWeeklyReviewPage })))
+const PlanningNotePage         = lazy(() => import('./pages/PlanningNotePage').then((m) => ({ default: m.PlanningNotePage })))
+const PlanningMonthPage        = lazy(() => import('./pages/PlanningMonthPage').then((m) => ({ default: m.PlanningMonthPage })))
+const PlanningReviewsPage      = lazy(() => import('./pages/PlanningReviewsPage').then((m) => ({ default: m.PlanningReviewsPage })))
+const PlanningReviewPage       = lazy(() => import('./pages/PlanningReviewPage').then((m) => ({ default: m.PlanningReviewPage })))
 
 // ─── Page loader ──────────────────────────────────────────────────────────────
 
@@ -148,6 +152,10 @@ export default function App() {
           <Route path="planning/week" element={<Suspense fallback={<PageLoader />}><PlanningWeekPage /></Suspense>} />
           <Route path="planning/week/:y/:w" element={<Suspense fallback={<PageLoader />}><PlanningWeekPage /></Suspense>} />
           <Route path="planning/review/new" element={<Suspense fallback={<PageLoader />}><PlanningWeeklyReviewPage /></Suspense>} />
+          <Route path="planning/review/:id" element={<Suspense fallback={<PageLoader />}><PlanningReviewPage /></Suspense>} />
+          <Route path="planning/reviews" element={<Suspense fallback={<PageLoader />}><PlanningReviewsPage /></Suspense>} />
+          <Route path="planning/notes/:slug" element={<Suspense fallback={<PageLoader />}><PlanningNotePage /></Suspense>} />
+          <Route path="planning/months/:y/:m" element={<Suspense fallback={<PageLoader />}><PlanningMonthPage /></Suspense>} />
           <Route path="domain/:id" element={<Suspense fallback={<PageLoader />}><DomainView /></Suspense>} />
           <Route path="focus" element={<Suspense fallback={<PageLoader />}><FocusDashboard /></Suspense>} />
           <Route path="finances" element={<Suspense fallback={<PageLoader />}><FinancePage /></Suspense>} />
