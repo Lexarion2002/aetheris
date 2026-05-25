@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import type { StateCreator } from 'zustand'
-import { supabaseStorage, registerStoreKey } from './supabaseSync'
+import { supabaseStorage, registerStoreKey, markStoreHydrated } from './supabaseSync'
 
 // ─── createPersistedStore ─────────────────────────────────────────────────────
 //
@@ -27,6 +27,9 @@ export function createPersistedStore<T>(name: string, creator: PersistCreator<T>
       name,
       storage: createJSONStorage(() => supabaseStorage),
       onRehydrateStorage: () => (state, error) => {
+        // Toujours marquer le store comme hydraté (même en cas d'erreur ou state null),
+        // sinon les écritures futures resteraient bloquées par le guard.
+        markStoreHydrated(name)
         if (error) {
           console.error(`[Debug] onRehydrateStorage("${name}") — erreur d'hydratation :`, error)
           return

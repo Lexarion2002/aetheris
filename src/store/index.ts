@@ -688,6 +688,14 @@ export const useStore = createPersistedStore<AetherisState>(
   }),
 )
 
+// ─── Debug handle ─────────────────────────────────────────────────────────────
+// Expose le store sur window pour permettre des récupérations manuelles depuis
+// la console (ex: restaurer des transactions depuis un export Excel après une
+// perte de données). N'expose pas les actions — juste setState/getState.
+if (typeof window !== 'undefined') {
+  ;(window as unknown as { __aetheris?: typeof useStore }).__aetheris = useStore
+}
+
 // ─── Selectors ────────────────────────────────────────────────────────────────
 
 export const selectDomainById = (id: string) => (s: AetherisState) =>

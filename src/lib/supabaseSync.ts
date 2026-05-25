@@ -28,6 +28,23 @@ function scopedKey(name: string): string {
   return _currentUserId ? `${_currentUserId}:${name}` : name
 }
 
+// ─── Hydration guard ──────────────────────────────────────────────────────────
+// On bloque les écritures d'un store tant que sa lecture initiale (getItem) n'est
+// pas terminée. Sans ce guard, des mutations React déclenchées avant la fin du
+// fetch cloud pousseraient l'état par défaut (vide) sur Supabase, écrasant la
+// sauvegarde authoritative. Bug reproduit en mai 2026 : perte des transactions
+// Finance.
+
+const _hydratedStores = new Set<string>()
+
+export function markStoreHydrated(name: string): void {
+  _hydratedStores.add(name)
+}
+
+function isStoreHydrated(name: string): boolean {
+  return _hydratedStores.has(name)
+}
+
 // ─── supabaseStorage — Zustand persist adapter (clé/valeur) ──────────────────
 
 // ─── localStorage quota check ─────────────────────────────────────────────────
@@ -98,6 +115,12 @@ export const supabaseStorage: StateStorage = {
 
   setItem: async (name: string, value: string): Promise<void> => {
     const key = scopedKey(name)
+
+    if (!isStoreHydrated(name)) {
+      console.warn(`[Supabase] ⏸ setItem("${key}") — bloqué, hydratation pas finie (évite l'écrasement du cloud par le state par défaut)`)
+      return
+    }
+
     try {
       localStorage.setItem(key, value)
     } catch {
@@ -169,6 +192,12 @@ export const supabaseOnlyStorage: StateStorage = {
 
   setItem: async (name: string, value: string): Promise<void> => {
     const key = scopedKey(name)
+
+    if (!isStoreHydrated(name)) {
+      console.warn(`[Supabase/cloud-only] ⏸ setItem("${key}") — bloqué, hydratation pas finie`)
+      return
+    }
+
     if (!supabase) {
       console.warn(`[Supabase/cloud-only] setItem(${name}) — client null, données perdues`)
       return

@@ -1,0 +1,3212 @@
+{
+  "transactions": [
+    {
+      "id": "rcv_0bcbf2c8a3",
+      "type": "expense",
+      "amount": 24.05,
+      "category": "courses",
+      "date": "2026-04-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8fc6fb1a30",
+      "type": "expense",
+      "amount": 1.75,
+      "category": "courses",
+      "date": "2026-04-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0ce49af192",
+      "type": "expense",
+      "amount": 11.38,
+      "category": "courses",
+      "date": "2026-04-24",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_eaa084fb43",
+      "type": "expense",
+      "amount": 10.18,
+      "category": "courses",
+      "date": "2026-04-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_fbb824a681",
+      "type": "expense",
+      "amount": 6.4,
+      "category": "courses",
+      "date": "2026-04-23",
+      "note": "Petit-déjeuner",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c6c60ee394",
+      "type": "expense",
+      "amount": 17.72,
+      "category": "courses",
+      "date": "2026-04-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f9a2dc58da",
+      "type": "expense",
+      "amount": 12.55,
+      "category": "courses",
+      "date": "2026-04-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_00623e91e6",
+      "type": "expense",
+      "amount": 6.99,
+      "category": "abonnement",
+      "date": "2026-04-23",
+      "note": "LeMonde",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_49e58dff45",
+      "type": "expense",
+      "amount": 2.8,
+      "category": "courses",
+      "date": "2026-04-22",
+      "note": "Petit-déjeuner",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_451fe56b1f",
+      "type": "expense",
+      "amount": 10.6,
+      "category": "sortie",
+      "date": "2026-04-22",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_31f1d55568",
+      "type": "expense",
+      "amount": 19.99,
+      "category": "abonnement",
+      "date": "2026-04-22",
+      "note": "Infuse",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c1b7617641",
+      "type": "expense",
+      "amount": 18.99,
+      "category": "shopping",
+      "date": "2026-04-22",
+      "note": "Raquette électrique",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d136caa62c",
+      "type": "expense",
+      "amount": 40.0,
+      "category": "autre",
+      "date": "2026-04-22",
+      "note": "Retrait distributeur",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d108af3fff",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-04-22",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f3b993e774",
+      "type": "expense",
+      "amount": 2.8,
+      "category": "courses",
+      "date": "2026-04-21",
+      "note": "Petit-déjeuner",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e6891f7867",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-04-21",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_491f75f55e",
+      "type": "expense",
+      "amount": 20.3,
+      "category": "sortie",
+      "date": "2026-04-21",
+      "note": "Burger King",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0205e86ee0",
+      "type": "expense",
+      "amount": 41.15,
+      "category": "animal",
+      "date": "2026-04-21",
+      "note": "Croquettes",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6040cdd098",
+      "type": "expense",
+      "amount": 17.75,
+      "category": "courses",
+      "date": "2026-04-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_dffc5b628c",
+      "type": "expense",
+      "amount": 2.8,
+      "category": "courses",
+      "date": "2026-04-20",
+      "note": "Petit-déjeuner",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5cf7b373cb",
+      "type": "expense",
+      "amount": 2.2,
+      "category": "courses",
+      "date": "2026-04-20",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_481920ffa5",
+      "type": "expense",
+      "amount": 2.5,
+      "category": "sortie",
+      "date": "2026-04-20",
+      "note": "Cookie",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b453b13d03",
+      "type": "expense",
+      "amount": 9.99,
+      "category": "abonnement",
+      "date": "2026-04-20",
+      "note": "Bouygues",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0acb0b1c1e",
+      "type": "expense",
+      "amount": 8.5,
+      "category": "sortie",
+      "date": "2026-04-20",
+      "note": "Lime",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4b38e640b6",
+      "type": "expense",
+      "amount": 8.03,
+      "category": "courses",
+      "date": "2026-04-20",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6461b10d59",
+      "type": "expense",
+      "amount": 16.5,
+      "category": "logement",
+      "date": "2026-04-19",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6d2f1f7b45",
+      "type": "expense",
+      "amount": 12.85,
+      "category": "courses",
+      "date": "2026-04-19",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d8afa32a05",
+      "type": "expense",
+      "amount": 12.04,
+      "category": "courses",
+      "date": "2026-04-19",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f15511f601",
+      "type": "expense",
+      "amount": 17.47,
+      "category": "animal",
+      "date": "2026-04-19",
+      "note": "Pâtée",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_38eb0d4e86",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-04-18",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4ca87b5819",
+      "type": "expense",
+      "amount": 10.22,
+      "category": "courses",
+      "date": "2026-04-18",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c2366308b2",
+      "type": "expense",
+      "amount": 9.09,
+      "category": "courses",
+      "date": "2026-04-18",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_648503f0c0",
+      "type": "expense",
+      "amount": 9.5,
+      "category": "sortie",
+      "date": "2026-04-18",
+      "note": "Gateaux",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e5c0693730",
+      "type": "expense",
+      "amount": 3.49,
+      "category": "shopping",
+      "date": "2026-04-17",
+      "note": "Amazon",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cfc34b99a7",
+      "type": "expense",
+      "amount": 25.0,
+      "category": "sortie",
+      "date": "2026-04-17",
+      "note": "Barber",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4e5080e2ba",
+      "type": "expense",
+      "amount": 8.0,
+      "category": "courses",
+      "date": "2026-04-17",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_440c85691f",
+      "type": "expense",
+      "amount": 25.79,
+      "category": "courses",
+      "date": "2026-04-16",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_301ecb8b5f",
+      "type": "expense",
+      "amount": 5.47,
+      "category": "courses",
+      "date": "2026-04-16",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a6532a4568",
+      "type": "expense",
+      "amount": 6.95,
+      "category": "courses",
+      "date": "2026-04-15",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_37802a3710",
+      "type": "expense",
+      "amount": 26.66,
+      "category": "courses",
+      "date": "2026-04-15",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6cef2488a0",
+      "type": "expense",
+      "amount": 9.15,
+      "category": "courses",
+      "date": "2026-04-15",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ee6efe9ad4",
+      "type": "expense",
+      "amount": 109.0,
+      "category": "shopping",
+      "date": "2026-04-15",
+      "note": "Bexley",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_96ac84ef9f",
+      "type": "expense",
+      "amount": 3.2,
+      "category": "sortie",
+      "date": "2026-04-15",
+      "note": "Boulangerie",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e080e86fed",
+      "type": "expense",
+      "amount": 13.62,
+      "category": "courses",
+      "date": "2026-04-14",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b4cb336135",
+      "type": "expense",
+      "amount": 6.2,
+      "category": "courses",
+      "date": "2026-04-14",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7e98056fc2",
+      "type": "expense",
+      "amount": 5.0,
+      "category": "courses",
+      "date": "2026-04-13",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d9f85852ac",
+      "type": "expense",
+      "amount": 65.4,
+      "category": "shopping",
+      "date": "2026-04-13",
+      "note": "MacPaw",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6e699fe31f",
+      "type": "expense",
+      "amount": 6.88,
+      "category": "courses",
+      "date": "2026-04-12",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7ee2a8ece4",
+      "type": "expense",
+      "amount": 16.5,
+      "category": "logement",
+      "date": "2026-04-12",
+      "note": "Laverie",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_15c0e78e01",
+      "type": "income",
+      "amount": 4.9,
+      "category": "famille",
+      "date": "2026-04-11",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8fc24fd0f7",
+      "type": "expense",
+      "amount": 5.78,
+      "category": "courses",
+      "date": "2026-04-11",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_daecf2d289",
+      "type": "expense",
+      "amount": 4.9,
+      "category": "shopping",
+      "date": "2026-04-11",
+      "note": "Le Vaugirard",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_12dab0cbea",
+      "type": "expense",
+      "amount": 25.67,
+      "category": "courses",
+      "date": "2026-04-11",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2d16167514",
+      "type": "expense",
+      "amount": 4.78,
+      "category": "courses",
+      "date": "2026-04-11",
+      "note": "Aldi",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_61d2af5064",
+      "type": "expense",
+      "amount": 5.99,
+      "category": "abonnement",
+      "date": "2026-04-11",
+      "note": "Apple",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_915db13a1a",
+      "type": "expense",
+      "amount": 5.5,
+      "category": "sante",
+      "date": "2026-04-11",
+      "note": "Pharmacie",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b05981c93c",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-04-11",
+      "note": "The Coffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0b39a22927",
+      "type": "expense",
+      "amount": 21.6,
+      "category": "abonnement",
+      "date": "2026-04-11",
+      "note": "Claude",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f6448e6e40",
+      "type": "expense",
+      "amount": 16.0,
+      "category": "sortie",
+      "date": "2026-04-10",
+      "note": "Kebab",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_184f9986b8",
+      "type": "expense",
+      "amount": 20.0,
+      "category": "shopping",
+      "date": "2026-04-10",
+      "note": "AMSHC",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c757c73e79",
+      "type": "expense",
+      "amount": 36.98,
+      "category": "shopping",
+      "date": "2026-04-10",
+      "note": "Amazon",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_05f0c36f14",
+      "type": "expense",
+      "amount": 3.2,
+      "category": "sortie",
+      "date": "2026-04-10",
+      "note": "Boulangerie",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9af161a02a",
+      "type": "expense",
+      "amount": 7.86,
+      "category": "courses",
+      "date": "2026-04-09",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_31b6477fe1",
+      "type": "expense",
+      "amount": 17.45,
+      "category": "courses",
+      "date": "2026-04-09",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cd1a8b8de6",
+      "type": "expense",
+      "amount": 13.8,
+      "category": "animal",
+      "date": "2026-04-09",
+      "note": "Vétérinaire",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a6d3198278",
+      "type": "expense",
+      "amount": 5.0,
+      "category": "courses",
+      "date": "2026-04-09",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_667124ba02",
+      "type": "expense",
+      "amount": 20.21,
+      "category": "courses",
+      "date": "2026-04-08",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_98645dd7bb",
+      "type": "expense",
+      "amount": 10.9,
+      "category": "sortie",
+      "date": "2026-04-08",
+      "note": "Lupo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ab4b974b92",
+      "type": "income",
+      "amount": 4.9,
+      "category": "famille",
+      "date": "2026-04-07",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6286eeb405",
+      "type": "income",
+      "amount": 1052.72,
+      "category": "salaire",
+      "date": "2026-04-07",
+      "note": "GB2A",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b4de697567",
+      "type": "income",
+      "amount": 239.0,
+      "category": "aides",
+      "date": "2026-04-07",
+      "note": "CAF",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_716e29e668",
+      "type": "expense",
+      "amount": 15.9,
+      "category": "sortie",
+      "date": "2026-04-07",
+      "note": "Pizza Hut",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_93af396141",
+      "type": "expense",
+      "amount": 4.9,
+      "category": "shopping",
+      "date": "2026-04-07",
+      "note": "Le Vaugirard",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e0f6ca37e5",
+      "type": "expense",
+      "amount": 0.33,
+      "category": "abonnement",
+      "date": "2026-04-07",
+      "note": "Orange",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4064f9036f",
+      "type": "expense",
+      "amount": 14.16,
+      "category": "abonnement",
+      "date": "2026-04-07",
+      "note": "Bouygues",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b2a00e31fe",
+      "type": "expense",
+      "amount": 2.83,
+      "category": "abonnement",
+      "date": "2026-04-07",
+      "note": "Apple",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2b07832ca3",
+      "type": "expense",
+      "amount": 50.98,
+      "category": "shopping",
+      "date": "2026-04-07",
+      "note": "Amazon",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8e91f426a0",
+      "type": "expense",
+      "amount": 5.18,
+      "category": "courses",
+      "date": "2026-04-07",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b176d7cb2b",
+      "type": "expense",
+      "amount": 13.9,
+      "category": "sortie",
+      "date": "2026-04-07",
+      "note": "Lupo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_83c29458a6",
+      "type": "income",
+      "amount": 18.39,
+      "category": "famille",
+      "date": "2026-04-06",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_991e9845c6",
+      "type": "expense",
+      "amount": 18.39,
+      "category": "sortie",
+      "date": "2026-04-06",
+      "note": "Deliveroo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7c8726b1bc",
+      "type": "income",
+      "amount": 10.3,
+      "category": "famille",
+      "date": "2026-04-05",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_43f82505a6",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-04-05",
+      "note": "The Coffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b35e7ec04b",
+      "type": "income",
+      "amount": 10.0,
+      "category": "famille",
+      "date": "2026-04-04",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_59cf49bdbb",
+      "type": "expense",
+      "amount": 6.99,
+      "category": "courses",
+      "date": "2026-04-04",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f30ad2c5a5",
+      "type": "expense",
+      "amount": 4.47,
+      "category": "courses",
+      "date": "2026-04-04",
+      "note": "Aldi",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6fe46119e5",
+      "type": "expense",
+      "amount": 4.16,
+      "category": "courses",
+      "date": "2026-04-03",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d21b58e0fa",
+      "type": "expense",
+      "amount": 6.25,
+      "category": "courses",
+      "date": "2026-04-02",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4ecc8d4832",
+      "type": "income",
+      "amount": 17.0,
+      "category": "famille",
+      "date": "2026-04-01",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_433882f01b",
+      "type": "expense",
+      "amount": 3.22,
+      "category": "shopping",
+      "date": "2026-04-01",
+      "note": "PAX HISTORIA",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cc439022e6",
+      "type": "expense",
+      "amount": 17.0,
+      "category": "shopping",
+      "date": "2026-04-01",
+      "note": "Amazon",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6abb4d7209",
+      "type": "expense",
+      "amount": 5.3,
+      "category": "sortie",
+      "date": "2026-04-01",
+      "note": "The Coffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bb134532fd",
+      "type": "expense",
+      "amount": 1.75,
+      "category": "courses",
+      "date": "2026-04-01",
+      "note": "Carrefour",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_23cbf709fc",
+      "type": "expense",
+      "amount": 6.59,
+      "category": "courses",
+      "date": "2026-03-31",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_99a2f442f1",
+      "type": "income",
+      "amount": 180.0,
+      "category": "famille",
+      "date": "2026-03-31",
+      "note": "Moësha iphone",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_595bacfc15",
+      "type": "income",
+      "amount": 19.0,
+      "category": "famille",
+      "date": "2026-03-31",
+      "note": "Moësha iPhone",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b7feb0b5c6",
+      "type": "expense",
+      "amount": 4.0,
+      "category": "sortie",
+      "date": "2026-03-31",
+      "note": "Velo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c7212c57ae",
+      "type": "expense",
+      "amount": 200.0,
+      "category": "autre",
+      "date": "2026-03-31",
+      "note": "Remboursement Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_acf75846a3",
+      "type": "income",
+      "amount": 199.0,
+      "category": "famille",
+      "date": "2026-03-31",
+      "note": "Moësha iPhone",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bf8ba25a61",
+      "type": "expense",
+      "amount": 179.75,
+      "category": "shopping",
+      "date": "2026-03-31",
+      "note": "Moësha iPhone",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f6d5b612bf",
+      "type": "expense",
+      "amount": 17.5,
+      "category": "logement",
+      "date": "2026-03-28",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_35bee4fb70",
+      "type": "expense",
+      "amount": 5.98,
+      "category": "courses",
+      "date": "2026-03-28",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ab1db5a6a6",
+      "type": "expense",
+      "amount": 2.6,
+      "category": "courses",
+      "date": "2026-03-27",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ee5747c085",
+      "type": "expense",
+      "amount": 1.95,
+      "category": "courses",
+      "date": "2026-03-27",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3b41742f1e",
+      "type": "expense",
+      "amount": 10.0,
+      "category": "courses",
+      "date": "2026-03-27",
+      "note": "CROUS",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0c6c1904df",
+      "type": "expense",
+      "amount": 9.46,
+      "category": "courses",
+      "date": "2026-03-27",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_895e05114b",
+      "type": "expense",
+      "amount": 2.7,
+      "category": "courses",
+      "date": "2026-03-26",
+      "note": "Petit-déjeuenr",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8bbb883bd7",
+      "type": "expense",
+      "amount": 2.2,
+      "category": "courses",
+      "date": "2026-03-26",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_15ddbc7cbe",
+      "type": "expense",
+      "amount": 2.0,
+      "category": "shopping",
+      "date": "2026-03-26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ae47ca370b",
+      "type": "expense",
+      "amount": 7.37,
+      "category": "courses",
+      "date": "2026-03-26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5ea2837898",
+      "type": "expense",
+      "amount": 4.9,
+      "category": "shopping",
+      "date": "2026-03-26",
+      "note": "Puff",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_aa7812eea8",
+      "type": "expense",
+      "amount": 11.02,
+      "category": "courses",
+      "date": "2026-03-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_23841c6b92",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-03-25",
+      "note": "The Coffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_245846c618",
+      "type": "expense",
+      "amount": 67.58,
+      "category": "logement",
+      "date": "2026-03-25",
+      "note": "EDF",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_29a980920b",
+      "type": "expense",
+      "amount": 13.3,
+      "category": "courses",
+      "date": "2026-03-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4d51ef0c7b",
+      "type": "expense",
+      "amount": 4.99,
+      "category": "courses",
+      "date": "2026-03-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_78b18196f3",
+      "type": "expense",
+      "amount": 1.56,
+      "category": "courses",
+      "date": "2026-03-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_dedb807137",
+      "type": "expense",
+      "amount": 5.85,
+      "category": "courses",
+      "date": "2026-03-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_59e186dfb4",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-03-23",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ac14f3bd17",
+      "type": "expense",
+      "amount": 7.98,
+      "category": "courses",
+      "date": "2026-03-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7234fb7631",
+      "type": "expense",
+      "amount": 14.97,
+      "category": "courses",
+      "date": "2026-03-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ff32f53e9e",
+      "type": "expense",
+      "amount": 0.9,
+      "category": "courses",
+      "date": "2026-03-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_795655bea2",
+      "type": "expense",
+      "amount": 6.98,
+      "category": "courses",
+      "date": "2026-03-22",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bd523451eb",
+      "type": "expense",
+      "amount": 18.99,
+      "category": "shopping",
+      "date": "2026-03-21",
+      "note": "Laisse pour le chat",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7f2fa12f00",
+      "type": "expense",
+      "amount": 17.47,
+      "category": "animal",
+      "date": "2026-03-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b578222286",
+      "type": "expense",
+      "amount": 9.23,
+      "category": "courses",
+      "date": "2026-03-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8a9741454f",
+      "type": "expense",
+      "amount": 7.99,
+      "category": "sante",
+      "date": "2026-03-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0d43191fb6",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-03-21",
+      "note": "The Coffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b9c91cb086",
+      "type": "expense",
+      "amount": 18.0,
+      "category": "sortie",
+      "date": "2026-03-21",
+      "note": "Kebab",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_543c02812e",
+      "type": "expense",
+      "amount": 6.9,
+      "category": "sante",
+      "date": "2026-03-20",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d59216c406",
+      "type": "expense",
+      "amount": 7.87,
+      "category": "courses",
+      "date": "2026-03-20",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_87d14ab79d",
+      "type": "expense",
+      "amount": 14.05,
+      "category": "abonnement",
+      "date": "2026-03-20",
+      "note": "Bouygues",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1251f1a250",
+      "type": "expense",
+      "amount": 22.3,
+      "category": "courses",
+      "date": "2026-03-19",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_84eaead5cd",
+      "type": "expense",
+      "amount": 7.87,
+      "category": "courses",
+      "date": "2026-03-18",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_654b6b16c9",
+      "type": "expense",
+      "amount": 16.5,
+      "category": "logement",
+      "date": "2026-03-18",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d4fc44fb3c",
+      "type": "expense",
+      "amount": 16.51,
+      "category": "courses",
+      "date": "2026-03-18",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d9d72b4915",
+      "type": "expense",
+      "amount": 3.49,
+      "category": "abonnement",
+      "date": "2026-03-17",
+      "note": "Prime",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5380b4cf38",
+      "type": "expense",
+      "amount": 7.4,
+      "category": "courses",
+      "date": "2026-03-17",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5aa4cae3ca",
+      "type": "expense",
+      "amount": 4.35,
+      "category": "courses",
+      "date": "2026-03-17",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c7e37b7d1a",
+      "type": "expense",
+      "amount": 7.47,
+      "category": "courses",
+      "date": "2026-03-17",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9dd57d1d15",
+      "type": "expense",
+      "amount": 7.4,
+      "category": "courses",
+      "date": "2026-03-16",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_56b428fb76",
+      "type": "expense",
+      "amount": 3.9,
+      "category": "autre",
+      "date": "2026-03-16",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_898e658c65",
+      "type": "expense",
+      "amount": 3.72,
+      "category": "courses",
+      "date": "2026-03-16",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4666e11cf3",
+      "type": "expense",
+      "amount": 32.5,
+      "category": "sortie",
+      "date": "2026-03-14",
+      "note": "Burger King",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_069a495e8f",
+      "type": "expense",
+      "amount": 58.57,
+      "category": "courses",
+      "date": "2026-03-14",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c2ada5a18a",
+      "type": "expense",
+      "amount": 29.2,
+      "category": "shopping",
+      "date": "2026-03-14",
+      "note": "Flexible de douche + Nettoyant écran + Chiffon microfibre",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_af146e1ed9",
+      "type": "expense",
+      "amount": 2.99,
+      "category": "courses",
+      "date": "2026-03-14",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4c8a16db66",
+      "type": "expense",
+      "amount": 2.2,
+      "category": "courses",
+      "date": "2026-03-13",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9d785d57d6",
+      "type": "expense",
+      "amount": 5.45,
+      "category": "courses",
+      "date": "2026-03-13",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_963eb28ffd",
+      "type": "expense",
+      "amount": 1.95,
+      "category": "courses",
+      "date": "2026-03-13",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a4f48adba0",
+      "type": "expense",
+      "amount": 15.0,
+      "category": "courses",
+      "date": "2026-03-13",
+      "note": "CROUS",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d1d2fa2ddc",
+      "type": "expense",
+      "amount": 0.99,
+      "category": "abonnement",
+      "date": "2026-03-12",
+      "note": "iCloud",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7e36e32eb0",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-03-12",
+      "note": "The Coffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7812d20cb5",
+      "type": "expense",
+      "amount": 13.97,
+      "category": "courses",
+      "date": "2026-03-12",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d703dbd6c5",
+      "type": "expense",
+      "amount": 20.98,
+      "category": "sante",
+      "date": "2026-03-12",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_04ebd611d7",
+      "type": "expense",
+      "amount": 5.01,
+      "category": "courses",
+      "date": "2026-03-12",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ea816dde27",
+      "type": "expense",
+      "amount": 48.0,
+      "category": "sortie",
+      "date": "2026-03-11",
+      "note": "Restaurant",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2b28e4b6b0",
+      "type": "expense",
+      "amount": 21.6,
+      "category": "abonnement",
+      "date": "2026-03-10",
+      "note": "Claude AI",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1b767a7e2d",
+      "type": "expense",
+      "amount": 56.62,
+      "category": "courses",
+      "date": "2026-03-09",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c6a92ad424",
+      "type": "expense",
+      "amount": 10.33,
+      "category": "courses",
+      "date": "2026-03-09",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_46ebcc5b89",
+      "type": "expense",
+      "amount": 15.6,
+      "category": "sortie",
+      "date": "2026-03-09",
+      "note": "Bubble Tea",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_50a90e91a3",
+      "type": "expense",
+      "amount": 22.35,
+      "category": "courses",
+      "date": "2026-03-08",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d1fafac710",
+      "type": "expense",
+      "amount": 7.99,
+      "category": "shopping",
+      "date": "2026-03-08",
+      "note": "Câble",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6578db5e65",
+      "type": "expense",
+      "amount": 11.3,
+      "category": "sortie",
+      "date": "2026-03-07",
+      "note": "TheCoffe",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_983733ea9b",
+      "type": "expense",
+      "amount": 14.5,
+      "category": "logement",
+      "date": "2026-03-07",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d6d343d366",
+      "type": "expense",
+      "amount": 11.52,
+      "category": "courses",
+      "date": "2026-03-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_077dedcd07",
+      "type": "expense",
+      "amount": 9.98,
+      "category": "courses",
+      "date": "2026-03-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_617aaaa42d",
+      "type": "expense",
+      "amount": 7.1,
+      "category": "courses",
+      "date": "2026-03-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_56b34954a1",
+      "type": "expense",
+      "amount": 8.9,
+      "category": "courses",
+      "date": "2026-03-06",
+      "note": "Lupo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f16bd4cebd",
+      "type": "expense",
+      "amount": 13.24,
+      "category": "courses",
+      "date": "2026-03-06",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2fe9970731",
+      "type": "expense",
+      "amount": 50.0,
+      "category": "abonnement",
+      "date": "2026-03-05",
+      "note": "Macbook",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_70888417dd",
+      "type": "income",
+      "amount": 239.0,
+      "category": "aides",
+      "date": "2026-03-05",
+      "note": "CAF",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5b21d157df",
+      "type": "expense",
+      "amount": 60.0,
+      "category": "autre",
+      "date": "2026-03-05",
+      "note": "Remboursement prêt famille",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ce7960dc8f",
+      "type": "expense",
+      "amount": 7.24,
+      "category": "courses",
+      "date": "2026-03-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4aab58f0eb",
+      "type": "expense",
+      "amount": 9.99,
+      "category": "abonnement",
+      "date": "2026-03-05",
+      "note": "Forfait mobile",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7b31a0c87f",
+      "type": "expense",
+      "amount": 25.89,
+      "category": "courses",
+      "date": "2026-03-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_fbb1f74874",
+      "type": "expense",
+      "amount": 7.4,
+      "category": "courses",
+      "date": "2026-03-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7545329e77",
+      "type": "expense",
+      "amount": 8.85,
+      "category": "courses",
+      "date": "2026-03-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f1361f4ae3",
+      "type": "expense",
+      "amount": 9.97,
+      "category": "courses",
+      "date": "2026-03-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c96be7efe3",
+      "type": "expense",
+      "amount": 5.99,
+      "category": "abonnement",
+      "date": "2026-03-04",
+      "note": "Apple Music",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d6f4bbf8ac",
+      "type": "income",
+      "amount": 1052.72,
+      "category": "salaire",
+      "date": "2026-03-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ac9862c371",
+      "type": "expense",
+      "amount": 58.62,
+      "category": "animal",
+      "date": "2026-03-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4a7155376b",
+      "type": "expense",
+      "amount": 37.99,
+      "category": "shopping",
+      "date": "2026-03-03",
+      "note": "Distributeur de croquettes",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_76ae3303b9",
+      "type": "expense",
+      "amount": 46.98,
+      "category": "shopping",
+      "date": "2026-03-03",
+      "note": "Store",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_83b6c1c64d",
+      "type": "expense",
+      "amount": 2.0,
+      "category": "courses",
+      "date": "2026-03-03",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e1314fd7b1",
+      "type": "expense",
+      "amount": 18.5,
+      "category": "shopping",
+      "date": "2026-03-03",
+      "note": "Fleurs",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9ffb937bba",
+      "type": "expense",
+      "amount": 25.37,
+      "category": "courses",
+      "date": "2026-03-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_27a7e00fbb",
+      "type": "expense",
+      "amount": 7.99,
+      "category": "sante",
+      "date": "2026-03-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_094811f818",
+      "type": "expense",
+      "amount": 4.6,
+      "category": "courses",
+      "date": "2026-03-02",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d203a8649f",
+      "type": "expense",
+      "amount": 11.6,
+      "category": "courses",
+      "date": "2026-03-02",
+      "note": "MisterGarden",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bab5c9ff35",
+      "type": "expense",
+      "amount": 5.87,
+      "category": "courses",
+      "date": "2026-02-28",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2f0d7d42ee",
+      "type": "expense",
+      "amount": 8.8,
+      "category": "courses",
+      "date": "2026-02-27",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_24eef865a3",
+      "type": "expense",
+      "amount": 4.49,
+      "category": "courses",
+      "date": "2026-02-27",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b4ca05656f",
+      "type": "expense",
+      "amount": 10.48,
+      "category": "animal",
+      "date": "2026-02-26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e27a533b99",
+      "type": "expense",
+      "amount": 10.0,
+      "category": "courses",
+      "date": "2026-02-26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3cff0e50d8",
+      "type": "expense",
+      "amount": 18.0,
+      "category": "logement",
+      "date": "2026-02-25",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ff287c237c",
+      "type": "expense",
+      "amount": 2.67,
+      "category": "courses",
+      "date": "2026-02-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_30ebb5f939",
+      "type": "expense",
+      "amount": 6.99,
+      "category": "courses",
+      "date": "2026-02-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_762226c714",
+      "type": "expense",
+      "amount": 67.58,
+      "category": "logement",
+      "date": "2026-02-25",
+      "note": "EDF",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_891b07c669",
+      "type": "expense",
+      "amount": 7.19,
+      "category": "courses",
+      "date": "2026-02-24",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3491f0cb2d",
+      "type": "expense",
+      "amount": 15.92,
+      "category": "courses",
+      "date": "2026-02-24",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_01a6eee2fe",
+      "type": "expense",
+      "amount": 10.9,
+      "category": "courses",
+      "date": "2026-02-23",
+      "note": "Lupo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_80399a3fe0",
+      "type": "expense",
+      "amount": 2.5,
+      "category": "courses",
+      "date": "2026-02-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0a7c00c7d5",
+      "type": "expense",
+      "amount": 4.7,
+      "category": "courses",
+      "date": "2026-02-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_fd62657f0b",
+      "type": "income",
+      "amount": 969.0,
+      "category": "famille",
+      "date": "2026-02-23",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4c287d6064",
+      "type": "expense",
+      "amount": 969.0,
+      "category": "shopping",
+      "date": "2026-02-23",
+      "note": "Macbook",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8cce563fd0",
+      "type": "expense",
+      "amount": 37.14,
+      "category": "shopping",
+      "date": "2026-02-23",
+      "note": "House Macbook",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_31aec4a126",
+      "type": "expense",
+      "amount": 5.1,
+      "category": "sortie",
+      "date": "2026-02-22",
+      "note": "Navigo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5f5279f9fe",
+      "type": "expense",
+      "amount": 10.21,
+      "category": "courses",
+      "date": "2026-02-22",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6a5dff9659",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-02-21",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8a3ac4e0fc",
+      "type": "expense",
+      "amount": 39.99,
+      "category": "shopping",
+      "date": "2026-02-21",
+      "note": "Cadeau mère",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c9888164f3",
+      "type": "expense",
+      "amount": 8.63,
+      "category": "courses",
+      "date": "2026-02-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d07da28488",
+      "type": "expense",
+      "amount": 3.19,
+      "category": "courses",
+      "date": "2026-02-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_049d548557",
+      "type": "expense",
+      "amount": 7.49,
+      "category": "courses",
+      "date": "2026-02-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_58ba610f1a",
+      "type": "expense",
+      "amount": 5.85,
+      "category": "courses",
+      "date": "2026-02-20",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d9b59a6796",
+      "type": "expense",
+      "amount": 4.9,
+      "category": "shopping",
+      "date": "2026-02-20",
+      "note": "Puff",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9b813e0a4f",
+      "type": "expense",
+      "amount": 17.0,
+      "category": "sortie",
+      "date": "2026-02-20",
+      "note": "Sandwich",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d3169dbf76",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-02-20",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e603fae9da",
+      "type": "expense",
+      "amount": 25.49,
+      "category": "sante",
+      "date": "2026-02-20",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_85dd0d4edf",
+      "type": "expense",
+      "amount": 22.81,
+      "category": "sortie",
+      "date": "2026-02-20",
+      "note": "Deliveroo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_10b3d42577",
+      "type": "expense",
+      "amount": 25.0,
+      "category": "sortie",
+      "date": "2026-02-19",
+      "note": "Barber",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_dbb94dd745",
+      "type": "expense",
+      "amount": 4.31,
+      "category": "courses",
+      "date": "2026-02-19",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c2c4d0359a",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-02-19",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bc07179e22",
+      "type": "expense",
+      "amount": 3.56,
+      "category": "courses",
+      "date": "2026-02-19",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e1c9deb95b",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-02-18",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_215c5673d3",
+      "type": "income",
+      "amount": 1.0,
+      "category": "autre_revenu",
+      "date": "2026-02-18",
+      "note": "Bouygues",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9c6077fdaa",
+      "type": "expense",
+      "amount": 13.72,
+      "category": "courses",
+      "date": "2026-02-18",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6a926942c2",
+      "type": "expense",
+      "amount": 3.49,
+      "category": "abonnement",
+      "date": "2026-02-17",
+      "note": "Prime",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cdda711412",
+      "type": "expense",
+      "amount": 1.59,
+      "category": "courses",
+      "date": "2026-02-17",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1cf2b8f091",
+      "type": "expense",
+      "amount": 16.84,
+      "category": "animal",
+      "date": "2026-02-16",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6b8c2d1d82",
+      "type": "expense",
+      "amount": 2.6,
+      "category": "courses",
+      "date": "2026-02-16",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a1029f36bc",
+      "type": "expense",
+      "amount": 1.95,
+      "category": "courses",
+      "date": "2026-02-16",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_87c4fc0863",
+      "type": "expense",
+      "amount": 8.9,
+      "category": "courses",
+      "date": "2026-02-16",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_52468dd7ef",
+      "type": "expense",
+      "amount": 17.5,
+      "category": "logement",
+      "date": "2026-02-15",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_59cbc67357",
+      "type": "expense",
+      "amount": 9.35,
+      "category": "courses",
+      "date": "2026-02-15",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_67defda40e",
+      "type": "expense",
+      "amount": 4.9,
+      "category": "shopping",
+      "date": "2026-02-15",
+      "note": "Puff",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_91b9796014",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-02-14",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_da04f47214",
+      "type": "expense",
+      "amount": 40.4,
+      "category": "sortie",
+      "date": "2026-02-14",
+      "note": "KFC",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f6216d37a8",
+      "type": "expense",
+      "amount": 9.52,
+      "category": "courses",
+      "date": "2026-02-13",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8dc86e542b",
+      "type": "expense",
+      "amount": 6.05,
+      "category": "courses",
+      "date": "2026-02-13",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8f23ed81fc",
+      "type": "expense",
+      "amount": 0.99,
+      "category": "abonnement",
+      "date": "2026-02-12",
+      "note": "iCloud",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_86acc4aadb",
+      "type": "expense",
+      "amount": 2.99,
+      "category": "courses",
+      "date": "2026-02-12",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_80bd0b2318",
+      "type": "expense",
+      "amount": 15.0,
+      "category": "autre",
+      "date": "2026-02-12",
+      "note": "Pénalité N26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_64d3aa57bc",
+      "type": "expense",
+      "amount": 10.0,
+      "category": "abonnement",
+      "date": "2026-02-11",
+      "note": "Sosh",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_af46481e85",
+      "type": "expense",
+      "amount": 5.99,
+      "category": "abonnement",
+      "date": "2026-02-11",
+      "note": "Apple Music",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ce31bac20d",
+      "type": "expense",
+      "amount": 6.45,
+      "category": "courses",
+      "date": "2026-02-11",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_21c40a2914",
+      "type": "expense",
+      "amount": 13.65,
+      "category": "courses",
+      "date": "2026-02-11",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_088bbf985e",
+      "type": "expense",
+      "amount": 3.65,
+      "category": "courses",
+      "date": "2026-02-11",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_df50f3cd9c",
+      "type": "expense",
+      "amount": 2.2,
+      "category": "courses",
+      "date": "2026-02-10",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7709e786ff",
+      "type": "expense",
+      "amount": 8.3,
+      "category": "courses",
+      "date": "2026-02-10",
+      "note": "BBT",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f2d30a604b",
+      "type": "expense",
+      "amount": 24.88,
+      "category": "abonnement",
+      "date": "2026-02-10",
+      "note": "Salle",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e5786cf77b",
+      "type": "expense",
+      "amount": 15.0,
+      "category": "autre",
+      "date": "2026-02-10",
+      "note": "Pénalité N26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7b20e5dc65",
+      "type": "expense",
+      "amount": 4.99,
+      "category": "courses",
+      "date": "2026-02-10",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f998ad9bcd",
+      "type": "expense",
+      "amount": 2.0,
+      "category": "shopping",
+      "date": "2026-02-09",
+      "note": "Bouygues",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6901897328",
+      "type": "expense",
+      "amount": 11.6,
+      "category": "courses",
+      "date": "2026-02-09",
+      "note": "MisterGarden",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_29d27b62a6",
+      "type": "expense",
+      "amount": 2.0,
+      "category": "courses",
+      "date": "2026-02-09",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0ad3e2deb7",
+      "type": "expense",
+      "amount": 124.48,
+      "category": "courses",
+      "date": "2026-02-08",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a3d84f84ce",
+      "type": "expense",
+      "amount": 16.5,
+      "category": "logement",
+      "date": "2026-02-08",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f13ab4f775",
+      "type": "expense",
+      "amount": 96.09,
+      "category": "courses",
+      "date": "2026-02-08",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1c7e31c0b2",
+      "type": "expense",
+      "amount": 67.58,
+      "category": "logement",
+      "date": "2026-02-08",
+      "note": "EDF",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_63610a3d1b",
+      "type": "expense",
+      "amount": 1.96,
+      "category": "courses",
+      "date": "2026-02-08",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_76ab965ac0",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-02-07",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_448f06bf21",
+      "type": "expense",
+      "amount": 28.98,
+      "category": "sante",
+      "date": "2026-02-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cdad30e3c8",
+      "type": "expense",
+      "amount": 10.09,
+      "category": "courses",
+      "date": "2026-02-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_11c2701ca2",
+      "type": "expense",
+      "amount": 2.2,
+      "category": "courses",
+      "date": "2026-02-06",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_78ebf836c1",
+      "type": "expense",
+      "amount": 2.5,
+      "category": "courses",
+      "date": "2026-02-06",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_eca21552a5",
+      "type": "expense",
+      "amount": 22.5,
+      "category": "sortie",
+      "date": "2026-02-06",
+      "note": "Crêpes",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bf21255a2f",
+      "type": "income",
+      "amount": 239.0,
+      "category": "aides",
+      "date": "2026-02-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e9a0afa780",
+      "type": "expense",
+      "amount": 5.78,
+      "category": "courses",
+      "date": "2026-02-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ea87f6b659",
+      "type": "expense",
+      "amount": 1.1,
+      "category": "courses",
+      "date": "2026-02-05",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a994101c25",
+      "type": "expense",
+      "amount": 5.74,
+      "category": "courses",
+      "date": "2026-02-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_5f96155333",
+      "type": "expense",
+      "amount": 5.9,
+      "category": "courses",
+      "date": "2026-02-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3d589a1611",
+      "type": "expense",
+      "amount": 2.8,
+      "category": "autre",
+      "date": "2026-02-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_11e4ee90ee",
+      "type": "expense",
+      "amount": 2.5,
+      "category": "courses",
+      "date": "2026-02-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3eab11e38c",
+      "type": "expense",
+      "amount": 1.9,
+      "category": "courses",
+      "date": "2026-02-04",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2ac8112783",
+      "type": "expense",
+      "amount": 4.24,
+      "category": "courses",
+      "date": "2026-02-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_947746e0ca",
+      "type": "income",
+      "amount": 813.73,
+      "category": "salaire",
+      "date": "2026-02-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bff03cae2d",
+      "type": "expense",
+      "amount": 6.73,
+      "category": "courses",
+      "date": "2026-02-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_06d375e3d2",
+      "type": "expense",
+      "amount": 7.48,
+      "category": "courses",
+      "date": "2026-02-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9de2a2b6c8",
+      "type": "expense",
+      "amount": 5.1,
+      "category": "sortie",
+      "date": "2026-02-02",
+      "note": "Navigo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2d3c81b7e1",
+      "type": "expense",
+      "amount": 42.0,
+      "category": "sortie",
+      "date": "2026-02-02",
+      "note": "Disney",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e13f344a9e",
+      "type": "expense",
+      "amount": 11.85,
+      "category": "courses",
+      "date": "2026-02-02",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_db50c351dd",
+      "type": "income",
+      "amount": 200.0,
+      "category": "famille",
+      "date": "2026-02-01",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b8fc6dd0eb",
+      "type": "expense",
+      "amount": 16.5,
+      "category": "logement",
+      "date": "2026-02-01",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8635293ddb",
+      "type": "expense",
+      "amount": 13.53,
+      "category": "courses",
+      "date": "2026-02-01",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_fb5fcbede2",
+      "type": "expense",
+      "amount": 41.08,
+      "category": "animal",
+      "date": "2026-02-01",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3964c827bc",
+      "type": "expense",
+      "amount": 1.49,
+      "category": "courses",
+      "date": "2026-01-26",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_02700981ef",
+      "type": "income",
+      "amount": 13.5,
+      "category": "famille",
+      "date": "2026-01-25",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_24d1a97428",
+      "type": "expense",
+      "amount": 17.5,
+      "category": "logement",
+      "date": "2026-01-25",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_af994586e4",
+      "type": "income",
+      "amount": 5.0,
+      "category": "famille",
+      "date": "2026-01-25",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_bbaa52d850",
+      "type": "income",
+      "amount": 2.0,
+      "category": "famille",
+      "date": "2026-01-25",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4b02071356",
+      "type": "expense",
+      "amount": 4.0,
+      "category": "courses",
+      "date": "2026-01-25",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_7a3e443cae",
+      "type": "income",
+      "amount": 15.0,
+      "category": "famille",
+      "date": "2026-01-24",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c34fe2fa7b",
+      "type": "expense",
+      "amount": 12.6,
+      "category": "courses",
+      "date": "2026-01-24",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_31c580de7a",
+      "type": "expense",
+      "amount": 1.0,
+      "category": "courses",
+      "date": "2026-01-23",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a90aef609a",
+      "type": "income",
+      "amount": 25.0,
+      "category": "famille",
+      "date": "2026-01-22",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a06494529e",
+      "type": "expense",
+      "amount": 164.0,
+      "category": "sortie",
+      "date": "2026-01-22",
+      "note": "Disney",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_227130fd3a",
+      "type": "expense",
+      "amount": 1.7,
+      "category": "courses",
+      "date": "2026-01-21",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3865df382a",
+      "type": "expense",
+      "amount": 1.5,
+      "category": "courses",
+      "date": "2026-01-21",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f93602bdf5",
+      "type": "expense",
+      "amount": 2.2,
+      "category": "courses",
+      "date": "2026-01-20",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cab852f3c3",
+      "type": "income",
+      "amount": 47.0,
+      "category": "famille",
+      "date": "2026-01-20",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_662f0cb00d",
+      "type": "expense",
+      "amount": 45.96,
+      "category": "sortie",
+      "date": "2026-01-20",
+      "note": "Deliveroo\n",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3b7e8ce549",
+      "type": "expense",
+      "amount": 1.49,
+      "category": "courses",
+      "date": "2026-01-19",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_413c60d59c",
+      "type": "expense",
+      "amount": 0.8,
+      "category": "courses",
+      "date": "2026-01-19",
+      "note": "Café",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_61bcc03e5b",
+      "type": "expense",
+      "amount": 3.49,
+      "category": "abonnement",
+      "date": "2026-01-17",
+      "note": "Prime",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_25b8c93f55",
+      "type": "expense",
+      "amount": 47.41,
+      "category": "courses",
+      "date": "2026-01-17",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_95bd36732d",
+      "type": "income",
+      "amount": 160.0,
+      "category": "famille",
+      "date": "2026-01-16",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b6020cb622",
+      "type": "expense",
+      "amount": 3.3,
+      "category": "courses",
+      "date": "2026-01-14",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_fec00b2380",
+      "type": "expense",
+      "amount": 7.39,
+      "category": "courses",
+      "date": "2026-01-13",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_eb5a93ed84",
+      "type": "expense",
+      "amount": 1.69,
+      "category": "courses",
+      "date": "2026-01-13",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b77b823596",
+      "type": "expense",
+      "amount": 0.99,
+      "category": "abonnement",
+      "date": "2026-01-12",
+      "note": "iCloud",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2e195965e1",
+      "type": "expense",
+      "amount": 4.94,
+      "category": "courses",
+      "date": "2026-01-12",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_fcdae1cdf6",
+      "type": "expense",
+      "amount": 5.99,
+      "category": "abonnement",
+      "date": "2026-01-11",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a88142e36d",
+      "type": "expense",
+      "amount": 41.08,
+      "category": "animal",
+      "date": "2026-01-11",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_f07ffec5fb",
+      "type": "expense",
+      "amount": 22.0,
+      "category": "logement",
+      "date": "2026-01-11",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a05897b24c",
+      "type": "income",
+      "amount": 25.0,
+      "category": "famille",
+      "date": "2026-01-11",
+      "note": "Moësha",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ba4aa8733e",
+      "type": "expense",
+      "amount": 32.08,
+      "category": "courses",
+      "date": "2026-01-11",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_68b5b6c167",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-01-10",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_00e5bbd99d",
+      "type": "expense",
+      "amount": 45.81,
+      "category": "sante",
+      "date": "2026-01-10",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a24df871f5",
+      "type": "expense",
+      "amount": 5.29,
+      "category": "courses",
+      "date": "2026-01-10",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0e7765eda4",
+      "type": "expense",
+      "amount": 8.97,
+      "category": "courses",
+      "date": "2026-01-10",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d25de7875e",
+      "type": "expense",
+      "amount": 24.87,
+      "category": "animal",
+      "date": "2026-01-10",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_76b3087f0c",
+      "type": "expense",
+      "amount": 14.9,
+      "category": "shopping",
+      "date": "2026-01-09",
+      "note": "Puff",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_28a71c2b5a",
+      "type": "expense",
+      "amount": 3.2,
+      "category": "courses",
+      "date": "2026-01-09",
+      "note": "Petit-déjeuner",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0c3f3c426b",
+      "type": "expense",
+      "amount": 7.2,
+      "category": "courses",
+      "date": "2026-01-09",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2688964ce9",
+      "type": "expense",
+      "amount": 13.9,
+      "category": "sante",
+      "date": "2026-01-09",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_629970eac6",
+      "type": "expense",
+      "amount": 9.53,
+      "category": "courses",
+      "date": "2026-01-09",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_a3801907ea",
+      "type": "expense",
+      "amount": 16.0,
+      "category": "sortie",
+      "date": "2026-01-09",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b3ed065202",
+      "type": "expense",
+      "amount": 10.3,
+      "category": "sortie",
+      "date": "2026-01-08",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_04b3718546",
+      "type": "expense",
+      "amount": 22.0,
+      "category": "sortie",
+      "date": "2026-01-08",
+      "note": "Bowler",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_0c8d9f94a8",
+      "type": "expense",
+      "amount": 2.05,
+      "category": "courses",
+      "date": "2026-01-08",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cab1fc913c",
+      "type": "expense",
+      "amount": 5.0,
+      "category": "sortie",
+      "date": "2026-01-07",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ce1a640b16",
+      "type": "expense",
+      "amount": 4.68,
+      "category": "courses",
+      "date": "2026-01-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_00c3be31eb",
+      "type": "expense",
+      "amount": 4.79,
+      "category": "courses",
+      "date": "2026-01-07",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_4325c56215",
+      "type": "expense",
+      "amount": 16.0,
+      "category": "sortie",
+      "date": "2026-01-07",
+      "note": "Kebab",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_90bafd43cc",
+      "type": "expense",
+      "amount": 6.63,
+      "category": "courses",
+      "date": "2026-01-06",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ffe6e9fa2a",
+      "type": "expense",
+      "amount": 3.0,
+      "category": "courses",
+      "date": "2026-01-06",
+      "note": "Petit-déjeuner\n",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_9a2c953216",
+      "type": "expense",
+      "amount": 5.0,
+      "category": "sortie",
+      "date": "2026-01-06",
+      "note": "TheCoffee",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_d755671e4e",
+      "type": "expense",
+      "amount": 180.0,
+      "category": "shopping",
+      "date": "2026-01-06",
+      "note": "Veste de costume",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cddcea39d9",
+      "type": "expense",
+      "amount": 9.74,
+      "category": "courses",
+      "date": "2026-01-06",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_772f86f44e",
+      "type": "expense",
+      "amount": 9.0,
+      "category": "sortie",
+      "date": "2026-01-06",
+      "note": "Kebab",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_3c4264c4b8",
+      "type": "expense",
+      "amount": 5.0,
+      "category": "autre",
+      "date": "2026-01-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6f85cff8bf",
+      "type": "income",
+      "amount": 239.0,
+      "category": "aides",
+      "date": "2026-01-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b6a4d7ac3f",
+      "type": "income",
+      "amount": 250.0,
+      "category": "famille",
+      "date": "2026-01-05",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_e614cebee6",
+      "type": "expense",
+      "amount": 15.0,
+      "category": "courses",
+      "date": "2026-01-05",
+      "note": "Crous",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_b01a52ee66",
+      "type": "expense",
+      "amount": 27.8,
+      "category": "sortie",
+      "date": "2026-01-05",
+      "note": "Hamburger ",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_ed9538de6e",
+      "type": "expense",
+      "amount": 2.55,
+      "category": "sortie",
+      "date": "2026-01-05",
+      "note": "Navigo",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2551021fdd",
+      "type": "expense",
+      "amount": 2.7,
+      "category": "courses",
+      "date": "2026-01-05",
+      "note": "Redbull",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8499899794",
+      "type": "expense",
+      "amount": 13.5,
+      "category": "logement",
+      "date": "2026-01-04",
+      "note": "Lessive",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_cd44704f1b",
+      "type": "expense",
+      "amount": 7.54,
+      "category": "courses",
+      "date": "2026-01-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1c2df66733",
+      "type": "expense",
+      "amount": 2.54,
+      "category": "courses",
+      "date": "2026-01-04",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1b4e5e7798",
+      "type": "expense",
+      "amount": 13.43,
+      "category": "courses",
+      "date": "2026-01-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8c462be63c",
+      "type": "income",
+      "amount": 100.0,
+      "category": "famille",
+      "date": "2026-01-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_6f2a4cd820",
+      "type": "expense",
+      "amount": 5.26,
+      "category": "courses",
+      "date": "2026-01-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_c31cad560c",
+      "type": "expense",
+      "amount": 4.51,
+      "category": "courses",
+      "date": "2026-01-03",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_1c8c7ae52f",
+      "type": "expense",
+      "amount": 24.89,
+      "category": "courses",
+      "date": "2026-01-02",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_2541bc0385",
+      "type": "income",
+      "amount": 110.36,
+      "category": "autre_revenu",
+      "date": "2026-01-01",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    },
+    {
+      "id": "rcv_8b2026dedf",
+      "type": "expense",
+      "amount": 4.19,
+      "category": "courses",
+      "date": "2026-01-01",
+      "createdAt": "2026-05-25T00:00:00.000Z"
+    }
+  ],
+  "financeCategories": [
+    {
+      "id": "logement",
+      "name": "Logement",
+      "type": "expense",
+      "color": "#6366f1",
+      "icon": "🏠"
+    },
+    {
+      "id": "nourriture",
+      "name": "Nourriture",
+      "type": "expense",
+      "color": "#22c55e",
+      "icon": "🍎"
+    },
+    {
+      "id": "transport",
+      "name": "Transport",
+      "type": "expense",
+      "color": "#3b82f6",
+      "icon": "🚌"
+    },
+    {
+      "id": "loisirs",
+      "name": "Loisirs",
+      "type": "expense",
+      "color": "#a855f7",
+      "icon": "🎭"
+    },
+    {
+      "id": "apprentissage",
+      "name": "Apprentissage",
+      "type": "expense",
+      "color": "#f59e0b",
+      "icon": "📚"
+    },
+    {
+      "id": "sante",
+      "name": "Santé",
+      "type": "expense",
+      "color": "#ef4444",
+      "icon": "💊"
+    },
+    {
+      "id": "autre",
+      "name": "Autre",
+      "type": "expense",
+      "color": "#71717a",
+      "icon": "📦"
+    },
+    {
+      "id": "salaire",
+      "name": "Salaire",
+      "type": "income",
+      "color": "#10b981",
+      "icon": "💼"
+    },
+    {
+      "id": "freelance",
+      "name": "Freelance",
+      "type": "income",
+      "color": "#06b6d4",
+      "icon": "💻"
+    },
+    {
+      "id": "investissement",
+      "name": "Investissement",
+      "type": "income",
+      "color": "#8b5cf6",
+      "icon": "📈"
+    },
+    {
+      "id": "prime",
+      "name": "Prime",
+      "type": "income",
+      "color": "#f97316",
+      "icon": "🎁"
+    },
+    {
+      "id": "cadeau",
+      "name": "Cadeau",
+      "type": "income",
+      "color": "#ec4899",
+      "icon": "🎀"
+    },
+    {
+      "id": "autre_revenu",
+      "name": "Autre revenu",
+      "type": "income",
+      "color": "#71717a",
+      "icon": "📦"
+    },
+    {
+      "id": "courses",
+      "name": "Courses",
+      "type": "expense",
+      "color": "#22c55e",
+      "icon": "🛒"
+    },
+    {
+      "id": "sortie",
+      "name": "Sortie",
+      "type": "expense",
+      "color": "#a855f7",
+      "icon": "🍷"
+    },
+    {
+      "id": "shopping",
+      "name": "Shopping",
+      "type": "expense",
+      "color": "#ec4899",
+      "icon": "🛍️"
+    },
+    {
+      "id": "animal",
+      "name": "Animal",
+      "type": "expense",
+      "color": "#84cc16",
+      "icon": "🐾"
+    },
+    {
+      "id": "abonnement",
+      "name": "Abonnement",
+      "type": "expense",
+      "color": "#06b6d4",
+      "icon": "🔄"
+    },
+    {
+      "id": "aides",
+      "name": "Aides",
+      "type": "income",
+      "color": "#0ea5e9",
+      "icon": "🤲"
+    },
+    {
+      "id": "famille",
+      "name": "Famille",
+      "type": "income",
+      "color": "#f43f5e",
+      "icon": "👨‍👩‍👧"
+    }
+  ]
+}
