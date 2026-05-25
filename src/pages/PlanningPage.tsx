@@ -13,10 +13,8 @@ import type {
 import type { Objective, Domain } from '../types'
 
 // =============================================================================
-// MVP brut — voir docs/planning/SPEC.md
 // Cascade : Identité → OKR → KR (= Objective) → Rock
-// Pas de Mois/Semaine/Jour/Revues dans ce MVP (Phase 3).
-// Plafonds stricts : 3 identités, 5 OKR/an, 4 KR/OKR, 5 rocks/trimestre.
+// Plafond : 3 identités (vision long terme). Pas de limite sur OKR/KR/Rocks.
 // =============================================================================
 
 // ─── Tokens locaux (cohérents avec le reste de l'app) ────────────────────────
@@ -178,6 +176,26 @@ function ProgressBar({
   )
 }
 
+// ─── Couleur de statut d'un Rock (point coloré dans la cascade) ─────────────
+
+function rockStatusColor(status: RockStatus): string {
+  switch (status) {
+    case 'a_faire':   return 'var(--ink-4)'
+    case 'en_cours':  return 'var(--terra)'
+    case 'termine':   return 'var(--sage-deep)'
+    case 'abandonne': return 'var(--paper-3, var(--paper-2))'
+  }
+}
+
+function rockStatusLabel(status: RockStatus): string {
+  switch (status) {
+    case 'a_faire':   return 'À faire'
+    case 'en_cours':  return 'En cours'
+    case 'termine':   return 'Terminé'
+    case 'abandonne': return 'Abandonné'
+  }
+}
+
 // ─── Status badge ────────────────────────────────────────────────────────────
 
 function StatusBadge({ status }: { status: string }) {
@@ -307,6 +325,7 @@ export function PlanningPage() {
       <RocksSection
         rocks={rocksThisQ}
         objectives={objectives}
+        okrs={okrs}
         currentQuarter={currentQuarter}
         onAdd={addRock}
         onUpdate={updateRock}
@@ -804,14 +823,13 @@ function OkrsSection({
   onAddKr, onUpdateKr, onDeleteKr, getKrs,
 }: OkrsSectionProps) {
   const [adding, setAdding] = useState(false)
-  const atCap = okrs.length >= 5
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <SectionHeader
         title={`OKR ${currentYear}`}
-        subtitle="Objectifs annuels avec résultats clés mesurables. Max 5 par année."
-        count={`${okrs.length}/5`}
+        subtitle="Objectifs annuels avec résultats clés mesurables."
+        count={`${okrs.length}`}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -845,12 +863,8 @@ function OkrsSection({
             onCancel={() => setAdding(false)}
           />
         ) : (
-          <button
-            disabled={atCap}
-            onClick={() => setAdding(true)}
-            style={{ ...btnSubtle, opacity: atCap ? 0.4 : 1, cursor: atCap ? 'not-allowed' : 'pointer' }}
-          >
-            <Plus size={14} /> {atCap ? 'Maximum atteint' : 'Ajouter un OKR'}
+          <button onClick={() => setAdding(true)} style={btnSubtle}>
+            <Plus size={14} /> Ajouter un OKR
           </button>
         )}
       </div>
@@ -873,7 +887,6 @@ function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onA
   const [editing, setEditing] = useState(false)
   const [addingKr, setAddingKr] = useState(false)
   const linkedIdentities = identities.filter((i) => okr.identityIds.includes(i.id))
-  const krAtCap = krs.length >= 4
   const okrProgress = okrProgressDerived(krs, rocks)
 
   if (editing) {
@@ -889,8 +902,13 @@ function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onA
   }
 
   return (
-    <div style={{ ...card }}>
+    <div style={{
+      ...card,
+      borderLeft: '3px solid var(--terra)',
+      paddingLeft: 18,
+    }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ ...labelStyle, fontSize: 9.5, color: 'var(--terra)' }}>OKR</span>
         <h3 style={{ fontSize: 15.5, fontWeight: 500, color: 'var(--fg)', margin: 0, flex: 1 }}>
           {okr.name}
         </h3>
@@ -925,15 +943,13 @@ function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onA
         </div>
       )}
 
-      {/* KR list */}
+      {/* KR list — cascade indentée sous l'OKR */}
       <div style={{
         marginTop: 14, paddingTop: 14,
         borderTop: '1px solid var(--paper-2)',
-        display: 'flex', flexDirection: 'column', gap: 6,
+        display: 'flex', flexDirection: 'column', gap: 8,
       }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={labelStyle}>Résultats clés · {krs.length}/4</span>
-        </div>
+        <span style={labelStyle}>Résultats clés · {krs.length}</span>
 
         {krs.length === 0 && !addingKr && (
           <p style={{ color: 'var(--fg-subtle)', fontSize: 12.5, fontStyle: 'italic', margin: 0 }}>
@@ -943,6 +959,7 @@ function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onA
 
         {krs.map((kr) => {
           const krProg = krProgressDerived(kr, rocks)
+          const linkedRocks = rocks.filter((r) => r.krIds.includes(kr.id))
           return (
             <KrRow
               key={kr.id}
@@ -950,6 +967,7 @@ function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onA
               domains={domains}
               progress={krProg.value}
               progressFromRocks={krProg.fromRocks}
+              linkedRocks={linkedRocks}
               onUpdate={(patch) => onUpdateKr(kr.id, patch)}
               onDelete={() => onDeleteKr(kr.id)}
             />
@@ -964,15 +982,10 @@ function OkrCard({ okr, identities, krs, rocks, domains, onUpdate, onDelete, onA
           />
         ) : (
           <button
-            disabled={krAtCap}
             onClick={() => setAddingKr(true)}
-            style={{
-              ...btnSubtle, opacity: krAtCap ? 0.4 : 1,
-              cursor: krAtCap ? 'not-allowed' : 'pointer',
-              alignSelf: 'flex-start', fontSize: 11.5,
-            }}
+            style={{ ...btnSubtle, alignSelf: 'flex-start', fontSize: 11.5 }}
           >
-            <Plus size={12} /> {krAtCap ? 'Maximum 4 KR' : 'Ajouter un KR'}
+            <Plus size={12} /> Ajouter un KR
           </button>
         )}
       </div>
@@ -1076,11 +1089,12 @@ function OkrEditForm({ currentYear, identities, initial, onSave, onCancel }: {
 // KR rows (Objective avec parentOkrId)
 // =============================================================================
 
-function KrRow({ kr, domains, progress, progressFromRocks, onUpdate, onDelete }: {
+function KrRow({ kr, domains, progress, progressFromRocks, linkedRocks, onUpdate, onDelete }: {
   kr: Objective
   domains: { id: string, name: string }[]
   progress: number
   progressFromRocks: boolean
+  linkedRocks: Rock[]
   onUpdate: (patch: Partial<Omit<Objective, 'id' | 'createdAt' | 'updatedAt'>>) => void
   onDelete: () => void
 }) {
@@ -1114,47 +1128,104 @@ function KrRow({ kr, domains, progress, progressFromRocks, onUpdate, onDelete }:
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'flex-start', gap: 10,
-      padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: 0,
       background: 'var(--paper)', border: '1px solid var(--paper-2)',
-      borderRadius: 8,
+      borderRadius: 8, overflow: 'hidden',
     }}>
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13.5, color: 'var(--fg)', fontWeight: 500 }}>{kr.title}</span>
-          {kr.targetValue && (
-            <span style={{ ...labelStyle, color: 'var(--terra)', fontSize: 10 }}>
-              → {kr.targetValue}
-            </span>
-          )}
-          {kr.targetDate && (
-            <span style={{ ...labelStyle, fontSize: 10 }}>
-              ⏵ {kr.targetDate}
-            </span>
-          )}
-        </div>
-        {(domain || kr.description) && (
-          <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 11.5, color: 'var(--fg-subtle)' }}>
-            {domain && <span style={labelStyle}>{domain.name}</span>}
-            {kr.description && <span style={{ fontStyle: 'italic' }}>{kr.description}</span>}
+      {/* En-tête du KR */}
+      <div style={{
+        display: 'flex', alignItems: 'flex-start', gap: 10,
+        padding: '8px 10px',
+      }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', flexWrap: 'wrap' }}>
+            <span style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}>KR</span>
+            <span style={{ fontSize: 13.5, color: 'var(--fg)', fontWeight: 500 }}>{kr.title}</span>
+            {kr.targetValue && (
+              <span style={{ ...labelStyle, color: 'var(--terra)', fontSize: 10 }}>
+                → {kr.targetValue}
+              </span>
+            )}
+            {kr.targetDate && (
+              <span style={{ ...labelStyle, fontSize: 10 }}>
+                ⏵ {kr.targetDate}
+              </span>
+            )}
           </div>
-        )}
-        <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <ProgressBar value={progress} height={4} />
-          {!progressFromRocks && (
-            <span
-              style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}
-              title="Pas de Rock lié — progression issue du champ KR (manuel)"
-            >
-              manuel
-            </span>
+          {(domain || kr.description) && (
+            <div style={{ display: 'flex', gap: 8, alignItems: 'baseline', fontSize: 11.5, color: 'var(--fg-subtle)' }}>
+              {domain && <span style={labelStyle}>{domain.name}</span>}
+              {kr.description && <span style={{ fontStyle: 'italic' }}>{kr.description}</span>}
+            </div>
           )}
+          <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ProgressBar value={progress} height={4} />
+            {!progressFromRocks && (
+              <span
+                style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}
+                title="Pas de Rock lié — progression issue du champ KR (manuel)"
+              >
+                manuel
+              </span>
+            )}
+          </div>
+        </div>
+        <div style={{ display: 'flex', gap: 2 }}>
+          <button style={ghostBtn} onClick={() => setEditing(true)}><ChevronRight size={12} /></button>
+          <button style={ghostBtn} onClick={onDelete}><X size={12} /></button>
         </div>
       </div>
-      <div style={{ display: 'flex', gap: 2 }}>
-        <button style={ghostBtn} onClick={() => setEditing(true)}><ChevronRight size={12} /></button>
-        <button style={ghostBtn} onClick={onDelete}><X size={12} /></button>
-      </div>
+
+      {/* Cascade : Rocks liés sous le KR */}
+      {linkedRocks.length > 0 && (
+        <div style={{
+          padding: '6px 10px 10px 22px',
+          display: 'flex', flexDirection: 'column', gap: 4,
+          background: 'var(--paper-1)',
+          borderTop: '1px dashed var(--paper-2)',
+          position: 'relative',
+        }}>
+          {linkedRocks.map((r) => (
+            <div key={r.id} style={{
+              display: 'flex', alignItems: 'center', gap: 8,
+              fontSize: 12, color: 'var(--fg-muted)',
+              position: 'relative',
+            }}>
+              <span aria-hidden style={{
+                color: 'var(--ink-5, var(--fg-subtle))',
+                fontFamily: 'var(--font-mono)',
+                fontSize: 11,
+                opacity: 0.6,
+              }}>
+                └
+              </span>
+              <span title={rockStatusLabel(r.status)} style={{
+                width: 7, height: 7, borderRadius: '50%',
+                background: rockStatusColor(r.status),
+                flexShrink: 0,
+                opacity: r.status === 'abandonne' ? 0.45 : 1,
+                border: r.status === 'a_faire' ? '1px solid var(--paper-3, var(--paper-2))' : 'none',
+                boxSizing: 'border-box',
+              }} />
+              <span style={{
+                color: r.status === 'abandonne' ? 'var(--fg-subtle)' : 'var(--fg)',
+                textDecoration: r.status === 'abandonne' ? 'line-through' : 'none',
+                fontWeight: 500,
+              }}>
+                {r.name}
+              </span>
+              <span style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}>
+                {rockStatusLabel(r.status)}
+              </span>
+              {r.deadline && (
+                <span style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}>
+                  ⏵ {r.deadline}
+                </span>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -1298,15 +1369,15 @@ function KrEditForm({ domains, initial, onSave, onCancel }: {
 interface RocksSectionProps {
   rocks:          Rock[]
   objectives:     Objective[]
+  okrs:           Okr[]
   currentQuarter: string
   onAdd:    (data: Omit<Rock, 'id' | 'createdAt' | 'updatedAt' | 'sortOrder'>) => Rock
   onUpdate: (id: string, patch: Partial<Omit<Rock, 'id' | 'createdAt' | 'updatedAt'>>) => void
   onDelete: (id: string) => void
 }
 
-function RocksSection({ rocks, objectives, currentQuarter, onAdd, onUpdate, onDelete }: RocksSectionProps) {
+function RocksSection({ rocks, objectives, okrs, currentQuarter, onAdd, onUpdate, onDelete }: RocksSectionProps) {
   const [adding, setAdding] = useState(false)
-  const atCap = rocks.length >= 5
 
   // Liste des Objectives qui sont des KR (avec parentOkrId)
   const krs = objectives.filter((o) => o.parentOkrId)
@@ -1315,8 +1386,8 @@ function RocksSection({ rocks, objectives, currentQuarter, onAdd, onUpdate, onDe
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
       <SectionHeader
         title={`Rocks · ${currentQuarter}`}
-        subtitle="Livrables concrets et datés sur 90 jours. Max 5 par trimestre."
-        count={`${rocks.length}/5`}
+        subtitle="Livrables concrets et datés sur 90 jours."
+        count={`${rocks.length}`}
       />
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -1331,6 +1402,7 @@ function RocksSection({ rocks, objectives, currentQuarter, onAdd, onUpdate, onDe
             key={rock.id}
             rock={rock}
             krs={krs}
+            okrs={okrs}
             onUpdate={(patch) => onUpdate(rock.id, patch)}
             onDelete={() => onDelete(rock.id)}
           />
@@ -1344,12 +1416,8 @@ function RocksSection({ rocks, objectives, currentQuarter, onAdd, onUpdate, onDe
             onCancel={() => setAdding(false)}
           />
         ) : (
-          <button
-            disabled={atCap}
-            onClick={() => setAdding(true)}
-            style={{ ...btnSubtle, opacity: atCap ? 0.4 : 1, cursor: atCap ? 'not-allowed' : 'pointer' }}
-          >
-            <Plus size={14} /> {atCap ? 'Maximum atteint' : 'Ajouter un Rock'}
+          <button onClick={() => setAdding(true)} style={btnSubtle}>
+            <Plus size={14} /> Ajouter un Rock
           </button>
         )}
       </div>
@@ -1357,9 +1425,10 @@ function RocksSection({ rocks, objectives, currentQuarter, onAdd, onUpdate, onDe
   )
 }
 
-function RockRow({ rock, krs, onUpdate, onDelete }: {
+function RockRow({ rock, krs, okrs, onUpdate, onDelete }: {
   rock: Rock
   krs: Objective[]
+  okrs: Okr[]
   onUpdate: (patch: Partial<Omit<Rock, 'id' | 'createdAt' | 'updatedAt'>>) => void
   onDelete: () => void
 }) {
@@ -1379,8 +1448,13 @@ function RockRow({ rock, krs, onUpdate, onDelete }: {
   }
 
   return (
-    <div style={{ ...card }}>
+    <div style={{
+      ...card,
+      borderLeft: `3px solid ${rockStatusColor(rock.status)}`,
+      paddingLeft: 18,
+    }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
+        <span style={{ ...labelStyle, fontSize: 9.5, color: 'var(--fg-subtle)' }}>ROCK</span>
         <h3 style={{ fontSize: 14.5, fontWeight: 500, color: 'var(--fg)', margin: 0, flex: 1 }}>
           {rock.name}
         </h3>
@@ -1398,17 +1472,58 @@ function RockRow({ rock, krs, onUpdate, onDelete }: {
           {rock.expectedResult}
         </p>
       )}
-      {linkedKrs.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-          {linkedKrs.map((kr) => (
-            <span key={kr.id} style={{
-              ...labelStyle,
-              background: 'var(--paper-2)', padding: '2px 8px',
-              borderRadius: 6, fontSize: 10,
-            }}>
-              ◇ {kr.title}
-            </span>
-          ))}
+      {linkedKrs.length > 0 ? (
+        <div style={{
+          marginTop: 10, paddingTop: 8,
+          borderTop: '1px dashed var(--paper-2)',
+          display: 'flex', flexDirection: 'column', gap: 4,
+        }}>
+          <span style={{ ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)' }}>
+            Sert {linkedKrs.length === 1 ? 'le KR' : 'les KR'}
+          </span>
+          {linkedKrs.map((kr) => {
+            const parentOkr = okrs.find((o) => o.id === kr.parentOkrId)
+            return (
+              <div key={kr.id} style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                fontSize: 11.5, lineHeight: 1.4,
+                flexWrap: 'wrap',
+              }}>
+                {parentOkr && (
+                  <>
+                    <span style={{
+                      ...labelStyle, fontSize: 9, color: 'var(--terra)',
+                      background: 'var(--terra-soft)',
+                      padding: '1px 6px', borderRadius: 4,
+                    }}>
+                      OKR
+                    </span>
+                    <span style={{ color: 'var(--fg-muted)', fontWeight: 500 }}>
+                      {parentOkr.name}
+                    </span>
+                    <ChevronRight size={11} style={{ color: 'var(--fg-subtle)', opacity: 0.6 }} />
+                  </>
+                )}
+                <span style={{
+                  ...labelStyle, fontSize: 9, color: 'var(--fg-subtle)',
+                  background: 'var(--paper-2)',
+                  padding: '1px 6px', borderRadius: 4,
+                }}>
+                  KR
+                </span>
+                <span style={{ color: 'var(--fg)' }}>{kr.title}</span>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        <div style={{ marginTop: 8 }}>
+          <span style={{
+            ...labelStyle, fontSize: 9,
+            color: 'var(--fg-subtle)', fontStyle: 'italic',
+          }}>
+            Aucun KR rattaché — Rock orphelin
+          </span>
         </div>
       )}
     </div>
