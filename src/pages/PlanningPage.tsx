@@ -14,7 +14,7 @@ import type { Objective, Domain } from '../types'
 
 // =============================================================================
 // Cascade : Identité → OKR → KR (= Objective) → Rock
-// Plafond : 3 identités (vision long terme). Pas de limite sur OKR/KR/Rocks.
+// Pas de plafond sur Identités/OKR/KR/Rocks.
 // =============================================================================
 
 // ─── Tokens locaux (cohérents avec le reste de l'app) ────────────────────────
@@ -440,7 +440,7 @@ function SystemNotesSection() {
 }
 
 // =============================================================================
-// Section: Identités (plafond 3)
+// Section: Identités
 // =============================================================================
 
 interface IdentitiesSectionProps {
@@ -453,13 +453,12 @@ interface IdentitiesSectionProps {
 function IdentitiesSection({ identities, onAdd, onUpdate, onDelete }: IdentitiesSectionProps) {
   const [adding, setAdding] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
-  const atCap = identities.length >= 3
 
   const editingIdentity = editingId ? identities.find((i) => i.id === editingId) : null
 
   return (
     <section style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <SectionHeader title="Identités" subtitle="Vision long terme (~10 ans). Maximum 3." count={`${identities.length}/3`} />
+      <SectionHeader title="Identités" subtitle="Vision long terme (~10 ans)." count={`${identities.length}`} />
 
       {identities.length === 0 && !adding && (
         <p style={{ color: 'var(--fg-subtle)', fontSize: 13, fontStyle: 'italic' }}>
@@ -501,12 +500,11 @@ function IdentitiesSection({ identities, onAdd, onUpdate, onDelete }: Identities
       ) : (
         !editingIdentity && (
           <button
-            disabled={atCap}
             onClick={() => setAdding(true)}
-            style={{ ...btnSubtle, opacity: atCap ? 0.4 : 1, cursor: atCap ? 'not-allowed' : 'pointer', alignSelf: 'flex-start' }}
-            title={atCap ? 'Maximum 3 identités atteint' : 'Ajouter une identité'}
+            style={{ ...btnSubtle, cursor: 'pointer', alignSelf: 'flex-start' }}
+            title="Ajouter une identité"
           >
-            <Plus size={14} /> {atCap ? 'Maximum atteint' : 'Ajouter une identité'}
+            <Plus size={14} /> Ajouter une identité
           </button>
         )
       )}
