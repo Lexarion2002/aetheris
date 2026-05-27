@@ -145,10 +145,16 @@ export function Sidebar({ onNavigate, onSearch }: SidebarProps) {
         {sectionLabel('Domaines')}
         {domains.map((domain) => {
           const urgency = computeDomainUrgency(domain, tasks, law, career)
+          // Le domaine "Droit" est désormais une page d'app dédiée (refonte
+          // juin 2026 : hub par matière, partiels, dossiers). On le route
+          // vers /droit pour qu'il n'atterrisse pas sur la vue domaine
+          // générique.
+          const isDroit = domain.name.trim().toLowerCase() === 'droit'
+          const to = isDroit ? '/droit' : `/domain/${domain.id}`
           return (
             <NavLink
               key={domain.id}
-              to={`/domain/${domain.id}`}
+              to={to}
               onClick={onNavigate}
               className={({ isActive }) =>
                 [
