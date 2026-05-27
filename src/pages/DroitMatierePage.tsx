@@ -2,7 +2,7 @@
 // Header + plan de révision collapsible + priorités épinglées + tableau de
 // sujets + log de simulations + flashcards rattachées.
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useNavigate, useParams, Navigate } from 'react-router-dom'
 import { useDroitStore } from '../store/droitStore'
 import { FlashcardReviewModal } from '../components/FlashcardReviewModal'
@@ -25,10 +25,19 @@ export function DroitMatierePage() {
   const { matiereId } = useParams<{ matiereId: string }>()
   const navigate      = useNavigate()
 
-  const matiere         = useDroitStore((s) => s.matieres.find((m) => m.id === matiereId))
-  const sujets          = useDroitStore((s) => s.sujets.filter((sj) => sj.matiereId === matiereId))
-  const simulations     = useDroitStore((s) => s.simulations.filter((sm) => sm.matiereId === matiereId))
-  const flashcards      = useDroitStore((s) => s.flashcards.filter((c) => c.matiereId === matiereId))
+  // ATTENTION : ne JAMAIS faire .filter()/.map() directement dans un sélecteur
+  // zustand — chaque appel renvoie une nouvelle référence et React 18 avec
+  // useSyncExternalStore détecte un état "incohérent", ce qui déclenche une
+  // boucle de re-render (React error #185). On sélectionne la liste complète
+  // (référence stable) et on filtre dans un useMemo.
+  const allMatieres    = useDroitStore((s) => s.matieres)
+  const allSujets      = useDroitStore((s) => s.sujets)
+  const allSimulations = useDroitStore((s) => s.simulations)
+  const allFlashcards  = useDroitStore((s) => s.flashcards)
+  const matiere     = useMemo(() => allMatieres.find((m) => m.id === matiereId),         [allMatieres, matiereId])
+  const sujets      = useMemo(() => allSujets.filter((sj) => sj.matiereId === matiereId), [allSujets, matiereId])
+  const simulations = useMemo(() => allSimulations.filter((sm) => sm.matiereId === matiereId), [allSimulations, matiereId])
+  const flashcards  = useMemo(() => allFlashcards.filter((c) => c.matiereId === matiereId), [allFlashcards, matiereId])
   const cycleConfidence = useDroitStore((s) => s.cycleConfidence)
   const toggleCheck     = useDroitStore((s) => s.toggleCheck)
   const addFlashcard    = useDroitStore((s) => s.addFlashcard)
