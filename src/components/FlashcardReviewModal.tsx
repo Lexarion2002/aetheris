@@ -3,23 +3,30 @@ import { X } from 'lucide-react'
 import { useDroitStore, type Flashcard, type ReviewQuality } from '../store/droitStore'
 
 interface Props {
-  // Si fourni → on révise uniquement les cartes de cette matière
-  matiereFilter?: string
+  // Si fourni → on révise uniquement les cartes de cette matière (id stable, v3+)
+  matiereId?: string
   onClose: () => void
 }
 
 const todayIso = () => new Date().toISOString().split('T')[0]
 
-export function FlashcardReviewModal({ matiereFilter, onClose }: Props) {
-  const flashcards     = useDroitStore((s) => s.flashcards)
+export function FlashcardReviewModal({ matiereId, onClose }: Props) {
+  const flashcards      = useDroitStore((s) => s.flashcards)
+  const matieres        = useDroitStore((s) => s.matieres)
   const reviewFlashcard = useDroitStore((s) => s.reviewFlashcard)
+
+  const matiereTitle = (id: string): string =>
+    matieres.find((m) => m.id === id)?.title ?? id
+
+  // Titre lisible de la matière filtrée (pour l'empty state)
+  const filterLabel = matiereId ? matiereTitle(matiereId) : undefined
 
   // Snapshot des cartes à réviser au début de la session (figé pour ne pas
   // que la liste change quand on note une carte)
   const [queue] = useState<Flashcard[]>(() => {
     const today = todayIso()
     return flashcards.filter((c) => {
-      if (matiereFilter && c.matiere !== matiereFilter) return false
+      if (matiereId && c.matiereId !== matiereId) return false
       return c.nextReview <= today
     })
   })
@@ -50,8 +57,8 @@ export function FlashcardReviewModal({ matiereFilter, onClose }: Props) {
             Rien à réviser pour le moment.
           </p>
           <p style={{ fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 14, color: 'var(--ink-3)', margin: 0 }}>
-            {matiereFilter
-              ? `Aucune carte de "${matiereFilter}" n'est due aujourd'hui.`
+            {filterLabel
+              ? `Aucune carte de "${filterLabel}" n'est due aujourd'hui.`
               : 'Toutes tes cartes sont à jour. Reviens plus tard ou crée-en de nouvelles.'}
           </p>
         </div>
@@ -102,7 +109,7 @@ export function FlashcardReviewModal({ matiereFilter, onClose }: Props) {
       }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: 10 }}>
           <span style={{ fontFamily: 'var(--font-mono)', fontSize: 11, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
-            {current.matiere}
+            {matiereTitle(current.matiereId)}
           </span>
           <span style={{ color: 'var(--ink-4)' }}>·</span>
           <span style={{ fontFamily: 'var(--font-mono)', fontVariantNumeric: 'tabular-nums', fontSize: 12, color: 'var(--ink-2)' }}>
@@ -192,7 +199,8 @@ export function FlashcardReviewModal({ matiereFilter, onClose }: Props) {
 function hint(card: Flashcard, quality: ReviewQuality): string {
   // Estimation grossière du prochain intervalle si on note avec cette qualité
   const q = { again: 0, hard: 3, good: 4, easy: 5 }[quality]
-  let { easeFactor, interval, repetitions } = card
+  const { easeFactor } = card
+  let { interval, repetitions } = card
   if (q < 3) {
     interval = 1
   } else {

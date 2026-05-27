@@ -27,6 +27,7 @@ const FilmsSeriesPage   = lazy(() => import('./pages/FilmsSeriesPage').then((m) 
 const BooksPage         = lazy(() => import('./pages/BooksPage').then((m) => ({ default: m.BooksPage })))
 const CabinetPage       = lazy(() => import('./pages/CabinetPage').then((m) => ({ default: m.CabinetPage })))
 const DroitPage         = lazy(() => import('./pages/DroitPage').then((m) => ({ default: m.DroitPage })))
+const DroitMatierePage  = lazy(() => import('./pages/DroitMatierePage').then((m) => ({ default: m.DroitMatierePage })))
 const SportView         = lazy(() => import('./pages/SportView').then((m) => ({ default: m.SportView })))
 const PlanningPage             = lazy(() => import('./pages/PlanningPage').then((m) => ({ default: m.PlanningPage })))
 const PlanningWeekPage         = lazy(() => import('./pages/PlanningWeekPage').then((m) => ({ default: m.PlanningWeekPage })))
@@ -168,6 +169,7 @@ export default function App() {
           <Route path="livres"   element={<Suspense fallback={<PageLoader />}><BooksPage /></Suspense>} />
           <Route path="cabinet" element={<Suspense fallback={<PageLoader />}><CabinetPage /></Suspense>} />
           <Route path="droit" element={<Suspense fallback={<PageLoader />}><DroitPage /></Suspense>} />
+          <Route path="droit/:matiereId" element={<Suspense fallback={<PageLoader />}><DroitMatierePage /></Suspense>} />
           <Route path="sport" element={<Suspense fallback={<PageLoader />}><SportView /></Suspense>} />
         </Route>
       </Routes>

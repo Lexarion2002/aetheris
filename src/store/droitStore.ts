@@ -1,23 +1,78 @@
 import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
+//
+// Modèle juin 2026 — Hub par matière :
+//   Matiere → Sujets (4 cases F/R/S/Q + confiance 🔴🟠🟢)
+//   Matiere → Simulations (log d'oraux chronométrés)
+//   Matiere → Flashcards (SM-2, rattachables à un sujet)
+//   Dossier (rendus indépendants : DM, dossiers candidature, rapport alternance)
+//
+// Plus de Tache/SousTache : table rase comme convenu lors de la refonte.
 
-export interface SousTache {
-  id: string
-  label: string
-  done: boolean
+export type ExamFormat = 'QCM' | 'Oral' | 'Écrit'
+export type Confidence = 'red' | 'amber' | 'green'
+export type DossierKind = 'DOSSIER' | 'RAPPORT' | 'DM' | 'ÉCRIT'
+export type SimAppraisal = 'oui' | 'moyen' | 'non'
+
+export interface SubjectChecks {
+  fiche:     boolean
+  revu:      boolean
+  simule:    boolean
+  questions: boolean
 }
 
-export interface Tache {
-  id: string
-  title: string
-  type: 'Partiel' | 'Exposé' | 'Rendu' | 'Mémoire' | 'Autre'
-  matiere: string
-  deadline: string | null   // format "DD.MM.YYYY"
-  estimation: string
-  note: string
-  subtasks: SousTache[]
-  manualProgress: number | null  // utilisé seulement si subtasks.length === 0
+export interface Sujet {
+  id:         string
+  matiereId:  string
+  title:      string
+  confidence: Confidence
+  checks:     SubjectChecks
+  createdAt:  string
+}
+
+export interface PlanRow {
+  day:   string   // "Mer 27/05"
+  focus: string
+}
+
+export interface PriorityItem {
+  id:     string
+  text:   string   // gras serif italique
+  detail: string   // sous-ligne sans-serif
+}
+
+export interface Matiere {
+  id:         string
+  title:      string
+  subtitle?:  string          // ex. "RGO" pour Régime général des obligations
+  format:     ExamFormat
+  examDate:   string          // ISO "2026-06-02"
+  examLabel?: string          // override d'affichage : "1—4 juin"
+  plan:       PlanRow[]
+  priorities: PriorityItem[]
+  createdAt:  string
+}
+
+export interface Simulation {
+  id:        string
+  matiereId: string
+  sujetId:   string | null    // null si sujet libre
+  date:      string           // ISO "2026-05-26"
+  sujetTire: string           // titre du sujet tiré (libre ou copié du sujet lié)
+  planClair: SimAppraisal | null
+  solidite:  SimAppraisal | null
+  temps:     SimAppraisal | null
+  point:     string           // point à corriger
+  createdAt: string
+}
+
+export interface Dossier {
+  id:        string
+  kind:      DossierKind
+  title:     string
+  sub?:      string
+  deadline:  string           // ISO "2026-06-01"
   createdAt: string
 }
 
@@ -26,33 +81,54 @@ export interface Tache {
 export type ReviewQuality = 'again' | 'hard' | 'good' | 'easy'
 
 export interface Flashcard {
-  id:            string
-  matiere:       string
-  question:      string
-  answer:        string
-  // SM-2 state
-  easeFactor:    number   // démarre à 2.5
-  interval:      number   // jours jusqu'à la prochaine révision
-  repetitions:   number   // nb de succès consécutifs
-  nextReview:    string   // YYYY-MM-DD
-  lastReviewed:  string | null
-  createdAt:     string
+  id:           string
+  matiereId:    string           // référence stable
+  sujetId:      string | null    // rattachement optionnel à un sujet
+  question:     string
+  answer:       string
+  easeFactor:   number   // démarre à 2.5
+  interval:     number   // jours jusqu'à la prochaine révision
+  repetitions:  number   // nb de succès consécutifs
+  nextReview:   string   // YYYY-MM-DD
+  lastReviewed: string | null
+  createdAt:    string
 }
 
+// ─── Store interface ──────────────────────────────────────────────────────────
+
 export interface DroitStore {
-  taches: Tache[]
-  addTache: (t: Omit<Tache, 'id' | 'createdAt'>) => void
-  deleteTache: (id: string) => void
-  updateNote: (id: string, note: string) => void
-  toggleSousTache: (tacheId: string, sousTacheId: string) => void
-  addSousTache: (tacheId: string, label: string) => void
-  removeSousTache: (tacheId: string, sousTacheId: string) => void
-  setProgressionManuelle: (tacheId: string, value: number) => void
+  // Données
+  matieres:    Matiere[]
+  sujets:      Sujet[]
+  simulations: Simulation[]
+  dossiers:    Dossier[]
+  flashcards:  Flashcard[]
+
+  // Matières
+  addMatiere:    (input: Omit<Matiere, 'id' | 'createdAt'>) => string
+  updateMatiere: (id: string, updates: Partial<Omit<Matiere, 'id' | 'createdAt'>>) => void
+  deleteMatiere: (id: string) => void
+
+  // Sujets
+  addSujet:           (input: Omit<Sujet, 'id' | 'createdAt' | 'confidence' | 'checks'>) => string
+  updateSujetTitle:   (id: string, title: string) => void
+  cycleConfidence:    (id: string) => void
+  toggleCheck:        (id: string, key: keyof SubjectChecks) => void
+  deleteSujet:        (id: string) => void
+
+  // Simulations
+  addSimulation:    (input: Omit<Simulation, 'id' | 'createdAt'>) => void
+  updateSimulation: (id: string, updates: Partial<Omit<Simulation, 'id' | 'createdAt'>>) => void
+  deleteSimulation: (id: string) => void
+
+  // Dossiers
+  addDossier:    (input: Omit<Dossier, 'id' | 'createdAt'>) => void
+  updateDossier: (id: string, updates: Partial<Omit<Dossier, 'id' | 'createdAt'>>) => void
+  deleteDossier: (id: string) => void
 
   // Flashcards
-  flashcards: Flashcard[]
-  addFlashcard:    (input: { matiere: string; question: string; answer: string }) => void
-  updateFlashcard: (id: string, updates: Partial<Pick<Flashcard, 'matiere' | 'question' | 'answer'>>) => void
+  addFlashcard:    (input: { matiereId: string; sujetId?: string | null; question: string; answer: string }) => void
+  updateFlashcard: (id: string, updates: Partial<Pick<Flashcard, 'matiereId' | 'sujetId' | 'question' | 'answer'>>) => void
   deleteFlashcard: (id: string) => void
   reviewFlashcard: (id: string, quality: ReviewQuality) => void
 
@@ -62,10 +138,10 @@ export interface DroitStore {
 // ─── SM-2 helpers ────────────────────────────────────────────────────────────
 
 const QUALITY_SCORE: Record<ReviewQuality, number> = {
-  again: 0,  // raté
-  hard:  3,  // dur mais OK
-  good:  4,  // bien
-  easy:  5,  // facile
+  again: 0,
+  hard:  3,
+  good:  4,
+  easy:  5,
 }
 
 const todayIsoDate = (): string => new Date().toISOString().split('T')[0]
@@ -81,7 +157,6 @@ function applySM2(card: Flashcard, quality: ReviewQuality): Flashcard {
   let { easeFactor, interval, repetitions } = card
 
   if (q < 3) {
-    // Échec — on repart de zéro mais on garde l'easeFactor
     repetitions = 0
     interval = 1
   } else {
@@ -103,172 +178,303 @@ function applySM2(card: Flashcard, quality: ReviewQuality): Flashcard {
   }
 }
 
-// ─── Données initiales ────────────────────────────────────────────────────────
+const CONFIDENCE_CYCLE: Confidence[] = ['red', 'amber', 'green']
 
-const DEFAULT_TACHES: Tache[] = [
+// ─── Données initiales — Juin 2026 ────────────────────────────────────────────
+
+const nowIso = () => new Date().toISOString()
+
+// IDs stables pour les matières (référencés par sujets/simulations/flashcards/dossiers)
+const M = {
+  assurance:    'm-assurance',
+  rgo:          'm-rgo',
+  contrats:     'm-contrats',
+  distribution: 'm-distribution',
+  rse:          'm-rse',
+} as const
+
+const DEFAULT_MATIERES: Matiere[] = [
   {
-    id: 't1',
-    title: 'Droit fiscal des entreprises',
-    type: 'Partiel',
-    matiere: 'Droit fiscal',
-    deadline: '12.05.2026',
-    estimation: '~3 h restantes',
-    note: '',
-    subtasks: [
-      { id: 's1', label: 'Lire le cours — restructurations', done: true },
-      { id: 's2', label: 'Faire les annales 2023', done: true },
-      { id: 's3', label: 'Réviser régime mère-fille', done: false },
-      { id: 's4', label: 'Faire un cas pratique type', done: false },
+    id:        M.assurance,
+    title:     'Assurance',
+    format:    'QCM',
+    examDate:  '2026-06-02',
+    examLabel: '2 juin 2026',
+    plan: [
+      { day: 'Lun 25/05', focus: 'Cartographie + mécanismes généraux' },
+      { day: 'Mar 26/05', focus: 'Coassurance + réassurance + rétrocession' },
+      { day: 'Mer 27/05', focus: "RC généralités + RC chef d'entreprise" },
+      { day: 'Jeu 28/05', focus: 'RCP professionnelle + RCP avocats' },
+      { day: 'Ven 29/05', focus: 'Exclusions (9) + déchéance + garantie NRF' },
+      { day: 'Sam 30/05', focus: 'Base réclamation / fait générateur / reprise du passé + cas pratique' },
+      { day: 'Dim 31/05', focus: 'Flashcards + cas pratique blanc' },
+      { day: 'Lun 01/06', focus: 'Mémo final + révision ciblée QCM' },
     ],
-    manualProgress: null,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 't2',
-    title: "Note d'arrêt — CJUE Solvay",
-    type: 'Rendu',
-    matiere: 'Droit européen',
-    deadline: '18.05.2026',
-    estimation: '~5 h estimées',
-    note: 'commencer par la portée, pas les faits',
-    subtasks: [],
-    manualProgress: 10,
-    createdAt: new Date().toISOString(),
-  },
-  {
-    id: 't3',
-    title: 'Exposé clause compromissoire',
-    type: 'Exposé',
-    matiere: 'Arbitrage',
-    deadline: '06.05.2026',
-    estimation: '',
-    note: '',
-    subtasks: [
-      { id: 's1', label: 'Trouver les arrêts de référence', done: true },
-      { id: 's2', label: 'Rédiger les slides', done: true },
-      { id: 's3', label: 'Répéter à voix haute', done: true },
+    priorities: [
+      { id: 'pa-1', text: 'Déchéance de garantie',          detail: "Conditions d'opposabilité, exigence du préjudice (art. L. 113-11)" },
+      { id: 'pa-2', text: '9 exclusions de RC',             detail: 'Faute intentionnelle (art. L. 113-1), amendes' },
+      { id: 'pa-3', text: 'Plafond RCP avocats',            detail: '4 M€, franchise 10 % plafonnée 3 000 €, inopposable aux tiers' },
+      { id: 'pa-4', text: 'Garantie NRF',                   detail: '3 conditions cumulatives, 20 % préjudices complémentaires, subrogation (art. L. 121-12)' },
+      { id: 'pa-5', text: 'Base réclamation vs fait générateur', detail: 'Délai subséquent minimal 5 ans (10 ans RCP pro, art. R. 124-2)' },
     ],
-    manualProgress: null,
-    createdAt: new Date().toISOString(),
+    createdAt: nowIso(),
   },
   {
-    id: 't4',
-    title: 'Mémoire — plan + bibliographie',
-    type: 'Mémoire',
-    matiere: 'Droit de la régulation',
-    deadline: '03.06.2026',
-    estimation: '~12 h estimées',
-    note: '',
-    subtasks: [
-      { id: 's1', label: 'Définir la problématique', done: true },
-      { id: 's2', label: 'Constituer la bibliographie', done: false },
-      { id: 's3', label: 'Rédiger le plan détaillé', done: false },
+    id:        M.rgo,
+    title:     'Régime général des obligations',
+    subtitle:  'RGO',
+    format:    'Oral',
+    examDate:  '2026-06-01',
+    examLabel: '1—4 juin',
+    plan:       [],
+    priorities: [],
+    createdAt:  nowIso(),
+  },
+  {
+    id:        M.contrats,
+    title:     'Droit des contrats',
+    format:    'Oral',
+    examDate:  '2026-06-01',
+    examLabel: '1—4 juin',
+    plan: [
+      { day: 'Mer 27/05', focus: 'Avant-contrats · promesse de vente' },
+      { day: 'Jeu 28/05', focus: 'Vices du consentement — dol, violence, erreur' },
+      { day: 'Ven 29/05', focus: 'Éléments essentiels — prix, objet' },
+      { day: 'Sam 30/05', focus: "Déséquilibre significatif · clause d'imprévision" },
+      { day: 'Dim 31/05', focus: 'Loyauté · négociations · révision générale' },
     ],
-    manualProgress: null,
-    createdAt: new Date().toISOString(),
+    priorities: [
+      { id: 'pc-1', text: 'Déséquilibre significatif',     detail: 'Art. 1171 — distinguer droit commun vs droit spécial (clauses abusives)' },
+      { id: 'pc-2', text: "Clause d'imprévision",          detail: "Art. 1195 — conditions d'admission + comparaison droit commercial" },
+      { id: 'pc-3', text: 'Vices du consentement',         detail: 'Articulation erreur / dol / violence — chevauchements jurisprudentiels' },
+      { id: 'pc-4', text: 'Promesse unilatérale de vente', detail: 'Réforme 2016 — rétractation du promettant : inexécution vs caducité' },
+      { id: 'pc-5', text: 'Négociations contractuelles',   detail: 'Rupture abusive — art. 1112 al. 2 — responsabilité délictuelle' },
+    ],
+    createdAt: nowIso(),
   },
   {
-    id: 't5',
-    title: 'Droit de la concurrence',
-    type: 'Partiel',
-    matiere: 'Concurrence',
-    deadline: null,
-    estimation: '',
-    note: '',
-    subtasks: [],
-    manualProgress: 60,
-    createdAt: new Date().toISOString(),
+    id:        M.distribution,
+    title:     'Distribution',
+    format:    'Oral',
+    examDate:  '2026-06-01',
+    examLabel: '1—4 juin',
+    plan:       [],
+    priorities: [],
+    createdAt:  nowIso(),
+  },
+  {
+    id:        M.rse,
+    title:     'RSE',
+    format:    'Oral',
+    examDate:  '2026-06-01',
+    examLabel: '1—4 juin',
+    plan:       [],
+    priorities: [],
+    createdAt:  nowIso(),
   },
 ]
 
+const emptyChecks = (): SubjectChecks => ({ fiche: false, revu: false, simule: false, questions: false })
+
+// Fabrique un sujet par défaut (rouge, tout décoché)
+const seedSujet = (id: string, matiereId: string, title: string): Sujet => ({
+  id, matiereId, title,
+  confidence: 'red',
+  checks:     emptyChecks(),
+  createdAt:  nowIso(),
+})
+
+const DEFAULT_SUJETS: Sujet[] = [
+  // Assurance — thèmes à maîtriser pour le QCM (8)
+  seedSujet('s-as-1', M.assurance, 'Cartographie + mécanismes généraux'),
+  seedSujet('s-as-2', M.assurance, 'Coassurance, réassurance, rétrocession'),
+  seedSujet('s-as-3', M.assurance, "RC chef d'entreprise"),
+  seedSujet('s-as-4', M.assurance, 'RCP professionnelle (avocats)'),
+  seedSujet('s-as-5', M.assurance, 'Les 9 exclusions de RC'),
+  seedSujet('s-as-6', M.assurance, 'Déchéance de garantie'),
+  seedSujet('s-as-7', M.assurance, 'Base réclamation / fait générateur / reprise du passé'),
+  seedSujet('s-as-8', M.assurance, 'Garantie NRF'),
+
+  // RGO — 5 sujets oral
+  seedSujet('s-rgo-1', M.rgo, 'La responsabilité des contractants envers les tiers'),
+  seedSujet('s-rgo-2', M.rgo, 'La renonciation à la condition suspensive'),
+  seedSujet('s-rgo-3', M.rgo, "L'opposabilité des exceptions par le débiteur cédé"),
+  seedSujet('s-rgo-4', M.rgo, 'La compensation des dettes connexes'),
+  seedSujet('s-rgo-5', M.rgo, 'La nullité relative du contrat'),
+
+  // Droit des contrats — 13 sujets oral
+  seedSujet('s-co-1',  M.contrats, 'Les avant-contrats : lequel choisir ?'),
+  seedSujet('s-co-2',  M.contrats, "L'obligation d'information"),
+  seedSujet('s-co-3',  M.contrats, 'Le dol'),
+  seedSujet('s-co-4',  M.contrats, 'La violence'),
+  seedSujet('s-co-5',  M.contrats, "L'erreur sur la rentabilité"),
+  seedSujet('s-co-6',  M.contrats, 'La promesse unilatérale de vente'),
+  seedSujet('s-co-7',  M.contrats, 'Les clauses essentielles des contrats de vente'),
+  seedSujet('s-co-8',  M.contrats, 'Le prix'),
+  seedSujet('s-co-9',  M.contrats, "L'objet du contrat"),
+  seedSujet('s-co-10', M.contrats, 'Le déséquilibre significatif (art. 1171)'),
+  seedSujet('s-co-11', M.contrats, "La clause d'imprévision (art. 1195)"),
+  seedSujet('s-co-12', M.contrats, 'La loyauté contractuelle'),
+  seedSujet('s-co-13', M.contrats, 'Les négociations contractuelles'),
+
+  // Distribution — 7 sujets oral
+  seedSujet('s-di-1', M.distribution, 'La franchise : notion et qualification'),
+  seedSujet('s-di-2', M.distribution, "L'obligation d'information précontractuelle (DIP — art. L.330-3)"),
+  seedSujet('s-di-3', M.distribution, "L'erreur sur la rentabilité en franchise"),
+  seedSujet('s-di-4', M.distribution, 'Le déséquilibre significatif en distribution (L.442-1, I, 2°)'),
+  seedSujet('s-di-5', M.distribution, 'La rupture du contrat de franchise'),
+  seedSujet('s-di-6', M.distribution, 'Les clauses de non-concurrence post-contractuelles'),
+  seedSujet('s-di-7', M.distribution, "L'exclusivité territoriale et la distribution en ligne"),
+
+  // RSE — 8 sujets oral
+  seedSujet('s-rse-1', M.rse, 'Le devoir de vigilance (loi 27 mars 2017)'),
+  seedSujet('s-rse-2', M.rse, 'La société à mission (art. L.210-10 à L.210-12)'),
+  seedSujet('s-rse-3', M.rse, "La raison d'être (art. 1835)"),
+  seedSujet('s-rse-4', M.rse, 'La contractualisation des engagements RSE'),
+  seedSujet('s-rse-5', M.rse, 'La valeur juridique des codes de conduite et chartes éthiques'),
+  seedSujet('s-rse-6', M.rse, 'Les clauses RSE et le déséquilibre significatif'),
+  seedSujet('s-rse-7', M.rse, 'La responsabilité civile, instrument de la RSE'),
+  seedSujet('s-rse-8', M.rse, 'RSE, ESG et compliance : distinctions'),
+]
+
+const DEFAULT_DOSSIERS: Dossier[] = [
+  { id: 'd-1', kind: 'DOSSIER', title: 'Mémoire Dauphine',       sub: 'Droit des affaires',  deadline: '2026-06-01', createdAt: nowIso() },
+  { id: 'd-2', kind: 'DM',      title: 'Transposition Contrats', sub: 'Directive UE',         deadline: '2026-06-12', createdAt: nowIso() },
+  { id: 'd-3', kind: 'RAPPORT', title: 'UPEC',                   sub: 'Compte rendu stage',   deadline: '2026-06-12', createdAt: nowIso() },
+  { id: 'd-4', kind: 'DOSSIER', title: 'Paris Cité',              sub: 'Juriste d\'affaires international', deadline: '2026-06-18', createdAt: nowIso() },
+  { id: 'd-5', kind: 'DM',      title: 'DM Sociétés',             sub: 'Dissertation + cas pratique', deadline: '2026-06-30', createdAt: nowIso() },
+  { id: 'd-6', kind: 'RAPPORT', title: 'Rapport alternance',      sub: 'Cabinet — plan + rédaction',  deadline: '2026-06-30', createdAt: nowIso() },
+]
+
 // ─── Store ────────────────────────────────────────────────────────────────────
+//
+// Clé `aetheris-droit-v3` : la v2 (Tache/SousTache + Flashcard avec matiere string)
+// reste en localStorage mais n'est plus chargée. Reset complet, table rase comme
+// décidé lors de la refonte juin 2026.
 
 export const useDroitStore = createPersistedStore<DroitStore>(
-  'aetheris-droit-v2',
+  'aetheris-droit-v3',
   (set) => ({
-    taches: DEFAULT_TACHES,
-    flashcards: [],
+    matieres:    DEFAULT_MATIERES,
+    sujets:      DEFAULT_SUJETS,
+    simulations: [],
+    dossiers:    DEFAULT_DOSSIERS,
+    flashcards:  [],
 
-    addTache: (t) =>
+    // ── Matières ─────────────────────────────────────────────────────────────
+
+    addMatiere: (input) => {
+      const id = crypto.randomUUID()
       set((s) => ({
-        taches: [
-          ...s.taches,
-          { ...t, id: crypto.randomUUID(), createdAt: new Date().toISOString() },
+        matieres: [...s.matieres, { ...input, id, createdAt: nowIso() }],
+      }))
+      return id
+    },
+
+    updateMatiere: (id, updates) =>
+      set((s) => ({
+        matieres: s.matieres.map((m) => (m.id === id ? { ...m, ...updates } : m)),
+      })),
+
+    deleteMatiere: (id) =>
+      set((s) => ({
+        matieres:    s.matieres.filter((m) => m.id !== id),
+        sujets:      s.sujets.filter((sj) => sj.matiereId !== id),
+        simulations: s.simulations.filter((sim) => sim.matiereId !== id),
+        flashcards:  s.flashcards.filter((c) => c.matiereId !== id),
+      })),
+
+    // ── Sujets ───────────────────────────────────────────────────────────────
+
+    addSujet: (input) => {
+      const id = crypto.randomUUID()
+      set((s) => ({
+        sujets: [
+          ...s.sujets,
+          { ...input, id, confidence: 'red', checks: emptyChecks(), createdAt: nowIso() },
+        ],
+      }))
+      return id
+    },
+
+    updateSujetTitle: (id, title) =>
+      set((s) => ({
+        sujets: s.sujets.map((sj) => (sj.id === id ? { ...sj, title } : sj)),
+      })),
+
+    cycleConfidence: (id) =>
+      set((s) => ({
+        sujets: s.sujets.map((sj) => {
+          if (sj.id !== id) return sj
+          const next = CONFIDENCE_CYCLE[(CONFIDENCE_CYCLE.indexOf(sj.confidence) + 1) % 3]
+          return { ...sj, confidence: next }
+        }),
+      })),
+
+    toggleCheck: (id, key) =>
+      set((s) => ({
+        sujets: s.sujets.map((sj) =>
+          sj.id === id ? { ...sj, checks: { ...sj.checks, [key]: !sj.checks[key] } } : sj,
+        ),
+      })),
+
+    deleteSujet: (id) =>
+      set((s) => ({
+        sujets:     s.sujets.filter((sj) => sj.id !== id),
+        flashcards: s.flashcards.map((c) => (c.sujetId === id ? { ...c, sujetId: null } : c)),
+      })),
+
+    // ── Simulations ──────────────────────────────────────────────────────────
+
+    addSimulation: (input) =>
+      set((s) => ({
+        simulations: [
+          ...s.simulations,
+          { ...input, id: crypto.randomUUID(), createdAt: nowIso() },
         ],
       })),
 
-    deleteTache: (id) =>
-      set((s) => ({ taches: s.taches.filter((t) => t.id !== id) })),
-
-    updateNote: (id, note) =>
+    updateSimulation: (id, updates) =>
       set((s) => ({
-        taches: s.taches.map((t) => (t.id === id ? { ...t, note } : t)),
+        simulations: s.simulations.map((sim) => (sim.id === id ? { ...sim, ...updates } : sim)),
       })),
 
-    toggleSousTache: (tacheId, sousTacheId) =>
+    deleteSimulation: (id) =>
+      set((s) => ({ simulations: s.simulations.filter((sim) => sim.id !== id) })),
+
+    // ── Dossiers ─────────────────────────────────────────────────────────────
+
+    addDossier: (input) =>
       set((s) => ({
-        taches: s.taches.map((t) =>
-          t.id === tacheId
-            ? {
-                ...t,
-                subtasks: t.subtasks.map((st) =>
-                  st.id === sousTacheId ? { ...st, done: !st.done } : st,
-                ),
-              }
-            : t,
-        ),
+        dossiers: [...s.dossiers, { ...input, id: crypto.randomUUID(), createdAt: nowIso() }],
       })),
 
-    addSousTache: (tacheId, label) =>
+    updateDossier: (id, updates) =>
       set((s) => ({
-        taches: s.taches.map((t) =>
-          t.id === tacheId
-            ? {
-                ...t,
-                subtasks: [
-                  ...t.subtasks,
-                  { id: crypto.randomUUID(), label, done: false },
-                ],
-              }
-            : t,
-        ),
+        dossiers: s.dossiers.map((d) => (d.id === id ? { ...d, ...updates } : d)),
       })),
 
-    removeSousTache: (tacheId, sousTacheId) =>
-      set((s) => ({
-        taches: s.taches.map((t) =>
-          t.id === tacheId
-            ? { ...t, subtasks: t.subtasks.filter((st) => st.id !== sousTacheId) }
-            : t,
-        ),
-      })),
+    deleteDossier: (id) =>
+      set((s) => ({ dossiers: s.dossiers.filter((d) => d.id !== id) })),
 
-    setProgressionManuelle: (tacheId, value) =>
-      set((s) => ({
-        taches: s.taches.map((t) =>
-          t.id === tacheId
-            ? { ...t, manualProgress: Math.min(100, Math.max(0, value)) }
-            : t,
-        ),
-      })),
+    // ── Flashcards ───────────────────────────────────────────────────────────
 
-    // ── Flashcards ────────────────────────────────────────────────────────
-
-    addFlashcard: ({ matiere, question, answer }) =>
+    addFlashcard: ({ matiereId, sujetId = null, question, answer }) =>
       set((s) => ({
         flashcards: [
           ...s.flashcards,
           {
             id:           crypto.randomUUID(),
-            matiere,
+            matiereId,
+            sujetId,
             question,
             answer,
             easeFactor:   2.5,
             interval:     0,
             repetitions:  0,
-            nextReview:   todayIsoDate(),  // due dès aujourd'hui
+            nextReview:   todayIsoDate(),   // due dès aujourd'hui
             lastReviewed: null,
-            createdAt:    new Date().toISOString(),
+            createdAt:    nowIso(),
           },
         ],
       })),
@@ -286,14 +492,19 @@ export const useDroitStore = createPersistedStore<DroitStore>(
         flashcards: s.flashcards.map((c) => (c.id === id ? applySM2(c, quality) : c)),
       })),
 
+    // ── Hydratation ──────────────────────────────────────────────────────────
+
     // Appelé par persistenceManager après rehydratation.
-    // Si Supabase/localStorage ne contient aucune donnée, on amorce avec les defaults.
+    // Si Supabase/localStorage ne contient aucune donnée pour cette clé v3,
+    // on amorce avec les defaults juin 2026.
     setHasHydrated: (v) =>
       set((s) => {
-        if (v && s.taches.length === 0) {
-          return { taches: DEFAULT_TACHES }
-        }
-        return {}
+        if (!v) return {}
+        const patch: Partial<DroitStore> = {}
+        if (s.matieres.length === 0) patch.matieres = DEFAULT_MATIERES
+        if (s.sujets.length   === 0) patch.sujets   = DEFAULT_SUJETS
+        if (s.dossiers.length === 0) patch.dossiers = DEFAULT_DOSSIERS
+        return patch
       }),
   }),
 )

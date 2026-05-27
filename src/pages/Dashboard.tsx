@@ -490,11 +490,9 @@ export function Dashboard() {
   startWeek.setDate(startWeek.getDate() - ((startWeek.getDay() + 6) % 7))
   const startWeekIso = startWeek.toISOString().split('T')[0]
 
-  const droitActiveCount = droit.taches.filter((t) => {
-    const totalSt = t.subtasks?.length ?? 0
-    const doneSt = t.subtasks?.filter((s) => s.done).length ?? 0
-    return totalSt === 0 || doneSt < totalSt
-  }).length
+  // Compte les matières dont l'examen est encore à venir (refonte juin 2026)
+  const todayIsoForDroit = new Date().toISOString().split('T')[0]
+  const droitActiveCount = droit.matieres.filter((m) => m.examDate >= todayIsoForDroit).length
   const sportSessionsWeekCount = sport.historique.filter((h) => h.date >= startWeekIso).length
   const careerActiveCount = career.missions.filter((m) => m.stade !== 'rendu').length
   const booksReadCount = books.bibliotheque.length
@@ -513,8 +511,11 @@ export function Dashboard() {
   const standaloneCards: Stand[] = [
     {
       name: 'Droit', icon: Scale, path: '/droit',
-      primary: String(droitActiveCount), unit: droitActiveCount > 1 ? 'tâches' : 'tâche',
-      secondary: droit.taches.length === 0 ? 'rien encore noté' : `${droit.taches.length} au total`,
+      primary: String(droitActiveCount),
+      unit: droitActiveCount > 1 ? 'examens à venir' : 'examen à venir',
+      secondary: droit.matieres.length === 0
+        ? 'aucune matière'
+        : `${droit.matieres.length} matière${droit.matieres.length > 1 ? 's' : ''}`,
       showCondition: !existingDomainNames.has('droit'),
     },
     {
