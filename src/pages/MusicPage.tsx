@@ -2,13 +2,6 @@ import { useState, useRef, useEffect } from 'react'
 import { useMusicStore } from '../store/musicStore'
 import type { AlbumCritique, AlbumAttente, AlbumTag } from '../store/musicStore'
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-const ALL_TAGS: AlbumTag[] = [
-  'ambient', 'jazz', 'rap', 'rock', 'electro', 'classical', 'soul',
-  'rnb', 'folk', 'metal', 'pop', 'world', 'experimental', 'indie',
-]
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function generateId() {
@@ -16,10 +9,11 @@ function generateId() {
   return Math.random().toString(36).substring(2, 15)
 }
 
+// Les notes sont sur 100.
 function noteColor(note: number): string {
-  if (note >= 9) return '#B5532A'
-  if (note >= 7) return '#5C7859'
-  if (note >= 5) return '#6B5B48'
+  if (note >= 90) return '#B5532A'
+  if (note >= 70) return '#5C7859'
+  if (note >= 50) return '#6B5B48'
   return '#A08B72'
 }
 
@@ -312,8 +306,8 @@ function AlbumCard({ album, onEdit, onDelete }: {
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onEdit(album)} style={{ cursor: 'pointer' }}>
       <div style={{ position: 'relative', transform: hover ? 'translateY(-2px)' : 'translateY(0)', transition: 'transform var(--dur) var(--ease)' }}>
         <AlbumCover titre={album.titre} artiste={album.artiste} pochette={album.pochette} />
-        <div style={{ position: 'absolute', top: 10, right: 10, width: 36, height: 36, borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', border: '2px solid var(--paper-1)', boxShadow: '0 1px 2px rgba(58,46,34,0.25)' }}>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 15, fontWeight: 500 }}>{album.note}</span>
+        <div style={{ position: 'absolute', top: 10, right: 10, minWidth: 36, height: 36, padding: '0 8px', borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', border: '2px solid var(--paper-1)', boxShadow: '0 1px 2px rgba(58,46,34,0.25)' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 14, fontWeight: 500, fontVariantNumeric: 'tabular-nums' }}>{album.note}</span>
         </div>
         {hover && (
           <button onClick={e => { e.stopPropagation(); onDelete(album.id!) }}
@@ -508,8 +502,8 @@ function PantheonCard({ album, onEdit }: { album: AlbumCritique; onEdit: (a: Alb
     <div onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)} onClick={() => onEdit(album)} style={{ cursor: 'pointer' }}>
       <div style={{ position: 'relative', transform: hover ? 'translateY(-2px)' : 'translateY(0)', transition: 'transform var(--dur) var(--ease)' }}>
         <AlbumCover titre={album.titre} artiste={album.artiste} pochette={album.pochette} />
-        <div style={{ position: 'absolute', top: 10, right: 10, width: 40, height: 40, borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', border: '2px solid var(--paper-1)', boxShadow: '0 1px 2px rgba(58,46,34,0.25)' }}>
-          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500, letterSpacing: '-0.01em', color: noteColor(album.note) }}>
+        <div style={{ position: 'absolute', top: 10, right: 10, minWidth: 40, height: 40, padding: '0 9px', borderRadius: 999, background: 'var(--ink)', color: 'var(--paper-1)', display: 'grid', placeItems: 'center', border: '2px solid var(--paper-1)', boxShadow: '0 1px 2px rgba(58,46,34,0.25)' }}>
+          <span style={{ fontFamily: 'var(--font-serif)', fontSize: 16, fontWeight: 500, letterSpacing: '-0.01em', fontVariantNumeric: 'tabular-nums', color: noteColor(album.note) }}>
             {album.note}
           </span>
         </div>
@@ -538,7 +532,7 @@ function PantheonCard({ album, onEdit }: { album: AlbumCritique; onEdit: (a: Alb
 function PantheonSection({ onEdit }: { onEdit: (a: AlbumCritique) => void }) {
   const bibliotheque = useMusicStore(s => s.bibliotheque)
   const pantheon = bibliotheque
-    .filter(a => a.note >= 9)
+    .filter(a => a.note >= 90)
     .sort((a, b) => {
       const da = a.dateOriginaleSortie ?? '', db = b.dateOriginaleSortie ?? ''
       if (!da && !db) return 0
@@ -552,11 +546,11 @@ function PantheonSection({ onEdit }: { onEdit: (a: AlbumCritique) => void }) {
       <SectionHeader
         kicker="Panthéon"
         title="Tes classiques"
-        right={<span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>Albums notés 9 et 10</span>}
+        right={<span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>Albums notés 90 et plus</span>}
       />
       {pantheon.length === 0 ? (
         <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-3)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
-          Aucun album noté 9 ou 10 encore.
+          Aucun album noté 90 ou plus encore.
         </div>
       ) : (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 28 }}>
@@ -688,12 +682,20 @@ export function MusicPage() {
   const fileAttente  = useMusicStore(s => s.fileAttente)
   const albumEnCours = useMusicStore(s => s.albumEnCours)
 
-  // Auto-fix corrupted data (missing IDs)
+  // Auto-fix corrupted data (missing IDs) + migration des notes /10 → /100
   useEffect(() => {
     if (_hasHydrated) {
       useMusicStore.setState(state => {
         let changed = false
-        const newBiblio   = state.bibliotheque.map(a => { if (!a.id) { changed = true; return { ...a, id: generateId() } } return a })
+        const newBiblio = state.bibliotheque.map(a => {
+          let next = a
+          if (!next.id) { changed = true; next = { ...next, id: generateId() } }
+          // Anciennes notes sur 10 → conversion sur 100
+          if (typeof next.note === 'number' && next.note > 0 && next.note <= 10) {
+            changed = true; next = { ...next, note: Math.round(next.note * 10) }
+          }
+          return next
+        })
         const newAttente  = state.fileAttente.map(a => { if (!a.id) { changed = true; return { ...a, id: generateId() } } return a })
         const newArtistes = state.artistesSuivis.map(a => { if (!a.id) { changed = true; return { ...a, id: generateId() } } return a })
         return changed ? { bibliotheque: newBiblio, fileAttente: newAttente, artistesSuivis: newArtistes } : state
@@ -704,7 +706,7 @@ export function MusicPage() {
   // Stats
   const thisYear      = new Date().getFullYear()
   const thisYearCount = bibliotheque.filter(a => a.dateCritique.startsWith(String(thisYear))).length
-  const pantheonCount = bibliotheque.filter(a => a.note >= 9).length
+  const pantheonCount = bibliotheque.filter(a => a.note >= 90).length
 
   return (
     <div style={{ padding: '32px 0 96px', maxWidth: 1180, margin: '0 auto' }}>
@@ -788,6 +790,8 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
   const addCritique       = useMusicStore((s) => s.addCritique)
   const updateCritique    = useMusicStore((s) => s.updateCritique)
   const deleteCritique    = useMusicStore((s) => s.deleteCritique)
+  const genres            = useMusicStore((s) => s.genres ?? [])
+  const addGenre          = useMusicStore((s) => s.addGenre)
   const fileAttente       = useMusicStore((s) => s.fileAttente)
   const removeFromFile    = useMusicStore((s) => s.removeFromFile)
   const albumEnCours      = useMusicStore((s) => s.albumEnCours)
@@ -801,12 +805,13 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
   const [artisteInput, setArtisteInput] = useState('')
   const [dateSortie, setDateSortie] = useState(initial?.dateOriginaleSortie ?? '')
   const [pochette,   setPochette]   = useState(initial?.pochette   ?? albumEnCours?.pochette ?? '')
-  const [note,       setNote]       = useState<number>(initial?.note ?? 7)
+  const [note,       setNote]       = useState<number>(initial?.note ?? 70)
   const [tags,       setTags]       = useState<AlbumTag[]>(initial?.tags ?? [])
   const [critique,   setCritique]   = useState(initial?.critique   ?? '')
   const [tracks,     setTracks]     = useState(initial?.tracksFavorites?.join('\n') ?? '')
   const [contexte,   setContexte]   = useState(initial?.contexte   ?? albumEnCours?.premiereImpression ?? '')
   const [dragOver,   setDragOver]   = useState(false)
+  const [genreInput, setGenreInput] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   function handleImageFile(file: File) {
@@ -825,6 +830,16 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
       if (prev.length >= 3) return prev
       return [...prev, tag]
     })
+  }
+
+  function createGenre(val: string) {
+    const g = val.trim()
+    if (!g) return
+    addGenre(g)
+    // sélectionne le nouveau genre s'il reste de la place
+    const existing = genres.find((x) => x.toLowerCase() === g.toLowerCase()) ?? g
+    setTags((prev) => (prev.includes(existing) || prev.length >= 3 ? prev : [...prev, existing]))
+    setGenreInput('')
   }
 
   const isExistingCritique = !!(initial?.id && bibliotheque.some((a) => a.id === initial.id))
@@ -974,24 +989,36 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
           {/* Note */}
           <div>
             <label className={labelCls}>
-              Note : <span className="font-semibold" style={{ color: noteColor(note) }}>{note % 1 === 0 ? note : note.toFixed(1)}/10</span>
+              Note : <span className="font-semibold" style={{ color: noteColor(note) }}>{note}/100</span>
             </label>
-            <input
-              type="range" min={1} max={10} step={0.5} value={note}
-              onChange={(e) => setNote(parseFloat(e.target.value))}
-              className="w-full"
-              style={{ accentColor: 'var(--terra)' }}
-            />
+            <div className="flex items-center gap-3">
+              <input
+                type="range" min={0} max={100} step={1} value={note}
+                onChange={(e) => setNote(parseInt(e.target.value, 10))}
+                className="flex-1"
+                style={{ accentColor: 'var(--terra)' }}
+              />
+              <input
+                type="number" min={0} max={100} step={1} value={note}
+                onChange={(e) => {
+                  const v = parseInt(e.target.value, 10)
+                  if (Number.isNaN(v)) { setNote(0); return }
+                  setNote(Math.max(0, Math.min(100, v)))
+                }}
+                className={inputCls + ' w-20 text-center'}
+                style={{ fontVariantNumeric: 'tabular-nums' }}
+              />
+            </div>
             <div className="flex justify-between text-[10px] mt-0.5" style={{ color: 'var(--fg-subtle)' }}>
-              <span>1</span><span>5</span><span>10</span>
+              <span>0</span><span>50</span><span>100</span>
             </div>
           </div>
 
-          {/* Tags */}
+          {/* Genres */}
           <div>
-            <label className={labelCls}>Tags (max 3)</label>
+            <label className={labelCls}>Genres (max 3)</label>
             <div className="flex flex-wrap gap-1.5">
-              {ALL_TAGS.map((tag) => (
+              {genres.map((tag) => (
                 <button
                   key={tag}
                   onClick={() => toggleTag(tag)}
@@ -1004,6 +1031,24 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
                   {tag}
                 </button>
               ))}
+            </div>
+            <div className="flex gap-2 mt-2">
+              <input
+                value={genreInput}
+                onChange={(e) => setGenreInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); createGenre(genreInput) } }}
+                className={inputCls + ' flex-1'}
+                placeholder="Ajouter un genre…"
+              />
+              <button
+                type="button"
+                onClick={() => createGenre(genreInput)}
+                disabled={!genreInput.trim()}
+                className="px-3 py-2 text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                style={{ background: 'var(--paper-2)', color: 'var(--fg)', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', cursor: 'pointer' }}
+              >
+                + Genre
+              </button>
             </div>
           </div>
 

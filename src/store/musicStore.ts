@@ -2,9 +2,14 @@ import { createPersistedStore } from '../lib/persistenceManager'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type AlbumTag =
-  | 'ambient' | 'jazz' | 'rap' | 'rock' | 'electro' | 'classical' | 'soul'
-  | 'rnb' | 'folk' | 'metal' | 'pop' | 'world' | 'experimental' | 'indie'
+// Un genre musical est désormais une simple chaîne, ce qui permet d'en ajouter librement.
+export type AlbumTag = string
+
+// Genres proposés par défaut (l'utilisateur peut en ajouter d'autres).
+export const DEFAULT_GENRES: string[] = [
+  'ambient', 'jazz', 'rap', 'rock', 'electro', 'classical', 'soul',
+  'rnb', 'folk', 'metal', 'pop', 'world', 'experimental', 'indie',
+]
 
 export interface AlbumCritique {
   id:                  string
@@ -58,6 +63,10 @@ export interface MusicState {
   bibliotheque:   AlbumCritique[]
   fileAttente:    AlbumAttente[]
   artistesSuivis: ArtisteFollowed[]
+  genres:         string[]
+
+  addGenre:    (genre: string) => void
+  removeGenre: (genre: string) => void
 
   setAlbumEnCours:       (album: Omit<AlbumEnCours, 'startedAt'>) => void
   clearAlbumEnCours:     () => void
@@ -90,6 +99,20 @@ export const useMusicStore = createPersistedStore<MusicState>(
       bibliotheque:   [],
       fileAttente:    [],
       artistesSuivis: [],
+      genres:         [...DEFAULT_GENRES],
+
+      addGenre: (genre) => {
+        const g = genre.trim()
+        if (!g) return
+        set((s) => {
+          const list = s.genres ?? [...DEFAULT_GENRES]
+          if (list.some((x) => x.toLowerCase() === g.toLowerCase())) return {}
+          return { genres: [...list, g] }
+        })
+      },
+
+      removeGenre: (genre) =>
+        set((s) => ({ genres: (s.genres ?? [...DEFAULT_GENRES]).filter((x) => x !== genre) })),
 
       setAlbumEnCours: (album) =>
         set({ albumEnCours: { ...album, startedAt: new Date().toISOString() } }),
