@@ -1005,11 +1005,11 @@ function CritiqueModal({ initial, onClose }: CritiqueModalProps) {
                   if (Number.isNaN(v)) { setNote(0); return }
                   setNote(Math.max(0, Math.min(100, v)))
                 }}
-                className={inputCls + ' w-20 text-center'}
-                style={{ fontVariantNumeric: 'tabular-nums' }}
+                className="rounded-[var(--r-md)] px-2 py-1.5 text-sm text-center outline-none transition-colors focus:border-[var(--terra)]"
+                style={{ width: 60, flexShrink: 0, background: 'var(--bg)', border: '1px solid var(--border)', color: 'var(--fg)', fontVariantNumeric: 'tabular-nums' }}
               />
             </div>
-            <div className="flex justify-between text-[10px] mt-0.5" style={{ color: 'var(--fg-subtle)' }}>
+            <div className="flex justify-between text-[10px] mt-0.5" style={{ color: 'var(--fg-subtle)', paddingRight: 72 }}>
               <span>0</span><span>50</span><span>100</span>
             </div>
           </div>
