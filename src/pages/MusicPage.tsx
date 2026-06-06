@@ -527,6 +527,73 @@ function PantheonCard({ album, onEdit }: { album: AlbumCritique; onEdit: (a: Alb
   )
 }
 
+// ─── TopYearSection ───────────────────────────────────────────────────────────
+
+function TopYearRow({ rank, album, onEdit }: {
+  rank: number
+  album: AlbumCritique
+  onEdit: (a: AlbumCritique) => void
+}) {
+  const [hover, setHover] = useState(false)
+  const isPodium = rank <= 3
+  const rankColor = rank === 1 ? '#B5532A' : rank === 2 ? '#6B5B48' : rank === 3 ? '#A08B72' : 'var(--ink-3)'
+  return (
+    <div
+      onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}
+      onClick={() => onEdit(album)}
+      style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '12px 18px', background: hover ? 'var(--paper-2)' : 'transparent', transition: 'background var(--dur) var(--ease)', cursor: 'pointer' }}
+    >
+      <span style={{ fontFamily: 'var(--font-serif)', fontSize: isPodium ? 26 : 20, fontWeight: 500, color: rankColor, width: 36, textAlign: 'center', flexShrink: 0, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>
+        {rank}
+      </span>
+      <AlbumCover titre={album.titre} artiste={album.artiste} pochette={album.pochette} size={48} style={{ borderRadius: 5 }} />
+      <div style={{ flex: '1 1 0', minWidth: 0 }}>
+        <div style={{ fontFamily: 'var(--font-serif)', fontSize: 17, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {album.titre}
+        </div>
+        <div style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-2)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+          {album.artiste}
+        </div>
+      </div>
+      <span style={{ fontFamily: 'var(--font-serif)', fontSize: 18, fontWeight: 500, color: noteColor(album.note), flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+        {album.note}<span style={{ fontSize: 11, color: 'var(--ink-3)' }}>/100</span>
+      </span>
+    </div>
+  )
+}
+
+function TopYearSection({ onEdit }: { onEdit: (a: AlbumCritique) => void }) {
+  const bibliotheque = useMusicStore(s => s.bibliotheque)
+  const year = new Date().getFullYear()
+  const top = bibliotheque
+    .filter(a => a.dateOriginaleSortie && new Date(a.dateOriginaleSortie).getFullYear() === year)
+    .sort((a, b) => b.note - a.note || a.titre.localeCompare(b.titre))
+    .slice(0, 10)
+
+  return (
+    <section style={{ marginTop: 72 }}>
+      <SectionHeader
+        kicker={`Top ${year}`}
+        title={`Les meilleurs albums de ${year}`}
+        right={<span style={{ fontFamily: 'var(--font-sans)', fontSize: 13, color: 'var(--ink-3)', fontStyle: 'italic' }}>Classés par note</span>}
+      />
+      {top.length === 0 ? (
+        <div style={{ padding: '48px 24px', textAlign: 'center', fontFamily: 'var(--font-serif)', fontStyle: 'italic', fontSize: 17, color: 'var(--ink-3)', border: '1px dashed var(--ink-4)', borderRadius: 12 }}>
+          Aucun album sorti en {year} dans ta bibliothèque.
+        </div>
+      ) : (
+        <div style={{ background: 'var(--paper-1)', border: '1px solid var(--paper-2)', borderRadius: 12, overflow: 'hidden' }}>
+          {top.map((album, i) => (
+            <div key={album.id || `top-${i}`} style={{ borderBottom: i === top.length - 1 ? 'none' : '1px solid var(--paper-2)' }}>
+              <TopYearRow rank={i + 1} album={album} onEdit={onEdit} />
+            </div>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 // ─── PantheonSection ──────────────────────────────────────────────────────────
 
 function PantheonSection({ onEdit }: { onEdit: (a: AlbumCritique) => void }) {
@@ -757,6 +824,9 @@ export function MusicPage() {
         onEdit={album => setCritiqueModal({ open: true, album })}
         onNew={() => setCritiqueModal({ open: true })}
       />
+
+      {/* ── Top de l'année ──────────────────────────────────────────────────── */}
+      <TopYearSection onEdit={album => setCritiqueModal({ open: true, album })} />
 
       {/* ── Panthéon ────────────────────────────────────────────────────────── */}
       <PantheonSection onEdit={album => setCritiqueModal({ open: true, album })} />
